@@ -123,7 +123,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 2 — Domain types and common primitives ⬅ NEXT
+## Phase 2 — Domain types and common primitives ✅ COMPLETE (2026-05-14)
 
 **Goal:** all immutable value types in place; `TimeMapper` is the only thing that touches timezone conversion.
 
@@ -138,9 +138,14 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `TreeMutationEventTest` — serialize/deserialize each operation type round-trip.
 - `InstanceIdProviderTest` — stable across the JVM lifetime.
 
+**Deviations from plan (reviewed and approved):**
+- `parentId` changed from `long` (primitive) to `Long` (boxed) in `CachedNode` and `StructuralRow`, matching the design doc spec (§4, §12) and CLAUDE.md invariant "parentId is Long, not nullable."
+
+**Actual done state:** All Phase 2 types compile. TimeMapperTest (6), InstanceIdProviderTest (3), TreeMutationEventTest (9) all green. `./gradlew clean build` → BUILD SUCCESSFUL; 23 tests pass.
+
 ---
 
-## Phase 3 — Persistence
+## Phase 3 — Persistence ⬅ NEXT
 
 **Goal:** `ItemTreeRepository` complete and verified against H2 (Oracle compat mode).
 
