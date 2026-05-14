@@ -10,10 +10,12 @@ import java.time.ZoneOffset;
 public class TimeMapper {
 
     public LocalDateTime toLocalDateTime(Instant instant) {
+        if (instant == null) return null;
         return instant.atOffset(ZoneOffset.UTC).toLocalDateTime();
     }
 
     public Instant toInstant(LocalDateTime localDateTime) {
+        if (localDateTime == null) return null;
         return localDateTime.toInstant(ZoneOffset.UTC);
     }
 }
