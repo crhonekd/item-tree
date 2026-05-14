@@ -73,6 +73,14 @@ openApiGenerate {
     ))
 }
 
+tasks.openApiGenerate {
+    doLast {
+        layout.buildDirectory.file(
+            "generated/openapi/src/main/java/com/myxcomp/ice/xtree/generated/api/ApiApi.java"
+        ).get().asFile.delete()
+    }
+}
+
 sourceSets {
     main {
         java {
