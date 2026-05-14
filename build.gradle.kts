@@ -16,7 +16,6 @@ java {
 
 repositories {
     mavenCentral()
-    gradlePluginPortal()
 }
 
 dependencies {
@@ -26,15 +25,14 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
-    // ── Jackson — time + XML ─────────────────────────────────────────────
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+    // ── Jackson — XML ───────────────────────────────────────────────────────
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
 
     // ── Observability ────────────────────────────────────────────────────
     implementation("io.micrometer:micrometer-registry-prometheus")
 
     // ── OpenAPI doc endpoint (spec authoring lands in Phase 1) ───────────
-    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
 
     // ── Lombok ───────────────────────────────────────────────────────────
     compileOnly("org.projectlombok:lombok")
