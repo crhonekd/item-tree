@@ -37,14 +37,14 @@ class TreeMutationEventDeserializer extends StdDeserializer<TreeMutationEvent> {
     public TreeMutationEvent deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
         JsonNode root = p.getCodec().readTree(p);
 
-        // Issue 1: null-check operationType field
+        // operationType is required; EXTERNAL_PROPERTY would embed it in the payload on serialization
         JsonNode opNode = root.get("operationType");
         if (opNode == null || opNode.isNull()) {
             throw new JsonMappingException(p, "Missing required field 'operationType'");
         }
         String operationTypeText = opNode.asText();
 
-        // Issue 2: catch IllegalArgumentException and re-throw as JsonMappingException
+        // Reject unknown enum values with a clear mapping exception instead of a raw IllegalArgumentException
         OperationType operationType;
         try {
             operationType = OperationType.valueOf(operationTypeText);
@@ -52,15 +52,23 @@ class TreeMutationEventDeserializer extends StdDeserializer<TreeMutationEvent> {
             throw new JsonMappingException(p, "Unknown operationType: '" + operationTypeText + "'");
         }
 
-        JsonNode payloadNode = root.get("payload");
-        EventPayload payload = deserializePayload(p, payloadNode, operationType);
-
-        // Issue 3: null-check occurredAt (required), use path() for sequence (optional with default 0)
+        // occurredAt is required; sequence defaults to 0 if absent (used only for gap detection)
         JsonNode occurredAtNode = root.get("occurredAt");
         if (occurredAtNode == null || occurredAtNode.isNull()) {
             throw new JsonMappingException(p, "Missing required field 'occurredAt'");
         }
-        Instant occurredAt = Instant.parse(occurredAtNode.asText());
+        Instant occurredAt;
+        try {
+            occurredAt = Instant.parse(occurredAtNode.asText());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new JsonMappingException(p, "Invalid occurredAt value: '" + occurredAtNode.asText() + "'");
+        }
+
+        JsonNode payloadNode = root.get("payload");
+        if (payloadNode == null || payloadNode.isNull()) {
+            throw new JsonMappingException(p, "Missing required field 'payload'");
+        }
+        EventPayload payload = deserializePayload(p, payloadNode, operationType);
 
         return TreeMutationEvent.builder()
                 .eventId(textOrNull(root, "eventId"))

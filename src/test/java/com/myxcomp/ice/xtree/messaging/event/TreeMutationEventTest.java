@@ -1,5 +1,6 @@
 package com.myxcomp.ice.xtree.messaging.event;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TreeMutationEventTest {
 
@@ -206,8 +208,59 @@ class TreeMutationEventTest {
             assertThat(root.has("sequence")).as("sequence").isTrue();
             assertThat(root.has("occurredAt")).as("occurredAt").isTrue();
             assertThat(root.has("iceUser")).as("iceUser").isTrue();
+            // impersonatedUser serializes as "impersonatedUser":null when null (no @JsonInclude(NON_NULL))
+            assertThat(root.has("impersonatedUser")).as("impersonatedUser").isTrue();
             assertThat(root.has("operationType")).as("operationType").isTrue();
             assertThat(root.has("payload")).as("payload").isTrue();
+        }
+    }
+
+    @Nested
+    class DeserializationErrors {
+
+        @Test
+        void deserialize_should_throw_when_operationType_missing() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,"occurredAt":"2026-05-13T14:30:00Z",
+                     "iceUser":"alice","payload":{"itemTreeId":1,"parentId":0,"name":"X","type":"Folder",
+                     "lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
+        }
+
+        @Test
+        void deserialize_should_throw_when_operationType_unknown() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,"occurredAt":"2026-05-13T14:30:00Z",
+                     "iceUser":"alice","operationType":"INVALID_OP",
+                     "payload":{"itemTreeId":1,"parentId":0,"name":"X","type":"Folder",
+                     "lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
+        }
+
+        @Test
+        void deserialize_should_throw_when_occurredAt_missing() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,
+                     "iceUser":"alice","operationType":"CREATE",
+                     "payload":{"itemTreeId":1,"parentId":0,"name":"X","type":"Folder",
+                     "lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
+        }
+
+        @Test
+        void deserialize_should_throw_when_payload_missing() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,"occurredAt":"2026-05-13T14:30:00Z",
+                     "iceUser":"alice","operationType":"CREATE"}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
         }
     }
 

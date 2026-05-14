@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class UserContextTest {
 
     @Nested
-    class effectiveUser {
+    class EffectiveUser {
 
         @Test
         void should_returnImpersonatedUser_when_impersonatedUserIsSet() {
