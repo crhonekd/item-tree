@@ -1,0 +1,503 @@
+openapi: 3.0.3
+info:
+  title: ItemTree API
+  description: REST service fronting the ITEMTREE Oracle table.
+  version: 1.0.0
+
+tags:
+  - name: items
+    description: Item CRUD operations
+  - name: tree
+    description: Tree view operations
+  - name: search
+    description: Search operations
+  - name: users
+    description: User operations
+
+paths:
+
+  /api/v1/itemtree/items:
+    post:
+      tags: [items]
+      operationId: createItem
+      summary: Create item
+      parameters:
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateItemRequest'
+      responses:
+        '201':
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/items/get:
+    post:
+      tags: [items]
+      operationId: getItems
+      summary: Bulk get by id list (POST avoids URL-length limits)
+      parameters:
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetItemsRequest'
+      responses:
+        '200':
+          description: Items found; missing ids are silently omitted
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemNodeWithData'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/items/{id}:
+    delete:
+      tags: [items]
+      operationId: deleteItem
+      summary: Delete item; cascades to all descendants when item is a folder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/items/{id}/move:
+    post:
+      tags: [items]
+      operationId: moveItem
+      summary: Move item to a new parent folder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveRequest'
+      responses:
+        '200':
+          description: Item moved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/items/{id}/rename:
+    post:
+      tags: [items]
+      operationId: renameItem
+      summary: Rename item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameRequest'
+      responses:
+        '200':
+          description: Item renamed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/items/{id}/data:
+    put:
+      tags: [items]
+      operationId: updateItemData
+      summary: Full JSON replace for item payload
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDataRequest'
+      responses:
+        '200':
+          description: Data updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/tree:
+    get:
+      tags: [tree]
+      operationId: getTree
+      summary: Get trimmed tree view for the resolved user (skeleton + ancestor chain + home-folder children)
+      parameters:
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      responses:
+        '200':
+          description: Flat list of ItemNode each with path populated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemNode'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/tree/{rootId}/subtree:
+    get:
+      tags: [tree]
+      operationId: getSubtree
+      summary: Get subtree rooted at rootId as a flat list with paths
+      parameters:
+        - name: rootId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      responses:
+        '200':
+          description: Flat list of ItemNode each with path populated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemNode'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/search:
+    get:
+      tags: [search]
+      operationId: search
+      summary: Search by id or name; supply exactly one of id or name
+      parameters:
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+        - name: id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchHit'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/users/{userName}/home-folder:
+    get:
+      tags: [users]
+      operationId: getHomeFolder
+      summary: Resolve home folder for the given user
+      parameters:
+        - name: userName
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      responses:
+        '200':
+          description: Home folder found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemNode'
+        '404':
+          description: Home folder not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+
+  parameters:
+    XIceUser:
+      name: X-Ice-User
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 20
+
+    XImpersonatedUser:
+      name: X-Impersonated-User
+      in: header
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 20
+
+  schemas:
+
+    ItemNode:
+      type: object
+      required: [itemTreeId, parentId, name, type, lastUpdate, lastUpdateUser]
+      properties:
+        itemTreeId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          description: "Always populated; 0 for root's parent"
+        name:
+          type: string
+        type:
+          type: string
+        path:
+          type: string
+          nullable: true
+          description: "Root-anchored slash-separated path, e.g. root/Folder1/IceReport; populated only on /tree and /subtree responses"
+        lastUpdate:
+          type: string
+          format: date-time
+        lastUpdateUser:
+          type: string
+
+    ItemNodeWithData:
+      type: object
+      required: [itemTreeId, parentId, name, type, lastUpdate, lastUpdateUser]
+      properties:
+        itemTreeId:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          type: string
+        lastUpdate:
+          type: string
+          format: date-time
+        lastUpdateUser:
+          type: string
+        dataJson:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: "Parsed JSON payload; at most one of dataJson/dataXml is populated"
+        dataXml:
+          type: string
+          nullable: true
+          description: "Raw XML payload; at most one of dataJson/dataXml is populated"
+        children:
+          type: array
+          description: "Direct children populated only when node is a Folder (one level deep)"
+          items:
+            $ref: '#/components/schemas/ItemNodeWithData'
+
+    SearchHit:
+      type: object
+      required: [itemTreeId, name, type]
+      properties:
+        itemTreeId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          type: string
+
+    CreateItemRequest:
+      type: object
+      required: [parentId, name, type]
+      properties:
+        parentId:
+          type: integer
+          format: int64
+        name:
+          type: string
+          minLength: 1
+          maxLength: 70
+        type:
+          type: string
+          minLength: 1
+          maxLength: 30
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: "Must be null for types-without-data (400 TYPE_CANNOT_HAVE_DATA otherwise)"
+
+    GetItemsRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    MoveRequest:
+      type: object
+      required: [newParentId]
+      properties:
+        newParentId:
+          type: integer
+          format: int64
+
+    RenameRequest:
+      type: object
+      required: [newName]
+      properties:
+        newName:
+          type: string
+          minLength: 1
+          maxLength: 70
+
+    UpdateDataRequest:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          additionalProperties: true
+
+    Problem:
+      type: object
+      description: RFC 7807 problem detail
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        errorCode:
+          type: string
+          description: "Machine-readable code e.g. PARENT_NOT_FOUND, MOVE_INTO_DESCENDANT"
+        traceId:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: Service unavailable — cache not ready
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

@@ -64,11 +64,12 @@ openApiGenerate {
     apiPackage.set("com.myxcomp.ice.xtree.generated.api")
     modelPackage.set("com.myxcomp.ice.xtree.generated.model")
     configOptions.set(mapOf(
-        "interfaceOnly"          to "true",
-        "useSpringBoot3"         to "true",
-        "openApiNullable"        to "false",
-        "dateLibrary"            to "java8",
-        "hideGenerationTimestamp" to "true"
+        "interfaceOnly"               to "true",
+        "useSpringBoot3"              to "true",
+        "openApiNullable"             to "false",
+        "dateLibrary"                 to "java8",
+        "hideGenerationTimestamp"     to "true",
+        "useTags"                     to "true"
     ))
 }
 

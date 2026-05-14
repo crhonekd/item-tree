@@ -38,3 +38,7 @@ itemtree:
   solace: {}
   oracle: {}
   data: {}
+
+springdoc:
+  api-docs:
+    version: openapi_3_0
