@@ -1,5 +1,7 @@
 package com.myxcomp.ice.xtree.messaging.event;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -17,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TreeMutationEventTest {
 
@@ -155,6 +158,109 @@ class TreeMutationEventTest {
             TreeMutationEvent restored = roundTrip(buildEvent(OperationType.DELETE, payload));
 
             assertThat(((DeletePayload) restored.getPayload()).deletedIds()).containsExactly(999L);
+        }
+    }
+
+    @Nested
+    class WireFormat {
+
+        @Test
+        void operationType_is_sibling_of_payload_in_json() throws Exception {
+            var payload = new CreatePayload(100L, 1L, "NewReport", "Report",
+                    Instant.parse("2026-05-13T14:30:00Z"), "alice");
+            String json = mapper.writeValueAsString(buildEvent(OperationType.CREATE, payload));
+
+            assertThat(json).contains("\"operationType\":\"CREATE\"");
+            assertThat(json).contains("\"payload\":");
+
+            JsonNode root = mapper.readTree(json);
+            assertThat(root.has("operationType"))
+                    .as("operationType must be a top-level envelope field")
+                    .isTrue();
+            assertThat(root.has("payload"))
+                    .as("payload must be a top-level envelope field")
+                    .isTrue();
+        }
+
+        @Test
+        void payload_does_not_contain_operationType_discriminator() throws Exception {
+            var payload = new UpdatePayload(100L, Instant.parse("2026-05-13T15:00:00Z"), "bob");
+            String json = mapper.writeValueAsString(buildEvent(OperationType.UPDATE, payload));
+
+            JsonNode root = mapper.readTree(json);
+            JsonNode payloadNode = root.get("payload");
+
+            assertThat(payloadNode).isNotNull();
+            assertThat(payloadNode.has("operationType"))
+                    .as("operationType must NOT appear inside the payload object — it belongs at the envelope level")
+                    .isFalse();
+        }
+
+        @Test
+        void all_envelope_fields_are_present_in_json() throws Exception {
+            var payload = new CreatePayload(100L, 1L, "NewReport", "Report",
+                    Instant.parse("2026-05-13T14:30:00Z"), "alice");
+            String json = mapper.writeValueAsString(buildEvent(OperationType.CREATE, payload));
+
+            JsonNode root = mapper.readTree(json);
+            assertThat(root.has("eventId")).as("eventId").isTrue();
+            assertThat(root.has("instanceId")).as("instanceId").isTrue();
+            assertThat(root.has("sequence")).as("sequence").isTrue();
+            assertThat(root.has("occurredAt")).as("occurredAt").isTrue();
+            assertThat(root.has("iceUser")).as("iceUser").isTrue();
+            // impersonatedUser serializes as "impersonatedUser":null when null (no @JsonInclude(NON_NULL))
+            assertThat(root.has("impersonatedUser")).as("impersonatedUser").isTrue();
+            assertThat(root.has("operationType")).as("operationType").isTrue();
+            assertThat(root.has("payload")).as("payload").isTrue();
+        }
+    }
+
+    @Nested
+    class DeserializationErrors {
+
+        @Test
+        void deserialize_should_throw_when_operationType_missing() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,"occurredAt":"2026-05-13T14:30:00Z",
+                     "iceUser":"alice","payload":{"itemTreeId":1,"parentId":0,"name":"X","type":"Folder",
+                     "lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
+        }
+
+        @Test
+        void deserialize_should_throw_when_operationType_unknown() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,"occurredAt":"2026-05-13T14:30:00Z",
+                     "iceUser":"alice","operationType":"INVALID_OP",
+                     "payload":{"itemTreeId":1,"parentId":0,"name":"X","type":"Folder",
+                     "lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
+        }
+
+        @Test
+        void deserialize_should_throw_when_occurredAt_missing() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,
+                     "iceUser":"alice","operationType":"CREATE",
+                     "payload":{"itemTreeId":1,"parentId":0,"name":"X","type":"Folder",
+                     "lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
+        }
+
+        @Test
+        void deserialize_should_throw_when_payload_missing() {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,"occurredAt":"2026-05-13T14:30:00Z",
+                     "iceUser":"alice","operationType":"CREATE"}
+                    """;
+            assertThatThrownBy(() -> mapper.readValue(json, TreeMutationEvent.class))
+                    .isInstanceOf(JsonMappingException.class);
         }
     }
 

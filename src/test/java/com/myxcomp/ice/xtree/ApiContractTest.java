@@ -25,6 +25,7 @@ class ApiContractTest {
     void apiDocsReturnsOkWithCorrectTitle() throws Exception {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
+                // Title must match itemtree-api.yaml info.title exactly — drift becomes a test failure
                 .andExpect(jsonPath("$.info.title").value("ItemTree API"))
                 // springdoc with openapi_3_0 emits "3.0.1"; accept any 3.0.x
                 .andExpect(jsonPath("$.openapi").value(startsWith("3.0")));
@@ -46,5 +47,29 @@ class ApiContractTest {
         assertThat(body).contains("\"getSubtree\"");
         assertThat(body).contains("\"search\"");
         assertThat(body).contains("\"getHomeFolder\"");
+    }
+
+    @Test
+    void apiDocsHasRequiredComponents() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                // Core model schemas registered by springdoc from the generated Java model classes
+                .andExpect(jsonPath("$.components.schemas.Problem").exists())
+                .andExpect(jsonPath("$.components.schemas.ItemNode").exists())
+                .andExpect(jsonPath("$.components.schemas.ItemNodeWithData").exists());
+    }
+
+    @Test
+    void apiDocsHasRequiredErrorResponses() throws Exception {
+        String body = mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Springdoc inlines error responses per-operation rather than emitting shared
+        // components/responses entries; verify the error descriptions appear in the doc
+        assertThat(body).contains("Bad request");
+        assertThat(body).contains("Service unavailable");
+        // The X-Ice-User header parameter is inlined per-operation (no shared components/parameters)
+        assertThat(body).contains("X-Ice-User");
     }
 }

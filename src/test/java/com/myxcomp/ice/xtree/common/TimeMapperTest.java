@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.common;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -68,5 +69,19 @@ class TimeMapperTest {
     void toLocalDateTime_handles_epoch() {
         assertThat(mapper.toLocalDateTime(Instant.EPOCH))
                 .isEqualTo(LocalDateTime.of(1970, 1, 1, 0, 0, 0));
+    }
+
+    @Nested
+    class NullHandling {
+
+        @Test
+        void toLocalDateTime_should_returnNull_when_instantIsNull() {
+            assertThat(mapper.toLocalDateTime(null)).isNull();
+        }
+
+        @Test
+        void toInstant_should_returnNull_when_localDateTimeIsNull() {
+            assertThat(mapper.toInstant(null)).isNull();
+        }
     }
 }
