@@ -56,3 +56,30 @@ tasks.withType<Test> {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
 }
+
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set("$projectDir/src/main/resources/openapi/itemtree-api.yaml")
+    outputDir.set(layout.buildDirectory.dir("generated/openapi").get().asFile.absolutePath)
+    apiPackage.set("com.myxcomp.ice.xtree.generated.api")
+    modelPackage.set("com.myxcomp.ice.xtree.generated.model")
+    configOptions.set(mapOf(
+        "interfaceOnly"          to "true",
+        "useSpringBoot3"         to "true",
+        "openApiNullable"        to "false",
+        "dateLibrary"            to "java8",
+        "hideGenerationTimestamp" to "true"
+    ))
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
+        }
+    }
+}
+
+tasks.compileJava {
+    dependsOn(tasks.openApiGenerate)
+}
