@@ -186,6 +186,8 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Concurrency stress: N reader threads + 1 writer thread for M seconds; assert no exceptions and final state matches expected.
 - `replaceAll` — snapshot swap is atomic from a reader's viewpoint.
 
+> **Follow-up (quality review):** `CachedNode.parentId` is boxed `Long` and the design contract says it is never null. Add a compact-constructor `Objects.requireNonNull(parentId, "parentId")` guard in `CachedNode.java` when implementing `DefaultTreeCache`, so the `apply*` methods and `applyCreate` upsert logic are introduced alongside their non-null enforcement and tests.
+
 ---
 
 ## Phase 5 — Type policy & conversion
@@ -311,6 +313,8 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Apply failure tolerated — logged + counter, no rethrow.
 - The `EventConsumerService.processPayload(String)` is unit-testable in complete isolation from JMS.
 
+> **Follow-up (quality review):** Add `@JsonIgnoreProperties(ignoreUnknown = true)` to `TreeMutationEvent` (or configure the consumer `ObjectMapper` with `DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES = false`) before Phase 10 goes live. A newer producer adding envelope fields (e.g. trace metadata) must not break older consumer instances.
+
 ---
 
 ## Phase 11 — Resilience — implementable in Phase A via stubs
@@ -343,6 +347,8 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 **Tests:**
 - Smoke test that each named metric exists after a representative workload run.
+
+> **Follow-up (quality review):** Add Micrometer Tracing dependency and `%X{traceId}` to `logback-spring.xml` pattern when wiring Phase 12 observability. The `traceId` field is referenced in the RFC 7807 `Problem` schema (design §3) and the design notes it propagates via Micrometer Tracing (§17).
 
 ---
 
