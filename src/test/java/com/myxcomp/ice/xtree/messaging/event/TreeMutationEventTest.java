@@ -1,5 +1,6 @@
 package com.myxcomp.ice.xtree.messaging.event;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -155,6 +156,58 @@ class TreeMutationEventTest {
             TreeMutationEvent restored = roundTrip(buildEvent(OperationType.DELETE, payload));
 
             assertThat(((DeletePayload) restored.getPayload()).deletedIds()).containsExactly(999L);
+        }
+    }
+
+    @Nested
+    class WireFormat {
+
+        @Test
+        void operationType_is_sibling_of_payload_in_json() throws Exception {
+            var payload = new CreatePayload(100L, 1L, "NewReport", "Report",
+                    Instant.parse("2026-05-13T14:30:00Z"), "alice");
+            String json = mapper.writeValueAsString(buildEvent(OperationType.CREATE, payload));
+
+            assertThat(json).contains("\"operationType\":\"CREATE\"");
+            assertThat(json).contains("\"payload\":");
+
+            JsonNode root = mapper.readTree(json);
+            assertThat(root.has("operationType"))
+                    .as("operationType must be a top-level envelope field")
+                    .isTrue();
+            assertThat(root.has("payload"))
+                    .as("payload must be a top-level envelope field")
+                    .isTrue();
+        }
+
+        @Test
+        void payload_does_not_contain_operationType_discriminator() throws Exception {
+            var payload = new UpdatePayload(100L, Instant.parse("2026-05-13T15:00:00Z"), "bob");
+            String json = mapper.writeValueAsString(buildEvent(OperationType.UPDATE, payload));
+
+            JsonNode root = mapper.readTree(json);
+            JsonNode payloadNode = root.get("payload");
+
+            assertThat(payloadNode).isNotNull();
+            assertThat(payloadNode.has("operationType"))
+                    .as("operationType must NOT appear inside the payload object — it belongs at the envelope level")
+                    .isFalse();
+        }
+
+        @Test
+        void all_envelope_fields_are_present_in_json() throws Exception {
+            var payload = new CreatePayload(100L, 1L, "NewReport", "Report",
+                    Instant.parse("2026-05-13T14:30:00Z"), "alice");
+            String json = mapper.writeValueAsString(buildEvent(OperationType.CREATE, payload));
+
+            JsonNode root = mapper.readTree(json);
+            assertThat(root.has("eventId")).as("eventId").isTrue();
+            assertThat(root.has("instanceId")).as("instanceId").isTrue();
+            assertThat(root.has("sequence")).as("sequence").isTrue();
+            assertThat(root.has("occurredAt")).as("occurredAt").isTrue();
+            assertThat(root.has("iceUser")).as("iceUser").isTrue();
+            assertThat(root.has("operationType")).as("operationType").isTrue();
+            assertThat(root.has("payload")).as("payload").isTrue();
         }
     }
 

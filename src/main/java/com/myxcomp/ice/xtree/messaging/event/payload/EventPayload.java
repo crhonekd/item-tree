@@ -1,18 +1,16 @@
 package com.myxcomp.ice.xtree.messaging.event.payload;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-
-@JsonTypeInfo(
-        use = JsonTypeInfo.Id.NAME,
-        include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
-        property = "operationType"
-)
-@JsonSubTypes({
-        @JsonSubTypes.Type(value = CreatePayload.class, name = "CREATE"),
-        @JsonSubTypes.Type(value = UpdatePayload.class, name = "UPDATE"),
-        @JsonSubTypes.Type(value = MovePayload.class, name = "MOVE"),
-        @JsonSubTypes.Type(value = RenamePayload.class, name = "RENAME"),
-        @JsonSubTypes.Type(value = DeletePayload.class, name = "DELETE")
-})
+/**
+ * Marker interface for per-operation event payloads.
+ *
+ * <p>Polymorphic deserialization is driven by the {@code operationType} field at the
+ * {@code TreeMutationEvent} envelope level (a sibling of {@code payload} in the JSON), not
+ * by a type discriminator embedded inside the payload object itself.  The custom
+ * {@code TreeMutationEventDeserializer} handles this dispatch.
+ *
+ * <p>We deliberately avoid {@code @JsonTypeInfo(include = EXTERNAL_PROPERTY)} on this
+ * interface because Jackson's implementation of that mode writes the type discriminator
+ * <em>inside</em> the serialised payload object, which would pollute the wire format seen
+ * by non-Java consumers.
+ */
 public interface EventPayload {}
