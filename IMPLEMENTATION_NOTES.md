@@ -139,7 +139,8 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `InstanceIdProviderTest` — stable across the JVM lifetime.
 
 **Deviations from plan (reviewed and approved):**
-- `parentId` changed from `long` (primitive) to `Long` (boxed) in `CachedNode` and `StructuralRow`, matching the design doc spec (§4, §12) and CLAUDE.md invariant "parentId is Long, not nullable."
+- `parentId` changed from `long` (primitive) to `Long` (boxed) in `CachedNode`, `StructuralRow`, and `CreatePayload`, matching the design doc spec (§4, §6, §12) and CLAUDE.md invariant "parentId is Long, not nullable." The plan mistakenly used primitive `long`; caught by code review.
+- `TreeMutationEvent` implemented as `@Value @Builder @Jacksonized` class (not a record), required for reliable Jackson EXTERNAL_PROPERTY polymorphic deserialization via the builder path.
 
 **Actual done state:** All Phase 2 types compile. TimeMapperTest (6), InstanceIdProviderTest (3), TreeMutationEventTest (9) all green. `./gradlew clean build` → BUILD SUCCESSFUL; 23 tests pass.
 
