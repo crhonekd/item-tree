@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-public class ItemsController implements ItemsApi {
+public class ItemController implements ItemsApi {
 
     @Override
     public ResponseEntity<ItemNode> createItem(String xIceUser, CreateItemRequest createItemRequest, String xImpersonatedUser) {
