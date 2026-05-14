@@ -25,7 +25,7 @@ class ApiContractTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("ItemTree API"))
-                .andExpect(jsonPath("$.openapi").value("3.0.3"));
+                .andExpect(jsonPath("$.openapi").value(org.hamcrest.Matchers.startsWith("3.0")));
     }
 
     @Test

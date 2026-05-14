@@ -9,7 +9,12 @@
 --   * one row of every §10 type
 --   * one JSON-null + XML-not-null row (backfill candidate)
 --   * one mixed-children folder (subfolders + leaves)
+--
+-- DELETE first so the script is idempotent: multiple ApplicationContexts that
+-- share the same named in-memory H2 database can each run this script without
+-- getting duplicate-key errors.
 -- =============================================================================
+DELETE FROM ITEMTREE;
 
 -- ── 1. Root ──────────────────────────────────────────────────────────────────
 INSERT INTO ITEMTREE (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON) VALUES

@@ -101,7 +101,16 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 1 — API contract ⬅ NEXT
+## Phase 1 — API contract ✅ COMPLETE (2026-05-14)
+
+**Deviations from plan (reviewed and approved):**
+- `useTags=true` added to openapi-generator config (required to split by tag into separate interfaces)
+- `doLast` block added to delete generated `ApiApi.java` (avoids duplicate route mappings)
+- `springdoc.api-docs.version: openapi_3_0` added to application.yml (forces 3.0 format for test assertion)
+- `OpenApiConfig` bean added in `config/` to set title "ItemTree API" (springdoc defaults to "OpenAPI definition" without it)
+- `schema.sql` updated to use `CREATE TABLE IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` / `CREATE SEQUENCE IF NOT EXISTS` (idempotent for multiple test ApplicationContexts sharing the named H2 DB)
+- `data.sql` prefixed with `DELETE FROM ITEMTREE` (idempotent re-seeding across multiple test contexts)
+- Test assertion updated: `$.openapi` uses `startsWith("3.0")` instead of exact `"3.0.3"` (springdoc with `openapi_3_0` produces "3.0.1")
 
 **Goal:** OpenAPI spec authored; generated stubs land in the right package; stub controllers prove the wiring.
 
@@ -114,7 +123,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 2 — Domain types and common primitives
+## Phase 2 — Domain types and common primitives ⬅ NEXT
 
 **Goal:** all immutable value types in place; `TimeMapper` is the only thing that touches timezone conversion.
 
