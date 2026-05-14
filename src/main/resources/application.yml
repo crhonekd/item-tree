@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: itemtree
+  profiles:
+    active: dev
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 200
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+
+# ── Placeholder config sections from design §17 ──────────────────────────────
+# Filled in by later phases:
+#   itemtree.cache.refresh.*       (Phase 9)
+#   itemtree.cache.name-search.*   (Phase 7)
+#   itemtree.solace.*              (Phases 10/11)
+#   itemtree.oracle.sequence-name  (Phase 3)
+#   itemtree.data.*                (Phase 5)
+itemtree:
+  cache:
+    refresh: {}
+    name-search: {}
+  solace: {}
+  oracle: {}
+  data: {}
