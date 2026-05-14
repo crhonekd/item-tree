@@ -4,7 +4,7 @@ import java.time.Instant;
 
 public record CachedNode(
         long itemTreeId,
-        long parentId,
+        Long parentId,
         String name,
         String type,
         Instant lastUpdate,
