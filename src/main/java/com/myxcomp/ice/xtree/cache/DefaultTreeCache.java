@@ -125,6 +125,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public List<CachedNode> searchByName(String needle, OptionalInt limit) {
+        Objects.requireNonNull(needle, "needle");
         lock.readLock().lock();
         try {
             String lowerNeedle = needle.toLowerCase(Locale.ROOT);
@@ -141,6 +142,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public boolean isAncestor(long candidateAncestorId, long nodeId) {
+        if (candidateAncestorId == nodeId) return false;
         lock.readLock().lock();
         try {
             int maxWalk = Math.min(byId.size() + 1, MAX_ANCESTOR_WALK);
@@ -309,6 +311,7 @@ public class DefaultTreeCache implements TreeCache {
     public void applyDelete(Set<Long> ids) {
         lock.writeLock().lock();
         try {
+            // Caller must pass the complete descendant set; partial sets leave dangling childrenByParent entries.
             for (Long id : ids) {
                 CachedNode node = byId.remove(id);
                 if (node != null) {
