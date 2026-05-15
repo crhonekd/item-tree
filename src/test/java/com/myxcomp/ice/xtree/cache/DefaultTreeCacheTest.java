@@ -226,4 +226,138 @@ class DefaultTreeCacheTest {
                     .isInstanceOf(UnsupportedOperationException.class);
         }
     }
+
+    @Nested
+    class ApplyMetadataUpdate {
+
+        @Test
+        void updatesTimestampAndUserOnExistingNode() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            Instant newTime = Instant.ofEpochSecond(100);
+            cache.applyMetadataUpdate(1L, newTime, "editor");
+
+            CachedNode updated = cache.getById(1L).get();
+            assertThat(updated.lastUpdate()).isEqualTo(newTime);
+            assertThat(updated.lastUpdateUser()).isEqualTo("editor");
+            assertThat(updated.name()).isEqualTo("root");
+            assertThat(updated.type()).isEqualTo("Folder");
+        }
+
+        @Test
+        void onMissingIdDoesNotThrowAndCacheIsUnchanged() {
+            cache.applyMetadataUpdate(999L, Instant.EPOCH, "user");
+            assertThat(cache.size()).isZero();
+        }
+    }
+
+    @Nested
+    class ApplyMove {
+
+        @BeforeEach
+        void setup() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "A"));
+            cache.applyCreate(folder(3L, 1L, "B"));
+            cache.applyCreate(leaf(10L, 2L, "item"));
+        }
+
+        @Test
+        void movesNodeToNewParent() {
+            cache.applyMove(10L, 3L, Instant.EPOCH, "user");
+
+            assertThat(cache.getById(10L).get().parentId()).isEqualTo(3L);
+            assertThat(cache.getChildren(2L)).extracting(CachedNode::itemTreeId).doesNotContain(10L);
+            assertThat(cache.getChildren(3L)).extracting(CachedNode::itemTreeId).contains(10L);
+        }
+
+        @Test
+        void onMissingIdDoesNotThrowAndCacheIsUnchanged() {
+            cache.applyMove(999L, 3L, Instant.EPOCH, "user");
+            assertThat(cache.size()).isEqualTo(4);
+        }
+
+        @Test
+        void onMissingNewParentDoesNotThrowAndNodeStaysAtOriginalParent() {
+            cache.applyMove(10L, 999L, Instant.EPOCH, "user");
+            assertThat(cache.getById(10L).get().parentId()).isEqualTo(2L);
+            assertThat(cache.getChildren(2L)).extracting(CachedNode::itemTreeId).contains(10L);
+        }
+    }
+
+    @Nested
+    class ApplyRename {
+
+        @BeforeEach
+        void setup() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "OldName"));
+            cache.applyCreate(leaf(10L, 2L, "report"));
+        }
+
+        @Test
+        void renamedFolderUpdatesNameAndFoldersByName() {
+            cache.applyRename(2L, "NewName", Instant.EPOCH, "user");
+
+            assertThat(cache.getById(2L).get().name()).isEqualTo("NewName");
+            assertThat(cache.findHomeFolder("OldName")).isEmpty();
+            assertThat(cache.findHomeFolder("NewName")).isPresent();
+        }
+
+        @Test
+        void renamedLeafDoesNotAffectFoldersByName() {
+            cache.applyRename(10L, "renamed-report", Instant.EPOCH, "user");
+            assertThat(cache.getById(10L).get().name()).isEqualTo("renamed-report");
+            assertThat(cache.findHomeFolder("renamed-report")).isEmpty();
+        }
+
+        @Test
+        void onMissingIdDoesNotThrowAndCacheIsUnchanged() {
+            cache.applyRename(999L, "NewName", Instant.EPOCH, "user");
+            assertThat(cache.size()).isEqualTo(3);
+        }
+    }
+
+    @Nested
+    class ApplyDelete {
+
+        @BeforeEach
+        void setup() {
+            loadStandardTree(cache); // ids: 1, 2, 3, 100
+        }
+
+        @Test
+        void deletedIdsAreRemovedFromByIdAndParentsChildSet() {
+            cache.applyDelete(Set.of(100L));
+
+            assertThat(cache.getById(100L)).isEmpty();
+            assertThat(cache.getChildren(3L)).isEmpty();
+            assertThat(cache.size()).isEqualTo(3);
+        }
+
+        @Test
+        void deleteOnMissingIdIsToleratedWithoutException() {
+            cache.applyDelete(Set.of(999L));
+            assertThat(cache.size()).isEqualTo(4);
+        }
+
+        @Test
+        void deleteMixOfExistingAndMissingIds() {
+            cache.applyDelete(Set.of(100L, 999L));
+            assertThat(cache.size()).isEqualTo(3);
+            assertThat(cache.getById(100L)).isEmpty();
+        }
+
+        @Test
+        void deleteFolderRemovesItFromFoldersByName() {
+            cache.applyDelete(Set.of(3L));
+            assertThat(cache.findHomeFolder("testuser1")).isEmpty();
+        }
+
+        @Test
+        void deleteSubtreeRemovesAllCascadedIds() {
+            cache.applyDelete(Set.of(2L, 3L, 100L));
+            assertThat(cache.size()).isEqualTo(1); // only root remains
+            assertThat(cache.getChildren(1L)).isEmpty();
+        }
+    }
 }
