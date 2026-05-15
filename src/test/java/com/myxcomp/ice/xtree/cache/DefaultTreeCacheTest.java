@@ -117,6 +117,63 @@ class DefaultTreeCacheTest {
     }
 
     @Nested
+    class EdgeCases {
+
+        @Test
+        void applyMoveToSameParentKeepsNodeInParent() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(leaf(10L, 1L, "item"));
+
+            cache.applyMove(10L, 1L, Instant.EPOCH, "user"); // move to same parent
+
+            assertThat(cache.getById(10L).get().parentId()).isEqualTo(1L);
+            assertThat(cache.getChildren(1L)).extracting(CachedNode::itemTreeId).contains(10L);
+        }
+
+        @Test
+        void applyRenameToSameNameKeepsFolderInIndex() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "Users"));
+
+            cache.applyRename(2L, "Users", Instant.EPOCH, "user"); // same name
+
+            assertThat(cache.getById(2L).get().name()).isEqualTo("Users");
+            assertThat(cache.findHomeFolder("Users")).isPresent();
+        }
+
+        @Test
+        void applyRenameToSharedNameAccumulatesInFoldersByName() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "alice"));
+            cache.applyCreate(folder(3L, 1L, "bob"));
+
+            // rename "alice" (id=2) to "bob" — now two folders named "bob"
+            cache.applyRename(2L, "bob", Instant.EPOCH, "user");
+
+            assertThat(cache.findHomeFolder("alice")).isEmpty(); // old name removed
+            Optional<CachedNode> home = cache.findHomeFolder("bob");
+            assertThat(home).isPresent(); // at least one "bob" found
+            // both ids must be reachable via the index
+            assertThat(cache.getById(2L).get().name()).isEqualTo("bob");
+            assertThat(cache.getById(3L).get().name()).isEqualTo("bob");
+        }
+
+        @Test
+        void applyCreateWithOrphanParentIsAcceptedAndIndexed() {
+            // No parent with id 999 exists in cache
+            cache.applyCreate(leaf(10L, 999L, "orphan"));
+
+            // Node is retrievable by id
+            assertThat(cache.getById(10L)).isPresent();
+            assertThat(cache.getById(10L).get().parentId()).isEqualTo(999L);
+
+            // childrenByParent was created for the missing parent
+            assertThat(cache.getChildren(999L))
+                    .extracting(CachedNode::itemTreeId).contains(10L);
+        }
+    }
+
+    @Nested
     class ApplyCreate {
         @Test
         void createdNodeIsRetrievableById() {
