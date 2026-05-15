@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SnapshotBuilderTest {
 
@@ -41,6 +42,20 @@ class SnapshotBuilderTest {
             assertThat(snap.childrenByParent().get(0L)).containsExactly(1L);
             assertThat(snap.foldersByName()).containsKey("root");
             assertThat(snap.foldersByName().get("root")).containsExactly(1L);
+        }
+
+        @Test
+        void snapshotMapsAndTheirSetsAreUnmodifiable() {
+            SnapshotBuilder builder = new SnapshotBuilder();
+            builder.accept(row(1L, 0L, "root", "Folder"));
+            TreeSnapshot snap = builder.build();
+
+            assertThatThrownBy(() -> snap.byId().put(99L, null))
+                    .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> snap.childrenByParent().get(0L).add(99L))
+                    .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> snap.foldersByName().get("root").add(99L))
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
@@ -88,6 +103,7 @@ class SnapshotBuilderTest {
             TreeSnapshot snap = builder.build();
 
             assertThat(snap.byId()).hasSize(2);
+            assertThat(snap.byId()).containsKeys(1L, 2L);
         }
     }
 }

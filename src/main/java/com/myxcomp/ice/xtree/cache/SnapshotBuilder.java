@@ -27,10 +27,17 @@ public class SnapshotBuilder {
         }
     }
 
+    /** Produces the snapshot. Do not call {@code accept} after calling this method. */
     public TreeSnapshot build() {
+        Map<Long, Set<Long>> immutableChildren = new HashMap<>(childrenByParent.size());
+        childrenByParent.forEach((k, v) -> immutableChildren.put(k, Set.copyOf(v)));
+
+        Map<String, Set<Long>> immutableFolders = new HashMap<>(foldersByName.size());
+        foldersByName.forEach((k, v) -> immutableFolders.put(k, Set.copyOf(v)));
+
         return new TreeSnapshot(
                 Map.copyOf(byId),
-                Map.copyOf(childrenByParent),
-                Map.copyOf(foldersByName));
+                Map.copyOf(immutableChildren),
+                Map.copyOf(immutableFolders));
     }
 }
