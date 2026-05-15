@@ -104,6 +104,30 @@ class ConfigurableTypePolicyTest {
     }
 
     @Nested
+    class NullGuards {
+
+        @ParameterizedTest(name = "{0}(null) throws NullPointerException")
+        @MethodSource("nullableMethods")
+        void nullTypeThrows(String label, ThrowingMethod method) {
+            assertThatThrownBy(() -> method.call(newPolicy(), null))
+                    .isInstanceOf(NullPointerException.class);
+        }
+
+        static Stream<Arguments> nullableMethods() {
+            return Stream.of(
+                    Arguments.of("hasData",                    (ThrowingMethod) (p, t) -> p.hasData(t)),
+                    Arguments.of("isAlsoPersistedAsXmlOnWrite", (ThrowingMethod) (p, t) -> p.isAlsoPersistedAsXmlOnWrite(t)),
+                    Arguments.of("isSentAsXmlToUi",           (ThrowingMethod) (p, t) -> p.isSentAsXmlToUi(t)),
+                    Arguments.of("isKnown",                   (ThrowingMethod) (p, t) -> p.isKnown(t)));
+        }
+
+        @FunctionalInterface
+        interface ThrowingMethod {
+            void call(ConfigurableTypePolicy policy, String type);
+        }
+    }
+
+    @Nested
     class Validation {
 
         @Test

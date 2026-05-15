@@ -3,6 +3,7 @@ package com.myxcomp.ice.xtree.policy;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -33,18 +34,22 @@ public class ConfigurableTypePolicy implements TypePolicy {
     }
 
     @Override public boolean hasData(String type) {
+        Objects.requireNonNull(type, "type");
         return !typesWithoutData.contains(type);
     }
 
     @Override public boolean isAlsoPersistedAsXmlOnWrite(String type) {
+        Objects.requireNonNull(type, "type");
         return typesAlsoPersistedAsXmlOnWrite.contains(type);
     }
 
     @Override public boolean isSentAsXmlToUi(String type) {
+        Objects.requireNonNull(type, "type");
         return typesSentAsXmlToUi.contains(type);
     }
 
     @Override public boolean isKnown(String type) {
+        Objects.requireNonNull(type, "type");
         return knownTypes.contains(type);
     }
 
