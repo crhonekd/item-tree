@@ -27,6 +27,9 @@ public class DefaultTreeCache implements TreeCache {
     /** Ceiling for ancestor-walk cycle detection; effective cap is min(cache-size+1, this). */
     private static final int MAX_ANCESTOR_WALK = 10_000;
 
+    /** Defensive cap for the chain walk in {@link #getTreeView}; effective cap is min(cache-size+1, this). */
+    private static final int MAX_TREE_DEPTH = 10_000;
+
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     // Replaced atomically under write lock in replaceAll:
@@ -92,7 +95,72 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public List<CachedNode> getTreeView(long homeFolderId) {
-        throw new UnsupportedOperationException("getTreeView implemented in Phase 6");
+        lock.readLock().lock();
+        try {
+            CachedNode home = byId.get(homeFolderId);
+            if (home == null) {
+                throw new IllegalArgumentException("Home folder not found in cache: " + homeFolderId);
+            }
+
+            LinkedHashSet<Long> resultIds = new LinkedHashSet<>();
+            addSkeletonFolders(resultIds);
+            addChainRootToHome(resultIds, home, homeFolderId);
+            resultIds.addAll(childrenByParent.getOrDefault(homeFolderId, Set.of()));
+
+            return resultIds.stream()
+                    .map(byId::get)
+                    .filter(Objects::nonNull)
+                    .toList();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    /** Adds folder ids at depths 0, 1, 2 (root, its folder children, their folder grandchildren). */
+    private void addSkeletonFolders(LinkedHashSet<Long> sink) {
+        for (Long depth0Id : childrenByParent.getOrDefault(TreeConstants.ROOT_PARENT_ID, Set.of())) {
+            CachedNode depth0 = byId.get(depth0Id);
+            if (depth0 == null || !Types.isFolder(depth0.type())) continue;
+            sink.add(depth0Id);
+            for (Long depth1Id : childrenByParent.getOrDefault(depth0Id, Set.of())) {
+                CachedNode depth1 = byId.get(depth1Id);
+                if (depth1 == null || !Types.isFolder(depth1.type())) continue;
+                sink.add(depth1Id);
+                for (Long depth2Id : childrenByParent.getOrDefault(depth1Id, Set.of())) {
+                    CachedNode depth2 = byId.get(depth2Id);
+                    if (depth2 == null || !Types.isFolder(depth2.type())) continue;
+                    sink.add(depth2Id);
+                }
+            }
+        }
+    }
+
+    /** Walks home → root, then inserts the chain into {@code sink} in root → home order. */
+    private void addChainRootToHome(LinkedHashSet<Long> sink, CachedNode home, long homeFolderId) {
+        List<Long> chain = new ArrayList<>();
+        int maxWalk = Math.min(byId.size() + 1, MAX_TREE_DEPTH);
+        CachedNode cursor = home;
+        int steps = 0;
+        while (cursor != null) {
+            chain.add(cursor.itemTreeId());
+            if (cursor.parentId() == TreeConstants.ROOT_PARENT_ID) {
+                break;
+            }
+            if (++steps > maxWalk) {
+                log.warn("getTreeView: ancestor-walk cap reached at homeFolderId={}, possible cycle",
+                        homeFolderId);
+                break;
+            }
+            CachedNode parent = byId.get(cursor.parentId());
+            if (parent == null) {
+                log.warn("getTreeView: missing ancestor parentId={} for nodeId={} (homeFolderId={})",
+                        cursor.parentId(), cursor.itemTreeId(), homeFolderId);
+                break;
+            }
+            cursor = parent;
+        }
+        Collections.reverse(chain);
+        sink.addAll(chain);
     }
 
     @Override
