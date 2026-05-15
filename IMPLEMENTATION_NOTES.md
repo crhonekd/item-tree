@@ -146,29 +146,31 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 3 — Persistence ⬅ NEXT
+## Phase 3 — Persistence ✅ COMPLETE (2026-05-15, tagged `phase-3-persistence`)
 
 **Goal:** `ItemTreeRepository` complete and verified against H2 (Oracle compat mode).
 
 - `ItemTreeRepository` interface per §12.
-- `JdbcItemTreeRepository` implementation using `JdbcClient`.
+- `JdbcItemTreeRepository` implementation using `JdbcClient` (plus `JdbcTemplate` for `streamAllStructural`).
 - Row mappers in `persistence/rowmapper/`.
 - CLOB column reads via `getString` by default.
 - IN-list chunking at 1000 ids.
-- Cascade delete: recursive CTE collects ids, batched DELETE.
+- Cascade delete: BFS traversal collects ids, chunked DELETE. (See deviation note below.)
 - Sequence-based id generation. **Portability note:** `INSERT ... RETURNING ... INTO` is Oracle-specific. Prefer a portable two-step in `JdbcClient`: `SELECT ITEMTREE_ID_SQN.NEXTVAL FROM DUAL` (works on both Oracle and H2 in Oracle mode) → use the returned value in the INSERT. Wrap both in the same transaction.
 - All write methods stamp `LASTUPDATE`/`LASTUPDATEUSER` (except `backfillJsonWhereNull`, which only writes the JSON column).
 
 **Tests:**
 - `JdbcItemTreeRepositoryIT` — uses the same H2 schema and seed data as the dev profile.
-- Cover every method including edge cases: empty id list, 1001+ id chunking, cascade delete of an empty subtree, conditional backfill (returns 0 if JSON already populated).
-- Verify recursive CTE syntax compatibility: both Oracle and H2 in `MODE=Oracle` accept `WITH sub(id) AS (... UNION ALL ...)`.
+- Covers every method including edge cases: empty id list, 1001+ id chunking, cascade delete of an empty subtree, conditional backfill (returns 0 if JSON already populated).
+- 23 IT tests, 72 total tests — all green.
 
-**Phase B note:** SQL portability work happens here. If any statement requires Oracle-specific syntax (`RETURNING INTO`, hierarchical `CONNECT BY`, etc.), document it. The portable two-step sequence pattern recommended above should require no changes when swapping H2 for Oracle.
+**Deviations from plan (reviewed and approved):**
+- `cascadeDeleteSubtree` uses **BFS traversal** instead of the recursive CTE specified in design §12. H2 2.x cannot resolve a recursive CTE self-reference when SQL is sent as a `PreparedStatement` (which Spring's `JdbcClient`/`NamedParameterJdbcTemplate` always uses). Error: `Table "SUB" not found [42102-232]` during prepare-phase parsing. The CTE works with plain `Statement.execute()` but not `PreparedStatement`. BFS achieves identical semantics and is fully Oracle-portable. **Phase B note:** If Oracle 19c is tested in Phase 14, verify BFS performs acceptably for expected tree depths (max ~10 levels); if not, the implementation can be switched to a `StatementCallback` with the CTE at that point.
+- `streamAllStructural` uses `JdbcTemplate.query(PreparedStatementCreator, RowCallbackHandler)` (not `JdbcClient`) to set `fetchSize=1000` per-query. H2 ignores fetchSize but the code is correct for Oracle.
 
 ---
 
-## Phase 4 — Cache
+## Phase 4 — Cache ⬅ NEXT
 
 **Goal:** in-memory tree with the full `apply*` tolerance contract; concurrency proven.
 
