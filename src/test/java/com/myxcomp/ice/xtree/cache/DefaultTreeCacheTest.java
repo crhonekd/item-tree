@@ -1,5 +1,6 @@
 package com.myxcomp.ice.xtree.cache;
 
+import com.myxcomp.ice.xtree.persistence.StructuralRow;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -358,6 +359,69 @@ class DefaultTreeCacheTest {
             cache.applyDelete(Set.of(2L, 3L, 100L));
             assertThat(cache.size()).isEqualTo(1); // only root remains
             assertThat(cache.getChildren(1L)).isEmpty();
+        }
+    }
+
+    @Nested
+    class ReplaceAll {
+
+        private TreeSnapshot buildSnapshot(long... leafIds) {
+            SnapshotBuilder builder = new SnapshotBuilder();
+            builder.accept(new StructuralRow(
+                    1L, 0L, "root", "Folder", T, "sys"));
+            for (long id : leafIds) {
+                builder.accept(new StructuralRow(
+                        id, 1L, "node" + id, "Report", T, "sys"));
+            }
+            return builder.build();
+        }
+
+        @Test
+        void replaceAllSwapsToNewSnapshot() {
+            loadStandardTree(cache); // ids 1, 2, 3, 100
+
+            TreeSnapshot snapB = buildSnapshot(200L, 201L); // root + two new leaves
+            cache.replaceAll(snapB);
+
+            assertThat(cache.size()).isEqualTo(3); // root + 200 + 201
+            assertThat(cache.getById(200L)).isPresent();
+            assertThat(cache.getById(201L)).isPresent();
+            // Old nodes are gone
+            assertThat(cache.getById(2L)).isEmpty();
+            assertThat(cache.getById(3L)).isEmpty();
+            assertThat(cache.getById(100L)).isEmpty();
+        }
+
+        @Test
+        void replaceAllWithEmptySnapshotClearsCache() {
+            loadStandardTree(cache);
+            cache.replaceAll(new SnapshotBuilder().build());
+            assertThat(cache.size()).isZero();
+        }
+
+        @Test
+        void replaceAllUpdatesChildrenIndex() {
+            loadStandardTree(cache);
+            TreeSnapshot snapB = buildSnapshot(200L, 201L);
+            cache.replaceAll(snapB);
+
+            List<CachedNode> rootChildren = cache.getChildren(1L);
+            assertThat(rootChildren).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(200L, 201L);
+        }
+
+        @Test
+        void replaceAllUpdatesFoldersByNameIndex() {
+            SnapshotBuilder builder = new SnapshotBuilder();
+            builder.accept(new StructuralRow(
+                    1L, 0L, "root", "Folder", T, "sys"));
+            builder.accept(new StructuralRow(
+                    50L, 1L, "specialFolder", "Folder", T, "sys"));
+            cache.replaceAll(builder.build());
+
+            assertThat(cache.findHomeFolder("specialFolder")).isPresent();
+            // "Users" was in the old tree but not in the snapshot — must be gone
+            assertThat(cache.findHomeFolder("Users")).isEmpty();
         }
     }
 }
