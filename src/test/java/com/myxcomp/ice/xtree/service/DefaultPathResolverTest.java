@@ -75,5 +75,26 @@ class DefaultPathResolverTest {
             loadFixture(cache);
             assertThat(resolver.pathOf(999L)).isEmpty();
         }
+
+        @Test
+        void orphanParentMidChainReturnsPartialPath() {
+            // OrphanA's parent (999) is not in the cache.
+            // pathOf walks one step (collects "OrphanA"), finds parent missing, stops.
+            // Returns the partial path with just the one name — no root prefix.
+            cache.applyCreate(folder(50L, 999L, "OrphanA"));
+
+            assertThat(resolver.pathOf(50L)).isEqualTo("OrphanA");
+        }
+
+        @Test
+        void cycleInParentChainTerminatesWithPartialPath() {
+            // Two-node cycle: A.parent=B, B.parent=A.
+            cache.applyCreate(folder(100L, 200L, "A"));
+            cache.applyCreate(folder(200L, 100L, "B"));
+
+            // Must terminate (cap hit) without throwing. Result is non-null.
+            assertThat(resolver.pathOf(100L)).isNotNull();
+            assertThat(resolver.pathOf(200L)).isNotNull();
+        }
     }
 }
