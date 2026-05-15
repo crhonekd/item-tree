@@ -137,4 +137,79 @@ class DefaultTreeCacheGetTreeViewTest {
             }
         }
     }
+
+    @Nested
+    class Composition {
+
+        @Test
+        void skeletonExcludesNonFolderChildrenOfRoot() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "FolderA"));
+            cache.applyCreate(leaf  (3L, 1L, "LeafA"));
+
+            // Home is FolderA (depth 1). LeafA is a non-folder depth-1 node; must NOT be in skeleton.
+            // FolderA has no children.
+            List<CachedNode> view = cache.getTreeView(2L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L);
+        }
+
+        @Test
+        void skeletonExcludesNonFolderGrandchildren() {
+            // root → Outer (folder) → InnerLeaf (non-folder).
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "Outer"));
+            cache.applyCreate(leaf  (3L, 2L, "InnerLeaf"));
+
+            // InnerLeaf is a depth-2 non-folder; NOT in skeleton. But it IS a direct child of
+            // Outer (the home), so it appears via the home-children source.
+            List<CachedNode> view = cache.getTreeView(2L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L, 3L);
+
+            // Move the home one level up to root — now InnerLeaf is no longer a home-child.
+            List<CachedNode> rootView = cache.getTreeView(1L);
+            assertThat(rootView).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L);
+        }
+
+        @Test
+        void duplicateIdsAcrossSourcesAppearOnlyOnce() {
+            loadFixture(cache);
+
+            // Users (id=2) is depth-1: it's in skeleton AND in the chain when home is testuser1.
+            // Must appear exactly once.
+            List<CachedNode> view = cache.getTreeView(10L);
+
+            long usersCount = view.stream().filter(n -> n.itemTreeId() == 2L).count();
+            assertThat(usersCount).isEqualTo(1);
+        }
+
+        @Test
+        void mixedTypeHomeChildrenAllAppear() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "Home"));
+            cache.applyCreate(folder(10L, 2L, "SubFolder"));
+            cache.applyCreate(leaf  (11L, 2L, "Report"));
+            cache.applyCreate(leaf  (12L, 2L, "Filter"));
+
+            List<CachedNode> view = cache.getTreeView(2L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L, 10L, 11L, 12L);
+        }
+
+        @Test
+        void emptyHomeFolderReturnsSkeletonAndChainOnly() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "Home")); // no children
+
+            List<CachedNode> view = cache.getTreeView(2L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L);
+        }
+    }
 }
