@@ -161,12 +161,16 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 **Tests:**
 - `JdbcItemTreeRepositoryIT` — uses the same H2 schema and seed data as the dev profile.
-- Covers every method including edge cases: empty id list, 1001+ id chunking, cascade delete of an empty subtree, conditional backfill (returns 0 if JSON already populated).
-- 23 IT tests, 72 total tests — all green.
+- Covers every method including edge cases: empty id list, 1001+ id chunking, cascade delete of an empty subtree, conditional backfill (returns 0 if JSON already populated), CLOB round-trip (8 KB payloads), empty-table streaming, full-tree cascade from root, batch backfill (mixed-state and all-null), sub-second boundary for delta query.
+- 30 IT tests, 79 total tests — all green.
 
 **Deviations from plan (reviewed and approved):**
 - `cascadeDeleteSubtree` uses **BFS traversal** instead of the recursive CTE specified in design §12. H2 2.x cannot resolve a recursive CTE self-reference when SQL is sent as a `PreparedStatement` (which Spring's `JdbcClient`/`NamedParameterJdbcTemplate` always uses). Error: `Table "SUB" not found [42102-232]` during prepare-phase parsing. The CTE works with plain `Statement.execute()` but not `PreparedStatement`. BFS achieves identical semantics and is fully Oracle-portable. **Phase B note:** If Oracle 19c is tested in Phase 14, verify BFS performs acceptably for expected tree depths (max ~10 levels); if not, the implementation can be switched to a `StatementCallback` with the CTE at that point.
 - `streamAllStructural` uses `JdbcTemplate.query(PreparedStatementCreator, RowCallbackHandler)` (not `JdbcClient`) to set `fetchSize=1000` per-query. H2 ignores fetchSize but the code is correct for Oracle.
+- `backfillJsonWhereNull` uses `JdbcTemplate.batchUpdate` (not a per-row `JdbcClient` loop) to match the design §11 "batched per request" requirement. `@Transactional` added at the repository method level as well (service layer will also provide a transaction boundary in Phase 7).
+- `cascadeDeleteSubtree` has `@Transactional` at the repository method level so the BFS reads and chunked DELETEs share one connection even before the service layer exists. This matches the design §12 "single transaction" requirement.
+- `StructuralRowMapper` reads `PARENTID` via `rs.getObject("PARENTID", Long.class)` rather than `rs.getLong` so SQL NULL (schema-forbidden but defensively handled) is preserved as `null` on the boxed-`Long` record field rather than silently becoming `0`.
+- Contract Javadoc added to all nine `ItemTreeRepository` interface methods (chunking, idempotency, no-LASTUPDATE-touch, return semantics).
 
 ---
 
