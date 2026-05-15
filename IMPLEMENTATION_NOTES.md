@@ -234,7 +234,13 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `catch (java.io.IOException e)` clauses removed from `JacksonXmlJsonConverter` — `JsonProcessingException` extends `IOException`, making them dead code. Jackson's `getOriginalMessage()` used for clean error messages.
 - Round-trip test (`roundTripXmlPreservesElementTree`) compares `XmlMapper.readTree()` output rather than raw XML strings, since `XmlMapper.readTree()` strips root element names — confirmed acceptable stub behaviour.
 
-**Actual done state:** 192 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+**Post-completion quality fixes (applied after audit, same day):**
+- `Objects.requireNonNull(type, "type")` guards added to all four public `TypePolicy` methods (`hasData`, `isAlsoPersistedAsXmlOnWrite`, `isSentAsXmlToUi`, `isKnown`) in `ConfigurableTypePolicy`. Matches the Phase 4 post-audit pattern. Tests pin the NPE message.
+- `JacksonXmlJsonConverter`: null + blank guards added to both `xmlToJson` and `jsonToXml` before any Jackson calls; `IllegalStateException` changed to `IllegalArgumentException` in both catch blocks (malformed input is a caller contract violation, not a state error). `XmlJsonConverter` interface Javadoc updated with `@throws` declarations for both exception types. Tests assert exception messages.
+- `@Order(Ordered.LOWEST_PRECEDENCE)` added to `TypePolicyStartupAuditor` to document ordering intent ahead of Phase 9 (`TreeCacheBootstrap @Order(1)`, `MessagingStarter @Order(2)`).
+- `permitsOverlapBetweenXmlOnWriteAndXmlToUi` test strengthened: now asserts all three policy methods return the expected values, not just that construction doesn't throw.
+
+**Actual done state:** 202 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
