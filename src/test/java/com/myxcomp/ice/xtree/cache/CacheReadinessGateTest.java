@@ -11,6 +11,8 @@ import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,16 +35,17 @@ class CacheReadinessGateTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void markReadyPublishesAcceptingTrafficEvent() {
         CacheReadinessGate gate = new CacheReadinessGate(eventPublisher);
         gate.markReady();
 
         ArgumentCaptor<ApplicationEvent> captor = ArgumentCaptor.forClass(ApplicationEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
-        Object event = captor.getValue();
-        assertThat(event).isInstanceOf(AvailabilityChangeEvent.class);
-        AvailabilityChangeEvent<?> ace = (AvailabilityChangeEvent<?>) event;
-        assertThat(ace.getState()).isEqualTo(ReadinessState.ACCEPTING_TRAFFIC);
+        assertThat(captor.getValue())
+                .isInstanceOf(AvailabilityChangeEvent.class)
+                .extracting(e -> ((AvailabilityChangeEvent<?>) e).getState())
+                .isEqualTo(ReadinessState.ACCEPTING_TRAFFIC);
     }
 
     @Test
@@ -51,5 +54,6 @@ class CacheReadinessGateTest {
         gate.markReady();
         gate.markReady();
         assertThat(gate.isReady()).isTrue();
+        verify(eventPublisher, times(2)).publishEvent(any(ApplicationEvent.class));
     }
 }
