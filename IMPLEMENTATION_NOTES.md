@@ -244,7 +244,11 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 6 — `getTreeView` algorithm + path resolution ⬅ NEXT
+## Phase 6 — `getTreeView` algorithm + path resolution ✅ COMPLETE (2026-05-16)
+
+**Deviations from plan:** none.
+
+**Actual done state:** 229 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 **Goal:** the trimmed tree view assembly proven across all edge cases.
 
@@ -262,7 +266,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 7 — Services
+## Phase 7 — Services ⬅ NEXT
 
 **Goal:** business logic complete; services don't depend on the HTTP layer or messaging impl.
 
