@@ -22,7 +22,7 @@ public class StructuralRowMapper implements RowMapper<StructuralRow> {
     public StructuralRow mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new StructuralRow(
                 rs.getLong("ITEMTREEID"),
-                rs.getLong("PARENTID"),
+                rs.getObject("PARENTID", Long.class),
                 rs.getString("NAME"),
                 rs.getString("TYPE"),
                 timeMapper.toInstant(rs.getObject("LASTUPDATE", LocalDateTime.class)),

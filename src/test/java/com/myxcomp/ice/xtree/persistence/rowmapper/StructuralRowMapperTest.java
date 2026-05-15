@@ -38,7 +38,7 @@ class StructuralRowMapperTest {
         void mapsAllColumnsCorrectly() throws SQLException {
             LocalDateTime lastUpdate = LocalDateTime.of(2026, 5, 1, 10, 0, 0);
             when(rs.getLong("ITEMTREEID")).thenReturn(42L);
-            when(rs.getLong("PARENTID")).thenReturn(7L);
+            when(rs.getObject("PARENTID", Long.class)).thenReturn(7L);
             when(rs.getString("NAME")).thenReturn("MyFolder");
             when(rs.getString("TYPE")).thenReturn("Folder");
             when(rs.getObject("LASTUPDATE", LocalDateTime.class)).thenReturn(lastUpdate);
@@ -57,7 +57,7 @@ class StructuralRowMapperTest {
         @Test
         void mapsRootParentId() throws SQLException {
             when(rs.getLong("ITEMTREEID")).thenReturn(1L);
-            when(rs.getLong("PARENTID")).thenReturn(0L);
+            when(rs.getObject("PARENTID", Long.class)).thenReturn(0L);
             when(rs.getString("NAME")).thenReturn("Root");
             when(rs.getString("TYPE")).thenReturn("Folder");
             when(rs.getObject("LASTUPDATE", LocalDateTime.class)).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0, 0));
@@ -76,7 +76,7 @@ class StructuralRowMapperTest {
         @Test
         void mapsNullLastUpdate() throws SQLException {
             when(rs.getLong("ITEMTREEID")).thenReturn(99L);
-            when(rs.getLong("PARENTID")).thenReturn(1L);
+            when(rs.getObject("PARENTID", Long.class)).thenReturn(1L);
             when(rs.getString("NAME")).thenReturn("Item");
             when(rs.getString("TYPE")).thenReturn("Document");
             when(rs.getObject("LASTUPDATE", LocalDateTime.class)).thenReturn(null);

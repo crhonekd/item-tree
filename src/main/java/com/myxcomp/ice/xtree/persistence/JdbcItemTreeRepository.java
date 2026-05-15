@@ -3,10 +3,14 @@ package com.myxcomp.ice.xtree.persistence;
 import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.persistence.rowmapper.PayloadRowMapper;
 import com.myxcomp.ice.xtree.persistence.rowmapper.StructuralRowMapper;
+import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,7 +51,7 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
                     return ps;
                 },
                 (org.springframework.jdbc.core.RowCallbackHandler)
-                        rs -> rowHandler.accept(structuralRowMapper.mapRow(rs, 0))
+                        rs -> rowHandler.accept(structuralRowMapper.mapRow(rs, 0)) // rowNum unused by this mapper
         );
     }
 
@@ -79,16 +83,25 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     }
 
     @Override
+    @Transactional
     public int backfillJsonWhereNull(Collection<JsonBackfillRow> rows) {
-        int updated = 0;
-        for (JsonBackfillRow row : rows) {
-            updated += jdbcClient.sql(
-                            "UPDATE ITEMTREE SET JSON = :json WHERE ITEMTREEID = :id AND JSON IS NULL")
-                    .param("json", row.json())
-                    .param("id", row.itemTreeId())
-                    .update();
-        }
-        return updated;
+        if (rows.isEmpty()) return 0;
+        List<JsonBackfillRow> list = new ArrayList<>(rows);
+        int[] counts = jdbcTemplate.batchUpdate(
+            "UPDATE ITEMTREE SET JSON = ? WHERE ITEMTREEID = ? AND JSON IS NULL",
+            new BatchPreparedStatementSetter() {
+                @Override
+                public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    ps.setString(1, list.get(i).json());
+                    ps.setLong(2, list.get(i).itemTreeId());
+                }
+                @Override
+                public int getBatchSize() { return list.size(); }
+            }
+        );
+        int total = 0;
+        for (int c : counts) total += (c > 0 ? c : 0);
+        return total;
     }
 
     @Override
@@ -168,18 +181,21 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     }
 
     @Override
+    @Transactional
     public List<Long> cascadeDeleteSubtree(long rootId) {
         // BFS instead of recursive CTE: Spring uses PreparedStatement, and H2 2.x
         // cannot resolve a recursive CTE self-reference at prepare time.
-        Long count = jdbcClient.sql("SELECT COUNT(*) FROM ITEMTREE WHERE ITEMTREEID = :id")
-                .param("id", rootId)
-                .query(Long.class)
-                .single();
-        if (count == null || count == 0) return Collections.emptyList();
+
+        // seed check: skip if root doesn't exist
+        List<Long> existingRoots = jdbcClient.sql(
+                "SELECT ITEMTREEID FROM ITEMTREE WHERE ITEMTREEID = :id")
+            .param("id", rootId)
+            .query(Long.class)
+            .list();
+        if (existingRoots.isEmpty()) return Collections.emptyList();
 
         List<Long> allIds = new ArrayList<>();
-        List<Long> frontier = new ArrayList<>();
-        frontier.add(rootId);
+        List<Long> frontier = List.of(rootId);
 
         while (!frontier.isEmpty()) {
             allIds.addAll(frontier);
@@ -207,7 +223,7 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
         List<Long> list = new ArrayList<>(ids);
         List<List<Long>> chunks = new ArrayList<>();
         for (int i = 0; i < list.size(); i += CHUNK_SIZE) {
-            chunks.add(list.subList(i, Math.min(i + CHUNK_SIZE, list.size())));
+            chunks.add(new ArrayList<>(list.subList(i, Math.min(i + CHUNK_SIZE, list.size()))));
         }
         return chunks;
     }
