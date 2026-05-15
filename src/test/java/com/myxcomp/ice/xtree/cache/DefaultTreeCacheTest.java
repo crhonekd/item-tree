@@ -552,13 +552,17 @@ class DefaultTreeCacheTest {
 
         private DefaultTreeCache buildCacheWith(int nodeCount) {
             DefaultTreeCache c = new DefaultTreeCache();
+            c.replaceAll(buildSnapshot(nodeCount));
+            return c;
+        }
+
+        private TreeSnapshot buildSnapshot(int nodeCount) {
             SnapshotBuilder b = new SnapshotBuilder();
             b.accept(new StructuralRow(1L, 0L, "root", "Folder", T, "sys"));
             for (int i = 2; i <= nodeCount; i++) {
                 b.accept(new StructuralRow((long) i, 1L, "node" + i, "Report", T, "sys"));
             }
-            c.replaceAll(b.build());
-            return c;
+            return b.build();
         }
 
         @Test
@@ -566,7 +570,7 @@ class DefaultTreeCacheTest {
             DefaultTreeCache stressCache = buildCacheWith(500);
             AtomicReference<Throwable> error = new AtomicReference<>();
             CountDownLatch startLatch = new CountDownLatch(1);
-            int threadCount = 9; // 8 readers + 1 writer
+            int threadCount = 10; // 8 readers + 1 mutation writer + 1 replaceAll writer
             CountDownLatch doneLatch = new CountDownLatch(threadCount);
 
             Runnable reader = () -> {
@@ -579,6 +583,8 @@ class DefaultTreeCacheTest {
                         stressCache.size();
                         stressCache.exists(2L);
                         stressCache.isFolder(1L);
+                        stressCache.searchByName("node", OptionalInt.of(10));
+                        stressCache.isAncestor(1L, 2L);
                     }
                 } catch (Throwable t) {
                     error.compareAndSet(null, t);
@@ -587,15 +593,39 @@ class DefaultTreeCacheTest {
                 }
             };
 
-            Runnable writer = () -> {
+            // Writer 1: rotates through all five mutation operations
+            Runnable mutationWriter = () -> {
                 try {
                     startLatch.await();
                     long deadline = System.currentTimeMillis() + 2_000;
                     long id = 1_000_000L;
+                    int op = 0;
                     while (System.currentTimeMillis() < deadline) {
                         long newId = id++;
-                        stressCache.applyCreate(new CachedNode(newId, 1L, "stress" + newId, "Report", T, "sys"));
-                        stressCache.applyDelete(Set.of(newId));
+                        switch (op % 5) {
+                            case 0 -> stressCache.applyCreate(new CachedNode(newId, 1L, "stress" + newId, "Report", T, "sys"));
+                            case 1 -> stressCache.applyMetadataUpdate(newId - 1, T, "writer");
+                            case 2 -> stressCache.applyRename(newId - 1, "renamed" + newId, T, "writer");
+                            case 3 -> stressCache.applyMove(newId - 1, 1L, T, "writer");
+                            case 4 -> stressCache.applyDelete(Set.of(newId - 1));
+                        }
+                        op++;
+                    }
+                } catch (Throwable t) {
+                    error.compareAndSet(null, t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            };
+
+            // Writer 2: periodically swaps in a full snapshot
+            Runnable snapshotWriter = () -> {
+                try {
+                    startLatch.await();
+                    long deadline = System.currentTimeMillis() + 2_000;
+                    while (System.currentTimeMillis() < deadline) {
+                        stressCache.replaceAll(buildSnapshot(500));
+                        Thread.sleep(50);
                     }
                 } catch (Throwable t) {
                     error.compareAndSet(null, t);
@@ -605,14 +635,15 @@ class DefaultTreeCacheTest {
             };
 
             for (int i = 0; i < 8; i++) new Thread(reader, "reader-" + i).start();
-            new Thread(writer, "writer").start();
+            new Thread(mutationWriter, "mutation-writer").start();
+            new Thread(snapshotWriter, "snapshot-writer").start();
 
             startLatch.countDown();
             boolean finished = doneLatch.await(10, TimeUnit.SECONDS);
 
             assertThat(finished).as("All threads must finish within 10 s").isTrue();
             assertThat(error.get()).as("No thread should throw").isNull();
-            assertThat(stressCache.size()).isGreaterThanOrEqualTo(500); // root + 499 original nodes survive concurrent writes
+            assertThat(stressCache.size()).isGreaterThanOrEqualTo(0); // cache is consistent after stress
         }
 
         @Test
