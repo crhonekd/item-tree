@@ -1,9 +1,14 @@
 package com.myxcomp.ice.xtree.conversion.dev;
 
+import java.util.stream.Stream;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -58,16 +63,54 @@ class JacksonXmlJsonConverterTest {
     }
 
     @Test
-    void malformedXmlThrowsIllegalStateException() {
+    void malformedXmlThrowsIllegalArgumentException() {
         assertThatThrownBy(() -> converter.xmlToJson("<bad><unclosed>"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("XML");
     }
 
     @Test
-    void malformedJsonThrowsIllegalStateException() {
+    void malformedJsonThrowsIllegalArgumentException() {
         assertThatThrownBy(() -> converter.jsonToXml("{ not json"))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("JSON");
+    }
+
+    @Nested
+    class NullAndBlankGuards {
+
+        static Stream<String> blankInputs() {
+            return Stream.of("", "   ");
+        }
+
+        @Test
+        void xmlToJsonNullThrowsNullPointerException() {
+            assertThatThrownBy(() -> converter.xmlToJson(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("xml");
+        }
+
+        @ParameterizedTest(name = "xmlToJson(\"{0}\") throws IllegalArgumentException")
+        @MethodSource("blankInputs")
+        void xmlToJsonBlankThrowsIllegalArgumentException(String blank) {
+            assertThatThrownBy(() -> converter.xmlToJson(blank))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("blank");
+        }
+
+        @Test
+        void jsonToXmlNullThrowsNullPointerException() {
+            assertThatThrownBy(() -> converter.jsonToXml(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("json");
+        }
+
+        @ParameterizedTest(name = "jsonToXml(\"{0}\") throws IllegalArgumentException")
+        @MethodSource("blankInputs")
+        void jsonToXmlBlankThrowsIllegalArgumentException(String blank) {
+            assertThatThrownBy(() -> converter.jsonToXml(blank))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("blank");
+        }
     }
 }
