@@ -51,6 +51,16 @@ class JdbcItemTreeRepositoryIT {
             assertThat(root.type()).isEqualTo("Folder");
             assertThat(root.lastUpdate()).isEqualTo(Instant.parse("2026-05-01T10:00:00Z"));
         }
+
+        @Test
+        void returnsNothingFromEmptyTable() {
+            jdbcClient.sql("DELETE FROM ITEMTREE").update();
+
+            List<StructuralRow> rows = new ArrayList<>();
+            repository.streamAllStructural(rows::add);
+
+            assertThat(rows).isEmpty();
+        }
     }
 
     @Nested
@@ -76,6 +86,18 @@ class JdbcItemTreeRepositoryIT {
             List<StructuralRow> rows = repository.findStructuralChangedSince(
                     Instant.parse("2026-05-02T00:00:00Z"));
             assertThat(rows).isEmpty();
+        }
+
+        @Test
+        void treatsSubSecondOffsetSameAsExactBoundary() {
+            // LASTUPDATE stored at second granularity; 999ms before the stored value
+            // is still < that second-truncated timestamp on Oracle DATE.
+            // Since since-query uses >, rows AT the truncated second are excluded.
+            Instant sinceWithSubSecond = Instant.parse("2026-05-01T09:59:59.999Z");
+            List<StructuralRow> rows = repository.findStructuralChangedSince(sinceWithSubSecond);
+            // 2026-05-01 09:59:59.999 truncates to 09:59:59 in Oracle DATE,
+            // and 10:00:00 > 09:59:59 → all 33 rows returned
+            assertThat(rows).hasSize(33);
         }
     }
 
@@ -128,6 +150,28 @@ class JdbcItemTreeRepositoryIT {
             List<PayloadRow> rows = repository.findPayloadByIds(insertedIds);
 
             assertThat(rows).hasSize(1001);
+        }
+
+        @Test
+        void roundTripsLargeClob() {
+            String largeJson = "{\"data\":\"" + "x".repeat(8192) + "\"}";
+            String largeXml  = "<root><data>" + "y".repeat(8192) + "</data></root>";
+            jdbcClient.sql("""
+                    INSERT INTO ITEMTREE
+                      (ITEMTREEID, PARENTID, NAME, TYPE, JSON, XML, LASTUPDATE, LASTUPDATEUSER)
+                    VALUES (:id, 1, 'ClobTest', 'Report', :json, :xml,
+                            TIMESTAMP '2026-05-15 10:00:00', 'test')
+                    """)
+                .param("id", 300_001L)
+                .param("json", largeJson)
+                .param("xml", largeXml)
+                .update();
+
+            List<PayloadRow> rows = repository.findPayloadByIds(List.of(300_001L));
+
+            assertThat(rows).hasSize(1);
+            assertThat(rows.get(0).json()).isEqualTo(largeJson);
+            assertThat(rows.get(0).xml()).isEqualTo(largeXml);
         }
     }
 
@@ -311,6 +355,17 @@ class JdbcItemTreeRepositoryIT {
             List<Long> ids = repository.cascadeDeleteSubtree(999_999L);
             assertThat(ids).isEmpty();
         }
+
+        @Test
+        void deletesEntireTreeFromRoot() {
+            List<Long> ids = repository.cascadeDeleteSubtree(1L);
+
+            assertThat(ids).hasSize(33); // all seed rows
+
+            long remaining = jdbcClient.sql("SELECT COUNT(*) FROM ITEMTREE")
+                    .query(Long.class).single();
+            assertThat(remaining).isZero();
+        }
     }
 
     @Nested
@@ -355,6 +410,52 @@ class JdbcItemTreeRepositoryIT {
                     .single();
 
             assertThat(after).isEqualTo(before);
+        }
+
+        @Test
+        void emptyInputReturnsZero() {
+            int updated = repository.backfillJsonWhereNull(List.of());
+            assertThat(updated).isZero();
+        }
+
+        @Test
+        void updatesOnlyNullJsonRowsInBatch() {
+            // id=60 has JSON=NULL; id=41 already has JSON
+            int updated = repository.backfillJsonWhereNull(List.of(
+                    new JsonBackfillRow(60L, "{\"name\":\"batch\",\"n\":1}"),
+                    new JsonBackfillRow(41L, "{\"name\":\"ignored\",\"n\":99}")
+            ));
+            assertThat(updated).isEqualTo(1);
+
+            String json60 = jdbcClient.sql("SELECT JSON FROM ITEMTREE WHERE ITEMTREEID = 60")
+                    .query((rs, n) -> rs.getString("JSON")).single();
+            assertThat(json60).isEqualTo("{\"name\":\"batch\",\"n\":1}");
+
+            // id=41 must be unchanged
+            String json41 = jdbcClient.sql("SELECT JSON FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> rs.getString("JSON")).single();
+            assertThat(json41).isEqualTo("{\"name\":\"r1\",\"n\":1}");
+        }
+
+        @Test
+        void allNullRowsBatchReturnsCorrectCount() {
+            // insert two rows with JSON=NULL
+            jdbcClient.sql("""
+                    INSERT INTO ITEMTREE (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON)
+                    VALUES (:id, 1, :name, 'Report', NULL, 'system', TIMESTAMP '2026-05-15 10:00:00', NULL)
+                    """)
+                .param("id", 300_010L).param("name", "Batch1").update();
+            jdbcClient.sql("""
+                    INSERT INTO ITEMTREE (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON)
+                    VALUES (:id, 1, :name, 'Report', NULL, 'system', TIMESTAMP '2026-05-15 10:00:00', NULL)
+                    """)
+                .param("id", 300_011L).param("name", "Batch2").update();
+
+            int updated = repository.backfillJsonWhereNull(List.of(
+                    new JsonBackfillRow(300_010L, "{\"n\":10}"),
+                    new JsonBackfillRow(300_011L, "{\"n\":11}")
+            ));
+            assertThat(updated).isEqualTo(2);
         }
     }
 }
