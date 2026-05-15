@@ -161,7 +161,38 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
 
     @Override
     public List<Long> cascadeDeleteSubtree(long rootId) {
-        throw new UnsupportedOperationException("not yet implemented");
+        // BFS instead of recursive CTE: Spring uses PreparedStatement, and H2 2.x
+        // cannot resolve a recursive CTE self-reference at prepare time.
+        Long count = jdbcClient.sql("SELECT COUNT(*) FROM ITEMTREE WHERE ITEMTREEID = :id")
+                .param("id", rootId)
+                .query(Long.class)
+                .single();
+        if (count == null || count == 0) return Collections.emptyList();
+
+        List<Long> allIds = new ArrayList<>();
+        List<Long> frontier = new ArrayList<>();
+        frontier.add(rootId);
+
+        while (!frontier.isEmpty()) {
+            allIds.addAll(frontier);
+            List<Long> next = new ArrayList<>();
+            for (List<Long> chunk : partition(frontier)) {
+                next.addAll(jdbcClient.sql(
+                                "SELECT ITEMTREEID FROM ITEMTREE WHERE PARENTID IN (:ids)")
+                        .param("ids", chunk)
+                        .query(Long.class)
+                        .list());
+            }
+            frontier = next;
+        }
+
+        for (List<Long> chunk : partition(allIds)) {
+            jdbcClient.sql("DELETE FROM ITEMTREE WHERE ITEMTREEID IN (:ids)")
+                    .param("ids", chunk)
+                    .update();
+        }
+
+        return allIds;
     }
 
     private List<List<Long>> partition(Collection<Long> ids) {
