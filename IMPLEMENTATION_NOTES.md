@@ -200,7 +200,14 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `isAncestor(x, x)` returns `false` via an explicit early-return guard rather than relying on tree structure.
 - `applyDelete` contract documented on the `TreeCache` interface: caller must pass the complete descendant set.
 
-**Actual done state:** 141 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+**Post-completion quality fixes (applied after audit, same phase):**
+- `removeFromChildren` / `removeFromFoldersByName` helpers now prune empty `Set<Long>` entries from `childrenByParent` and `foldersByName` after removal using the two-arg `Map.remove(key, value)` to prevent unbounded map growth under churn.
+- `Objects.requireNonNull` guards added to all six public mutation methods (`applyCreate`, `applyMetadataUpdate`, `applyMove`, `applyRename`, `applyDelete`, `replaceAll`) covering node, ids, snapshot, newName, lastUpdate, and lastUpdateUser parameters; all guards precede lock acquisition.
+- `CacheReadinessGate.markReady()` replaced `volatile boolean` check-then-act with `AtomicBoolean.compareAndSet` so the `ACCEPTING_TRAFFIC` event is published exactly once regardless of concurrent callers.
+- `MAX_ANCESTOR_WALK` Javadoc corrected: removed incorrect "independent of live map size" claim; the effective cap is `min(cache-size+1, 10_000)`.
+- `DefaultTreeCacheTest` extended with: 10 null-guard assertion tests (`NullGuards` nested class); 4 edge-case tests (`EdgeCases` nested class) covering no-op move, no-op rename, rename-to-shared-folder-name, and orphan-parent create; concurrency stress writer broadened to rotate through all five mutation types (`applyCreate`, `applyMetadataUpdate`, `applyRename`, `applyMove`, `applyDelete`) with a second concurrent `replaceAll` writer thread.
+
+**Actual done state:** 155 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
