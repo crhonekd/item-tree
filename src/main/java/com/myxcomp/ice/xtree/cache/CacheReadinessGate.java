@@ -16,6 +16,7 @@ public class CacheReadinessGate {
     }
 
     public void markReady() {
+        if (ready) return;
         ready = true;
         AvailabilityChangeEvent.publish(eventPublisher, this, ReadinessState.ACCEPTING_TRAFFIC);
     }

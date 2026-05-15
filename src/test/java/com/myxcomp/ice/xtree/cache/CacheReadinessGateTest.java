@@ -54,6 +54,6 @@ class CacheReadinessGateTest {
         gate.markReady();
         gate.markReady();
         assertThat(gate.isReady()).isTrue();
-        verify(eventPublisher, times(2)).publishEvent(any(ApplicationEvent.class));
+        verify(eventPublisher, times(1)).publishEvent(any(ApplicationEvent.class));
     }
 }

@@ -24,7 +24,7 @@ public class DefaultTreeCache implements TreeCache {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultTreeCache.class);
 
-    /** Safety cap for ancestor-walk cycle detection (independent of live map size). */
+    /** Ceiling for ancestor-walk cycle detection; effective cap is min(cache-size+1, this). */
     private static final int MAX_ANCESTOR_WALK = 10_000;
 
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
@@ -105,6 +105,7 @@ public class DefaultTreeCache implements TreeCache {
             }
             if (candidates.size() > 1) {
                 log.warn("Multiple home folders found for user '{}': ids={}", userName, candidates);
+                // Iteration order over ConcurrentHashMap.newKeySet() is non-deterministic; any match is returned.
             }
             for (Long id : candidates) {
                 CachedNode node = byId.get(id);
@@ -204,6 +205,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public void applyCreate(CachedNode node) {
+        Objects.requireNonNull(node, "node");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(node.itemTreeId());
@@ -231,6 +233,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public void applyMetadataUpdate(long id, Instant lastUpdate, String lastUpdateUser) {
+        Objects.requireNonNull(lastUpdate, "lastUpdate");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(id);
@@ -252,6 +255,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public void applyMove(long id, long newParentId, Instant lastUpdate, String lastUpdateUser) {
+        Objects.requireNonNull(lastUpdate, "lastUpdate");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(id);
@@ -282,6 +286,8 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public void applyRename(long id, String newName, Instant lastUpdate, String lastUpdateUser) {
+        Objects.requireNonNull(newName, "newName");
+        Objects.requireNonNull(lastUpdate, "lastUpdate");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(id);
@@ -309,6 +315,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public void applyDelete(Set<Long> ids) {
+        Objects.requireNonNull(ids, "ids");
         lock.writeLock().lock();
         try {
             // Caller must pass the complete descendant set; partial sets leave dangling childrenByParent entries.
@@ -330,6 +337,7 @@ public class DefaultTreeCache implements TreeCache {
 
     @Override
     public void replaceAll(TreeSnapshot snapshot) {
+        Objects.requireNonNull(snapshot, "snapshot");
         // Deep-copy OUTSIDE the write lock to keep lock duration minimal (no I/O, just map copies)
         Map<Long, CachedNode> newById = new ConcurrentHashMap<>(snapshot.byId());
 
@@ -364,6 +372,9 @@ public class DefaultTreeCache implements TreeCache {
         Set<Long> siblings = childrenByParent.get(parentId);
         if (siblings != null) {
             siblings.remove(childId);
+            if (siblings.isEmpty()) {
+                childrenByParent.remove(parentId, siblings);
+            }
         }
     }
 
@@ -371,6 +382,9 @@ public class DefaultTreeCache implements TreeCache {
         Set<Long> folders = foldersByName.get(name);
         if (folders != null) {
             folders.remove(id);
+            if (folders.isEmpty()) {
+                foldersByName.remove(name, folders);
+            }
         }
     }
 }
