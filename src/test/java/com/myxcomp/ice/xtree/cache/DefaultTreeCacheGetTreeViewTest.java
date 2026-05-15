@@ -212,4 +212,48 @@ class DefaultTreeCacheGetTreeViewTest {
                     .containsExactlyInAnyOrder(1L, 2L);
         }
     }
+
+    @Nested
+    class Drift {
+
+        @Test
+        void missingHomeFolderThrowsIllegalArgumentException() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> cache.getTreeView(999L))
+                    .withMessageContaining("999");
+        }
+
+        @Test
+        void missingAncestorMidWalkReturnsPartialResultWithoutThrowing() {
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(2L, 1L, "Users"));
+            // Orphan: parentId=999 doesn't exist. The walk hits a missing ancestor on its
+            // first step (after collecting Orphan itself) and stops.
+            cache.applyCreate(folder(50L, 999L, "Orphan"));
+            cache.applyCreate(leaf  (51L, 50L, "OrphanChild"));
+
+            List<CachedNode> view = cache.getTreeView(50L);
+
+            // Skeleton: 1, 2 (root + Users). Chain stops at Orphan (id=50) — partial.
+            // Home children of Orphan: 51.
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L, 50L, 51L);
+        }
+
+        @Test
+        void cycleInParentChainIsCappedAndReturnsPartial() {
+            // Two-node cycle: A(100).parent=B(200), B(200).parent=A(100).
+            cache.applyCreate(folder(1L, 0L, "root"));
+            cache.applyCreate(folder(100L, 200L, "A")); // A.parent = B
+            cache.applyCreate(folder(200L, 100L, "B")); // B.parent = A — cycle established
+
+            // getTreeView on A: walk goes A → B → A → B... cap fires; no throw.
+            // At minimum, the result must contain the skeleton (root=1) and A itself (100).
+            List<CachedNode> view = cache.getTreeView(100L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId).contains(1L, 100L);
+        }
+    }
 }
