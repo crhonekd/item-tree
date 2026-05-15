@@ -113,19 +113,50 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     @Override
     public void updateJson(long id, String json, String xmlOrNull,
                            Instant lastUpdate, String lastUpdateUser) {
-        throw new UnsupportedOperationException("not yet implemented");
+        jdbcClient.sql("""
+                        UPDATE ITEMTREE
+                           SET JSON = :json, XML = :xml,
+                               LASTUPDATE = :lastUpdate, LASTUPDATEUSER = :lastUpdateUser
+                         WHERE ITEMTREEID = :id
+                        """)
+                .param("json", json)
+                .param("xml", xmlOrNull)
+                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
+                .param("lastUpdateUser", lastUpdateUser)
+                .param("id", id)
+                .update();
     }
 
     @Override
     public void updateParent(long id, long newParentId,
                              Instant lastUpdate, String lastUpdateUser) {
-        throw new UnsupportedOperationException("not yet implemented");
+        jdbcClient.sql("""
+                        UPDATE ITEMTREE
+                           SET PARENTID = :newParentId,
+                               LASTUPDATE = :lastUpdate, LASTUPDATEUSER = :lastUpdateUser
+                         WHERE ITEMTREEID = :id
+                        """)
+                .param("newParentId", newParentId)
+                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
+                .param("lastUpdateUser", lastUpdateUser)
+                .param("id", id)
+                .update();
     }
 
     @Override
     public void updateName(long id, String newName,
                            Instant lastUpdate, String lastUpdateUser) {
-        throw new UnsupportedOperationException("not yet implemented");
+        jdbcClient.sql("""
+                        UPDATE ITEMTREE
+                           SET NAME = :newName,
+                               LASTUPDATE = :lastUpdate, LASTUPDATEUSER = :lastUpdateUser
+                         WHERE ITEMTREEID = :id
+                        """)
+                .param("newName", newName)
+                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
+                .param("lastUpdateUser", lastUpdateUser)
+                .param("id", id)
+                .update();
     }
 
     @Override

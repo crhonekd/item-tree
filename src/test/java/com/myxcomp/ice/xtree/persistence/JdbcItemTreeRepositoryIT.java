@@ -174,4 +174,111 @@ class JdbcItemTreeRepositoryIT {
             assertThat(row.json()).isNull();
         }
     }
+
+    @Nested
+    class UpdateJson {
+
+        @Test
+        void updatesJsonAndXmlColumns() {
+            repository.updateJson(41L, "{\"name\":\"updated\",\"n\":2}",
+                    "<report><name>updated</name></report>",
+                    Instant.parse("2026-05-15T14:00:00Z"), "editor");
+
+            record Row(String json, String xml, String name) {}
+            Row row = jdbcClient.sql(
+                            "SELECT JSON, XML, NAME FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> new Row(
+                            rs.getString("JSON"), rs.getString("XML"), rs.getString("NAME")))
+                    .single();
+
+            assertThat(row.json()).isEqualTo("{\"name\":\"updated\",\"n\":2}");
+            assertThat(row.xml()).isEqualTo("<report><name>updated</name></report>");
+            assertThat(row.name()).isEqualTo("Report1"); // NAME must not change
+        }
+
+        @Test
+        void stampsLastUpdateAndUser() {
+            repository.updateJson(41L, "{\"name\":\"updated\",\"n\":2}", null,
+                    Instant.parse("2026-05-15T14:00:00Z"), "editor");
+
+            record Row(java.time.LocalDateTime lastUpdate, String lastUpdateUser) {}
+            Row row = jdbcClient.sql(
+                            "SELECT LASTUPDATE, LASTUPDATEUSER FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> new Row(
+                            rs.getObject("LASTUPDATE", java.time.LocalDateTime.class),
+                            rs.getString("LASTUPDATEUSER")))
+                    .single();
+
+            assertThat(row.lastUpdate()).isEqualTo(java.time.LocalDateTime.of(2026, 5, 15, 14, 0, 0));
+            assertThat(row.lastUpdateUser()).isEqualTo("editor");
+        }
+    }
+
+    @Nested
+    class UpdateParent {
+
+        @Test
+        void changesParentId() {
+            repository.updateParent(41L, 6L,
+                    Instant.parse("2026-05-15T14:00:00Z"), "mover");
+
+            long parentId = jdbcClient.sql(
+                            "SELECT PARENTID FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> rs.getLong("PARENTID"))
+                    .single();
+
+            assertThat(parentId).isEqualTo(6L);
+        }
+
+        @Test
+        void stampsLastUpdateAndUser() {
+            repository.updateParent(41L, 6L,
+                    Instant.parse("2026-05-15T14:00:00Z"), "mover");
+
+            record Row(java.time.LocalDateTime lastUpdate, String lastUpdateUser) {}
+            Row row = jdbcClient.sql(
+                            "SELECT LASTUPDATE, LASTUPDATEUSER FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> new Row(
+                            rs.getObject("LASTUPDATE", java.time.LocalDateTime.class),
+                            rs.getString("LASTUPDATEUSER")))
+                    .single();
+
+            assertThat(row.lastUpdate()).isEqualTo(java.time.LocalDateTime.of(2026, 5, 15, 14, 0, 0));
+            assertThat(row.lastUpdateUser()).isEqualTo("mover");
+        }
+    }
+
+    @Nested
+    class UpdateName {
+
+        @Test
+        void changesName() {
+            repository.updateName(41L, "RenamedReport",
+                    Instant.parse("2026-05-15T14:00:00Z"), "renamer");
+
+            String name = jdbcClient.sql(
+                            "SELECT NAME FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> rs.getString("NAME"))
+                    .single();
+
+            assertThat(name).isEqualTo("RenamedReport");
+        }
+
+        @Test
+        void stampsLastUpdateAndUser() {
+            repository.updateName(41L, "RenamedReport",
+                    Instant.parse("2026-05-15T14:00:00Z"), "renamer");
+
+            record Row(java.time.LocalDateTime lastUpdate, String lastUpdateUser) {}
+            Row row = jdbcClient.sql(
+                            "SELECT LASTUPDATE, LASTUPDATEUSER FROM ITEMTREE WHERE ITEMTREEID = 41")
+                    .query((rs, n) -> new Row(
+                            rs.getObject("LASTUPDATE", java.time.LocalDateTime.class),
+                            rs.getString("LASTUPDATEUSER")))
+                    .single();
+
+            assertThat(row.lastUpdate()).isEqualTo(java.time.LocalDateTime.of(2026, 5, 15, 14, 0, 0));
+            assertThat(row.lastUpdateUser()).isEqualTo("renamer");
+        }
+    }
 }
