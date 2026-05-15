@@ -494,7 +494,7 @@ class DefaultTreeCacheTest {
 
             assertThat(finished).as("All threads must finish within 10 s").isTrue();
             assertThat(error.get()).as("No thread should throw").isNull();
-            assertThat(stressCache.size()).isGreaterThan(0);
+            assertThat(stressCache.size()).isGreaterThanOrEqualTo(500); // root + 499 original nodes survive concurrent writes
         }
 
         @Test
@@ -520,7 +520,10 @@ class DefaultTreeCacheTest {
             // Snap-A IDs are in [2, 51]; snap-B IDs are in [1000, 1049].  Any overlap would mean
             // a child from one snapshot appeared alongside a child from the other snapshot in the
             // same call, which would prove a non-atomic swap.
+            CountDownLatch readyLatch = new CountDownLatch(1);
+
             Thread reader = new Thread(() -> {
+                readyLatch.countDown();  // signal: thread is running, loop about to start
                 while (!stop.get()) {
                     List<CachedNode> children = atomicCache.getChildren(1L);
                     if (children.isEmpty()) continue;
@@ -533,12 +536,14 @@ class DefaultTreeCacheTest {
                 }
             }, "atomicity-reader");
             reader.start();
-
-            Thread.sleep(10);
+            readyLatch.await();  // deterministic: reader thread is running
             atomicCache.replaceAll(snapB);
             stop.set(true);
             reader.join(2_000);
 
+            assertThat(reader.isAlive())
+                    .as("atomicity-reader must terminate within 2 s")
+                    .isFalse();
             assertThat(inconsistencyFound.get())
                     .as("getChildren must never return children from two different snapshots in one call")
                     .isFalse();
