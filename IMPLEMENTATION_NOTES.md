@@ -174,7 +174,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 4 — Cache ⬅ NEXT
+## Phase 4 — Cache ✅ COMPLETE (2026-05-15)
 
 **Goal:** in-memory tree with the full `apply*` tolerance contract; concurrency proven.
 
@@ -192,11 +192,21 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Concurrency stress: N reader threads + 1 writer thread for M seconds; assert no exceptions and final state matches expected.
 - `replaceAll` — snapshot swap is atomic from a reader's viewpoint.
 
-> **Follow-up (quality review):** `CachedNode.parentId` is boxed `Long` and the design contract says it is never null. Add a compact-constructor `Objects.requireNonNull(parentId, "parentId")` guard in `CachedNode.java` when implementing `DefaultTreeCache`, so the `apply*` methods and `applyCreate` upsert logic are introduced alongside their non-null enforcement and tests.
+**Deviations from plan (reviewed and approved):**
+- `CachedNode` compact-constructor `Objects.requireNonNull(parentId, "parentId")` guard added as part of Phase 4 (was a follow-up note in Phase 3 quality review). Tests added in `CachedNodeTest`.
+- `SnapshotBuilder.build()` deep-copies inner `Set<Long>` values via `Set.copyOf()` in addition to outer `Map.copyOf()`, producing a fully immutable `TreeSnapshot`. Plain shallow `Map.copyOf()` was rejected in code review as it left inner sets mutable.
+- `replaceAllIsAtomicFromReadersView` concurrency test was redesigned from the original plan spec. The original used two separate read-lock acquisitions (`getChildren` then `exists`) creating a TOCTOU window; the final test verifies the correct atomicity guarantee: within a single `getChildren` call the returned children all belong to one snapshot (A or B), never a mix.
+- `searchByName(null, ...)` guards with `Objects.requireNonNull` (defensive boundary at cache level, not just service level).
+- `isAncestor(x, x)` returns `false` via an explicit early-return guard rather than relying on tree structure.
+- `applyDelete` contract documented on the `TreeCache` interface: caller must pass the complete descendant set.
+
+**Actual done state:** 141 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
-## Phase 5 — Type policy & conversion
+---
+
+## Phase 5 — Type policy & conversion ⬅ NEXT
 
 **Goal:** `TypePolicy` validates at startup; `XmlJsonConverter` interface available; Phase A stub backed by Jackson.
 
