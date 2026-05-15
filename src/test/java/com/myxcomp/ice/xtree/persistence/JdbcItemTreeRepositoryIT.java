@@ -89,15 +89,13 @@ class JdbcItemTreeRepositoryIT {
         }
 
         @Test
-        void treatsSubSecondOffsetSameAsExactBoundary() {
-            // LASTUPDATE stored at second granularity; 999ms before the stored value
-            // is still < that second-truncated timestamp on Oracle DATE.
-            // Since since-query uses >, rows AT the truncated second are excluded.
-            Instant sinceWithSubSecond = Instant.parse("2026-05-01T09:59:59.999Z");
-            List<StructuralRow> rows = repository.findStructuralChangedSince(sinceWithSubSecond);
-            // 2026-05-01 09:59:59.999 truncates to 09:59:59 in Oracle DATE,
-            // and 10:00:00 > 09:59:59 → all 33 rows returned
-            assertThat(rows).hasSize(33);
+        void subSecondAboveStoredSecondIsExcluded() {
+            // Oracle DATE has 1-second precision; a since value 1ms past the stored second
+            // truncates to the stored second, making the > predicate false → 0 rows.
+            // H2 without truncation also yields 0 rows (10:00:00 is not > 10:00:00.001).
+            List<StructuralRow> rows = repository.findStructuralChangedSince(
+                    Instant.parse("2026-05-01T10:00:00.001Z"));
+            assertThat(rows).isEmpty();
         }
     }
 
