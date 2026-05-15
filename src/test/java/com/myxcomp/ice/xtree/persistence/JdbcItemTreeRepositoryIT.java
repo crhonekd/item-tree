@@ -130,4 +130,48 @@ class JdbcItemTreeRepositoryIT {
             assertThat(rows).hasSize(1001);
         }
     }
+
+    @Nested
+    class Insert {
+
+        @Test
+        void returnsGeneratedId() {
+            long id = repository.insert(1L, "NewReport", "Report",
+                    "{\"x\":1}", null,
+                    Instant.parse("2026-05-15T12:00:00Z"), "tester");
+
+            assertThat(id).isGreaterThanOrEqualTo(100_000L);
+        }
+
+        @Test
+        void rowPresentInDbWithCorrectValues() {
+            Instant ts = Instant.parse("2026-05-15T12:00:00Z");
+            long id = repository.insert(1L, "NewFolder", "Folder", null, null, ts, "admin");
+
+            record Row(long itemTreeId, long parentId, String name, String type,
+                       java.time.LocalDateTime lastUpdate, String lastUpdateUser, String json) {}
+
+            Row row = jdbcClient.sql("""
+                            SELECT ITEMTREEID, PARENTID, NAME, TYPE, LASTUPDATE, LASTUPDATEUSER, JSON
+                            FROM ITEMTREE WHERE ITEMTREEID = :id
+                            """)
+                    .param("id", id)
+                    .query((rs, n) -> new Row(
+                            rs.getLong("ITEMTREEID"),
+                            rs.getLong("PARENTID"),
+                            rs.getString("NAME"),
+                            rs.getString("TYPE"),
+                            rs.getObject("LASTUPDATE", java.time.LocalDateTime.class),
+                            rs.getString("LASTUPDATEUSER"),
+                            rs.getString("JSON")))
+                    .single();
+
+            assertThat(row.parentId()).isEqualTo(1L);
+            assertThat(row.name()).isEqualTo("NewFolder");
+            assertThat(row.type()).isEqualTo("Folder");
+            assertThat(row.lastUpdate()).isEqualTo(java.time.LocalDateTime.of(2026, 5, 15, 12, 0, 0));
+            assertThat(row.lastUpdateUser()).isEqualTo("admin");
+            assertThat(row.json()).isNull();
+        }
+    }
 }

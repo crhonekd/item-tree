@@ -87,7 +87,27 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     public long insert(long parentId, String name, String type,
                        String jsonOrNull, String xmlOrNull,
                        Instant lastUpdate, String lastUpdateUser) {
-        throw new UnsupportedOperationException("not yet implemented");
+        long id = jdbcClient.sql("SELECT ITEMTREE_ID_SQN.NEXTVAL FROM DUAL")
+                .query(Long.class)
+                .single();
+
+        jdbcClient.sql("""
+                        INSERT INTO ITEMTREE
+                          (ITEMTREEID, PARENTID, NAME, TYPE, JSON, XML, LASTUPDATE, LASTUPDATEUSER)
+                        VALUES
+                          (:id, :parentId, :name, :type, :json, :xml, :lastUpdate, :lastUpdateUser)
+                        """)
+                .param("id", id)
+                .param("parentId", parentId)
+                .param("name", name)
+                .param("type", type)
+                .param("json", jsonOrNull)
+                .param("xml", xmlOrNull)
+                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
+                .param("lastUpdateUser", lastUpdateUser)
+                .update();
+
+        return id;
     }
 
     @Override
