@@ -51,7 +51,7 @@ class ItemTreeApplicationTests {
                 .single();
 
         assertThat(root.id()).isEqualTo(1L);
-        assertThat(root.parentId()).isEqualTo(0L);
+        assertThat(root.parentId()).isZero();
         assertThat(root.name()).isEqualTo("root");
         assertThat(root.type()).isEqualTo("Folder");
     }

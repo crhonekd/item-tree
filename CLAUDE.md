@@ -146,6 +146,15 @@ Tests mirror these packages, plus an `e2e/` package for `@SpringBootTest` agains
 - E2E in `e2e/`: full wiring against H2 with the stub messaging stack, two
   `ApplicationContext`s in one JVM proving cache convergence over the in-memory bus.
 - Use JUnit 5, Mockito (no PowerMock), AssertJ. Don't test Spring's own behaviour.
+- Use AssertJ's semantic assertion methods — `isZero()` not `isEqualTo(0L)`,
+  `isEmpty()` not `isEqualTo(0)` on sizes, `isNull()` / `isNotNull()` not
+  `isEqualTo(null)`. Prefer the most specific assertion the type supports.
+- When two or more tests in the same class exercise the same logic with different
+  inputs, collapse them into a single `@ParameterizedTest` with `@MethodSource`
+  or `@ValueSource`. Keep one test per distinct behaviour, not per input value.
+- Extract repeated string literals (SQL column names used as named parameters,
+  constant field names, etc.) into `private static final String` constants in
+  the class where they appear. Apply this in both production and test code.
 - Cover all execution paths: happy path, edge cases, null inputs, boundary values,
   and expected exceptions. Use `@ParameterizedTest` for input variants;
   `@Nested` inner classes to group scenarios.

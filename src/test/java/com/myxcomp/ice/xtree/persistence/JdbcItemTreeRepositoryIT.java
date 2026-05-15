@@ -2,6 +2,9 @@ package com.myxcomp.ice.xtree.persistence;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -12,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -46,7 +50,7 @@ class JdbcItemTreeRepositoryIT {
                     .findFirst()
                     .orElseThrow();
 
-            assertThat(root.parentId()).isEqualTo(0L);
+            assertThat(root.parentId()).isZero();
             assertThat(root.name()).isEqualTo("root");
             assertThat(root.type()).isEqualTo("Folder");
             assertThat(root.lastUpdate()).isEqualTo(Instant.parse("2026-05-01T10:00:00Z"));
@@ -73,29 +77,21 @@ class JdbcItemTreeRepositoryIT {
             assertThat(rows).hasSize(33);
         }
 
-        @Test
-        void excludesRowsAtExactTimestamp() {
-            // WHERE LASTUPDATE > :since — exact match is excluded
-            List<StructuralRow> rows = repository.findStructuralChangedSince(
-                    Instant.parse("2026-05-01T10:00:00Z"));
-            assertThat(rows).isEmpty();
+        @ParameterizedTest(name = "{0}")
+        @MethodSource("sinceInstantsThatYieldNoRows")
+        void returnsEmptyForSinceAtOrAfterData(String description, Instant since) {
+            assertThat(repository.findStructuralChangedSince(since)).isEmpty();
         }
 
-        @Test
-        void returnsNothingWhenSinceIsAfterAllRows() {
-            List<StructuralRow> rows = repository.findStructuralChangedSince(
-                    Instant.parse("2026-05-02T00:00:00Z"));
-            assertThat(rows).isEmpty();
-        }
-
-        @Test
-        void subSecondAboveStoredSecondIsExcluded() {
-            // Oracle DATE has 1-second precision; a since value 1ms past the stored second
-            // truncates to the stored second, making the > predicate false → 0 rows.
-            // H2 without truncation also yields 0 rows (10:00:00 is not > 10:00:00.001).
-            List<StructuralRow> rows = repository.findStructuralChangedSince(
-                    Instant.parse("2026-05-01T10:00:00.001Z"));
-            assertThat(rows).isEmpty();
+        static Stream<Arguments> sinceInstantsThatYieldNoRows() {
+            return Stream.of(
+                // WHERE LASTUPDATE > :since — exact match is excluded (not >=)
+                Arguments.of("exact stored timestamp", Instant.parse("2026-05-01T10:00:00Z")),
+                // since is past all data
+                Arguments.of("after all data", Instant.parse("2026-05-02T00:00:00Z")),
+                // Oracle DATE has 1-second precision; sub-second past stored second is not > stored second
+                Arguments.of("sub-second above stored second", Instant.parse("2026-05-01T10:00:00.001Z"))
+            );
         }
     }
 

@@ -66,7 +66,7 @@ class StructuralRowMapperTest {
             StructuralRow row = mapper.mapRow(rs, 1);
 
             assertThat(row.itemTreeId()).isEqualTo(1L);
-            assertThat(row.parentId()).isEqualTo(0L);
+            assertThat(row.parentId()).isZero();
         }
     }
 

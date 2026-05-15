@@ -22,6 +22,8 @@ import java.util.function.Consumer;
 public class JdbcItemTreeRepository implements ItemTreeRepository {
 
     private static final int CHUNK_SIZE = 1000;
+    private static final String PARAM_LAST_UPDATE = "lastUpdate";
+    private static final String PARAM_LAST_UPDATE_USER = "lastUpdateUser";
 
     private final JdbcClient jdbcClient;
     private final JdbcTemplate jdbcTemplate;
@@ -124,8 +126,8 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
                 .param("type", type)
                 .param("json", jsonOrNull)
                 .param("xml", xmlOrNull)
-                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
-                .param("lastUpdateUser", lastUpdateUser)
+                .param(PARAM_LAST_UPDATE, timeMapper.toLocalDateTime(lastUpdate))
+                .param(PARAM_LAST_UPDATE_USER, lastUpdateUser)
                 .update();
 
         return id;
@@ -142,8 +144,8 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
                         """)
                 .param("json", json)
                 .param("xml", xmlOrNull)
-                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
-                .param("lastUpdateUser", lastUpdateUser)
+                .param(PARAM_LAST_UPDATE, timeMapper.toLocalDateTime(lastUpdate))
+                .param(PARAM_LAST_UPDATE_USER, lastUpdateUser)
                 .param("id", id)
                 .update();
     }
@@ -158,8 +160,8 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
                          WHERE ITEMTREEID = :id
                         """)
                 .param("newParentId", newParentId)
-                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
-                .param("lastUpdateUser", lastUpdateUser)
+                .param(PARAM_LAST_UPDATE, timeMapper.toLocalDateTime(lastUpdate))
+                .param(PARAM_LAST_UPDATE_USER, lastUpdateUser)
                 .param("id", id)
                 .update();
     }
@@ -174,8 +176,8 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
                          WHERE ITEMTREEID = :id
                         """)
                 .param("newName", newName)
-                .param("lastUpdate", timeMapper.toLocalDateTime(lastUpdate))
-                .param("lastUpdateUser", lastUpdateUser)
+                .param(PARAM_LAST_UPDATE, timeMapper.toLocalDateTime(lastUpdate))
+                .param(PARAM_LAST_UPDATE_USER, lastUpdateUser)
                 .param("id", id)
                 .update();
     }

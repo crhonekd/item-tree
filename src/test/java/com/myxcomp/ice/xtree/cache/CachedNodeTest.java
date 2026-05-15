@@ -19,6 +19,6 @@ class CachedNodeTest {
     @Test
     void nonNullParentIdConstructsSuccessfully() {
         CachedNode node = new CachedNode(1L, 0L, "root", "Folder", Instant.EPOCH, "sys");
-        assertThat(node.parentId()).isEqualTo(0L);
+        assertThat(node.parentId()).isZero();
     }
 }
