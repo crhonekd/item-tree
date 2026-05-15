@@ -37,7 +37,22 @@ itemtree:
     name-search: {}
   solace: {}
   oracle: {}
-  data: {}
+  data:
+    types-without-data:
+      - Folder
+      - Shortcut
+      - Shortcut.Report
+      - Shortcut.Filter
+      - Shortcut.Filter.Nested
+    types-also-persisted-as-xml-on-write:
+      - DrillDown.Set
+      - Report
+      - Filter
+      - Details.Column.Collection
+      - Numeric.Bucket.Collection
+      - Discrete.Bucket.Collection
+      - Bucket.Collection
+    types-sent-as-xml-to-ui: []
 
 springdoc:
   api-docs:

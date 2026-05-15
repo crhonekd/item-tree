@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,10 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("dev")
 @Transactional
-@TestPropertySource(properties = {
-    "itemtree.data.types-without-data=Folder,Shortcut,Shortcut.Report,Shortcut.Filter,Shortcut.Filter.Nested",
-    "itemtree.data.types-also-persisted-as-xml-on-write=DrillDown.Set,Report,Filter,Details.Column.Collection,Numeric.Bucket.Collection,Discrete.Bucket.Collection,Bucket.Collection"
-})
 class TypePolicyStartupAuditorIT {
 
     @Autowired private JdbcClient jdbcClient;
