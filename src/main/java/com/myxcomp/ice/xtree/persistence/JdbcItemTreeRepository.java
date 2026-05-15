@@ -39,12 +39,28 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
 
     @Override
     public void streamAllStructural(Consumer<StructuralRow> rowHandler) {
-        throw new UnsupportedOperationException("not yet implemented");
+        jdbcTemplate.query(
+                conn -> {
+                    java.sql.PreparedStatement ps = conn.prepareStatement(
+                            "SELECT ITEMTREEID, PARENTID, NAME, TYPE, LASTUPDATE, LASTUPDATEUSER FROM ITEMTREE");
+                    ps.setFetchSize(1000);
+                    return ps;
+                },
+                (org.springframework.jdbc.core.RowCallbackHandler)
+                        rs -> rowHandler.accept(structuralRowMapper.mapRow(rs, 0))
+        );
     }
 
     @Override
     public List<StructuralRow> findStructuralChangedSince(Instant since) {
-        throw new UnsupportedOperationException("not yet implemented");
+        return jdbcClient.sql("""
+                        SELECT ITEMTREEID, PARENTID, NAME, TYPE, LASTUPDATE, LASTUPDATEUSER
+                        FROM ITEMTREE
+                        WHERE LASTUPDATE > :since
+                        """)
+                .param("since", timeMapper.toLocalDateTime(since))
+                .query(structuralRowMapper)
+                .list();
     }
 
     @Override
