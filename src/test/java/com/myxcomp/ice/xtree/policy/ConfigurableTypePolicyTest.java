@@ -110,7 +110,8 @@ class ConfigurableTypePolicyTest {
         @MethodSource("nullableMethods")
         void nullTypeThrows(String label, ThrowingMethod method) {
             assertThatThrownBy(() -> method.call(newPolicy(), null))
-                    .isInstanceOf(NullPointerException.class);
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("type");
         }
 
         static Stream<Arguments> nullableMethods() {
@@ -173,7 +174,10 @@ class ConfigurableTypePolicyTest {
                     List.of("Folder"),
                     List.of("Report"),
                     List.of("Report"));
-            new ConfigurableTypePolicy(ok); // does not throw
+            ConfigurableTypePolicy policy = new ConfigurableTypePolicy(ok);
+            assertThat(policy.isAlsoPersistedAsXmlOnWrite("Report")).isTrue();
+            assertThat(policy.isSentAsXmlToUi("Report")).isTrue();
+            assertThat(policy.hasData("Report")).isTrue();
         }
 
         @ParameterizedTest(name = "rejects whitespace entry {0}")
