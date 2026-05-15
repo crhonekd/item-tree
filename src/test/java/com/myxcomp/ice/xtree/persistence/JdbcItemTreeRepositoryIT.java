@@ -281,4 +281,80 @@ class JdbcItemTreeRepositoryIT {
             assertThat(row.lastUpdateUser()).isEqualTo("renamer");
         }
     }
+
+    @Nested
+    class CascadeDeleteSubtree {
+
+        @Test
+        void returnsLeafNodeIdForSingleNodeSubtree() {
+            // testuser1 (id=10) has no children in seed data
+            List<Long> ids = repository.cascadeDeleteSubtree(10L);
+            assertThat(ids).containsExactlyInAnyOrder(10L);
+        }
+
+        @Test
+        void returnsAllDescendantsAndDeletesThem() {
+            // deepuser (id=12) subtree: 12, 20, 21, 22, 23, 24, 25
+            List<Long> ids = repository.cascadeDeleteSubtree(12L);
+
+            assertThat(ids).containsExactlyInAnyOrder(12L, 20L, 21L, 22L, 23L, 24L, 25L);
+
+            long remaining = jdbcClient.sql(
+                            "SELECT COUNT(*) FROM ITEMTREE WHERE ITEMTREEID IN (12, 20, 21, 22, 23, 24, 25)")
+                    .query(Long.class)
+                    .single();
+            assertThat(remaining).isZero();
+        }
+
+        @Test
+        void returnsEmptyListForNonExistentId() {
+            List<Long> ids = repository.cascadeDeleteSubtree(999_999L);
+            assertThat(ids).isEmpty();
+        }
+    }
+
+    @Nested
+    class BackfillJsonWhereNull {
+
+        @Test
+        void returnsZeroWhenJsonAlreadyPresent() {
+            // id=41 (Report1) already has JSON populated
+            int updated = repository.backfillJsonWhereNull(
+                    List.of(new JsonBackfillRow(41L, "{\"name\":\"new\",\"n\":99}")));
+            assertThat(updated).isZero();
+        }
+
+        @Test
+        void updatesRowsWhereJsonIsNull() {
+            // id=60 (BackfillReport) has JSON=NULL
+            int updated = repository.backfillJsonWhereNull(
+                    List.of(new JsonBackfillRow(60L, "{\"name\":\"backfill-me\",\"n\":42}")));
+
+            assertThat(updated).isEqualTo(1);
+
+            String json = jdbcClient.sql(
+                            "SELECT JSON FROM ITEMTREE WHERE ITEMTREEID = 60")
+                    .query((rs, n) -> rs.getString("JSON"))
+                    .single();
+            assertThat(json).isEqualTo("{\"name\":\"backfill-me\",\"n\":42}");
+        }
+
+        @Test
+        void doesNotTouchLastUpdate() {
+            java.time.LocalDateTime before = jdbcClient.sql(
+                            "SELECT LASTUPDATE FROM ITEMTREE WHERE ITEMTREEID = 60")
+                    .query((rs, n) -> rs.getObject("LASTUPDATE", java.time.LocalDateTime.class))
+                    .single();
+
+            repository.backfillJsonWhereNull(
+                    List.of(new JsonBackfillRow(60L, "{\"name\":\"backfill-me\",\"n\":42}")));
+
+            java.time.LocalDateTime after = jdbcClient.sql(
+                            "SELECT LASTUPDATE FROM ITEMTREE WHERE ITEMTREEID = 60")
+                    .query((rs, n) -> rs.getObject("LASTUPDATE", java.time.LocalDateTime.class))
+                    .single();
+
+            assertThat(after).isEqualTo(before);
+        }
+    }
 }

@@ -80,7 +80,15 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
 
     @Override
     public int backfillJsonWhereNull(Collection<JsonBackfillRow> rows) {
-        throw new UnsupportedOperationException("not yet implemented");
+        int updated = 0;
+        for (JsonBackfillRow row : rows) {
+            updated += jdbcClient.sql(
+                            "UPDATE ITEMTREE SET JSON = :json WHERE ITEMTREEID = :id AND JSON IS NULL")
+                    .param("json", row.json())
+                    .param("id", row.itemTreeId())
+                    .update();
+        }
+        return updated;
     }
 
     @Override
