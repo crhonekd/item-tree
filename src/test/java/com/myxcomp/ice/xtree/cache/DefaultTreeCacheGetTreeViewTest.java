@@ -78,5 +78,63 @@ class DefaultTreeCacheGetTreeViewTest {
             assertThat(view).extracting(CachedNode::itemTreeId)
                     .containsExactlyInAnyOrder(1L, 2L, 3L, 4L, 6L, 10L, 12L, 30L, 110L);
         }
+
+        @Test
+        void depth0HomeFolderIsTheRoot() {
+            loadFixture(cache);
+
+            List<CachedNode> view = cache.getTreeView(1L);
+
+            // Skeleton: root(1) + depth-1 folders (2,3,4,6) + depth-2 folders (10,12,30).
+            // Chain is just [1]; home children of root are (2,3,4,6) — all already in skeleton.
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L, 3L, 4L, 6L, 10L, 12L, 30L);
+        }
+
+        @Test
+        void depth1HomeFolderReportsAddsNonFolderChild() {
+            loadFixture(cache);
+
+            // Reports (id=3) is at depth 1. Its direct children are ReportSubA(30, folder)
+            // and Report1(41, leaf). Both must appear in the result via home-children.
+            List<CachedNode> view = cache.getTreeView(3L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(1L, 2L, 3L, 4L, 6L, 10L, 12L, 30L, 41L);
+        }
+
+        @Test
+        void deepHomeFolderL6IncludesFullChainAndItsChildren() {
+            loadFixture(cache);
+
+            // L6 (id=24) is at depth 7: root(1)→Users(2)→deepuser(12)→L2(20)→L3(21)→L4(22)→L5(23)→L6(24).
+            // Its child is leafItem(25).
+            List<CachedNode> view = cache.getTreeView(24L);
+
+            assertThat(view).extracting(CachedNode::itemTreeId)
+                    .containsExactlyInAnyOrder(
+                            1L, 2L, 3L, 4L, 6L, 10L, 12L, 30L,   // skeleton (depths 0-2)
+                            20L, 21L, 22L, 23L, 24L,              // chain segment beyond skeleton
+                            25L                                    // L6's child
+                    );
+        }
+
+        @Test
+        void chainAppearsInRootToHomeOrder() {
+            loadFixture(cache);
+
+            List<Long> ids = cache.getTreeView(24L).stream().map(CachedNode::itemTreeId).toList();
+
+            // Chain root→L6: 1, 2, 12, 20, 21, 22, 23, 24. They must appear in that relative order.
+            // (Not necessarily contiguous — skeleton elements 3, 4, 6, 10, 30 may be interleaved.)
+            List<Long> chainOrder = List.of(1L, 2L, 12L, 20L, 21L, 22L, 23L, 24L);
+            List<Integer> positions = chainOrder.stream().map(ids::indexOf).toList();
+            assertThat(positions).doesNotContain(-1); // every chain id is present
+            for (int i = 1; i < positions.size(); i++) {
+                assertThat(positions.get(i))
+                        .as("chain element %s must appear after %s", chainOrder.get(i), chainOrder.get(i - 1))
+                        .isGreaterThan(positions.get(i - 1));
+            }
+        }
     }
 }
