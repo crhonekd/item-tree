@@ -10,6 +10,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ConfigurableTypePolicyTest {
 
@@ -99,6 +100,68 @@ class ConfigurableTypePolicyTest {
                     Arguments.of("Report",          true),
                     Arguments.of("View",            false),
                     Arguments.of("UnknownType",     false));
+        }
+    }
+
+    @Nested
+    class Validation {
+
+        @Test
+        void rejectsWhenFolderMissingFromTypesWithoutData() {
+            DataProperties bad = new DataProperties(
+                    List.of("Shortcut"),                  // no Folder!
+                    List.of("Report"),
+                    List.of());
+            assertThatThrownBy(() -> new ConfigurableTypePolicy(bad))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Folder")
+                    .hasMessageContaining("types-without-data");
+        }
+
+        @Test
+        void rejectsOverlapBetweenTypesWithoutDataAndXmlOnWrite() {
+            DataProperties bad = new DataProperties(
+                    List.of("Folder", "Report"),          // Report also in xml-on-write
+                    List.of("Report"),
+                    List.of());
+            assertThatThrownBy(() -> new ConfigurableTypePolicy(bad))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("overlap")
+                    .hasMessageContaining("Report");
+        }
+
+        @Test
+        void rejectsOverlapBetweenTypesWithoutDataAndXmlToUi() {
+            DataProperties bad = new DataProperties(
+                    List.of("Folder", "Legacy"),
+                    List.of(),
+                    List.of("Legacy"));                   // Legacy also in xml-to-ui
+            assertThatThrownBy(() -> new ConfigurableTypePolicy(bad))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("overlap")
+                    .hasMessageContaining("Legacy");
+        }
+
+        @Test
+        void permitsOverlapBetweenXmlOnWriteAndXmlToUi() {
+            // Per design §10: these two govern independent dimensions and may coexist.
+            DataProperties ok = new DataProperties(
+                    List.of("Folder"),
+                    List.of("Report"),
+                    List.of("Report"));
+            new ConfigurableTypePolicy(ok); // does not throw
+        }
+
+        @ParameterizedTest(name = "rejects whitespace entry {0}")
+        @org.junit.jupiter.params.provider.ValueSource(strings = {" Folder", "Folder ", " ", ""})
+        void rejectsWhitespaceOrBlankEntries(String badEntry) {
+            DataProperties bad = new DataProperties(
+                    List.of("Folder", badEntry),
+                    List.of(),
+                    List.of());
+            assertThatThrownBy(() -> new ConfigurableTypePolicy(bad))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("whitespace");
         }
     }
 }
