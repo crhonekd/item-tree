@@ -5,10 +5,12 @@ import org.springframework.boot.availability.ReadinessState;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Component
 public class CacheReadinessGate {
 
-    private volatile boolean ready = false;
+    private final AtomicBoolean ready = new AtomicBoolean(false);
     private final ApplicationEventPublisher eventPublisher;
 
     public CacheReadinessGate(ApplicationEventPublisher eventPublisher) {
@@ -16,12 +18,12 @@ public class CacheReadinessGate {
     }
 
     public void markReady() {
-        if (ready) return;
-        ready = true;
-        AvailabilityChangeEvent.publish(eventPublisher, this, ReadinessState.ACCEPTING_TRAFFIC);
+        if (ready.compareAndSet(false, true)) {
+            AvailabilityChangeEvent.publish(eventPublisher, this, ReadinessState.ACCEPTING_TRAFFIC);
+        }
     }
 
     public boolean isReady() {
-        return ready;
+        return ready.get();
     }
 }

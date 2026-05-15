@@ -234,6 +234,7 @@ public class DefaultTreeCache implements TreeCache {
     @Override
     public void applyMetadataUpdate(long id, Instant lastUpdate, String lastUpdateUser) {
         Objects.requireNonNull(lastUpdate, "lastUpdate");
+        Objects.requireNonNull(lastUpdateUser, "lastUpdateUser");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(id);
@@ -256,6 +257,7 @@ public class DefaultTreeCache implements TreeCache {
     @Override
     public void applyMove(long id, long newParentId, Instant lastUpdate, String lastUpdateUser) {
         Objects.requireNonNull(lastUpdate, "lastUpdate");
+        Objects.requireNonNull(lastUpdateUser, "lastUpdateUser");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(id);
@@ -288,6 +290,7 @@ public class DefaultTreeCache implements TreeCache {
     public void applyRename(long id, String newName, Instant lastUpdate, String lastUpdateUser) {
         Objects.requireNonNull(newName, "newName");
         Objects.requireNonNull(lastUpdate, "lastUpdate");
+        Objects.requireNonNull(lastUpdateUser, "lastUpdateUser");
         lock.writeLock().lock();
         try {
             CachedNode existing = byId.get(id);

@@ -64,6 +64,59 @@ class DefaultTreeCacheTest {
     }
 
     @Nested
+    class NullGuards {
+        @Test
+        void applyCreateNullThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyCreate(null));
+        }
+
+        @Test
+        void applyMetadataUpdateNullLastUpdateThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyMetadataUpdate(1L, null, "u"));
+        }
+
+        @Test
+        void applyMetadataUpdateNullLastUpdateUserThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyMetadataUpdate(1L, Instant.EPOCH, null));
+        }
+
+        @Test
+        void applyMoveNullLastUpdateThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyMove(1L, 0L, null, "u"));
+        }
+
+        @Test
+        void applyMoveNullLastUpdateUserThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyMove(1L, 0L, Instant.EPOCH, null));
+        }
+
+        @Test
+        void applyRenameNullNewNameThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyRename(1L, null, Instant.EPOCH, "u"));
+        }
+
+        @Test
+        void applyRenameNullLastUpdateThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyRename(1L, "n", null, "u"));
+        }
+
+        @Test
+        void applyRenameNullLastUpdateUserThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyRename(1L, "n", Instant.EPOCH, null));
+        }
+
+        @Test
+        void applyDeleteNullThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyDelete(null));
+        }
+
+        @Test
+        void replaceAllNullThrowsNpe() {
+            assertThatNullPointerException().isThrownBy(() -> cache.replaceAll(null));
+        }
+    }
+
+    @Nested
     class ApplyCreate {
         @Test
         void createdNodeIsRetrievableById() {
