@@ -29,6 +29,7 @@ class JacksonXmlJsonConverterTest {
         String xml = converter.jsonToXml(json);
         assertThat(xml).contains("<name>r1</name>");
         assertThat(xml).contains("<n>1</n>");
+        assertThat(xml).contains("<data>");
     }
 
     @Test

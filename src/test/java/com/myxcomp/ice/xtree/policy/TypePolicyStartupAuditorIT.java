@@ -86,6 +86,7 @@ class TypePolicyStartupAuditorIT {
         List<String> configured = new ArrayList<>();
         configured.addAll(dataProperties.typesWithoutData());
         configured.addAll(dataProperties.typesAlsoPersistedAsXmlOnWrite());
+        configured.addAll(dataProperties.typesSentAsXmlToUi());
         long id = 1000L;
         for (String t : configured) {
             jdbcClient.sql(

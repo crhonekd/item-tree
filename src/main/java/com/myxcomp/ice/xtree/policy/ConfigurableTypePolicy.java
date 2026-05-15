@@ -74,7 +74,7 @@ public class ConfigurableTypePolicy implements TypePolicy {
 
     private static void rejectWhitespace(String listName, List<String> entries) {
         for (String entry : entries) {
-            if (entry == null || entry.isBlank() || !entry.equals(entry.trim())) {
+            if (entry.isBlank() || !entry.equals(entry.trim())) {
                 throw new IllegalStateException(
                         "Invalid itemtree.data." + listName
                         + ": entries must not contain whitespace; offending entry: '" + entry + "'");
