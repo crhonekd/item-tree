@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,6 +76,58 @@ class JdbcItemTreeRepositoryIT {
             List<StructuralRow> rows = repository.findStructuralChangedSince(
                     Instant.parse("2026-05-02T00:00:00Z"));
             assertThat(rows).isEmpty();
+        }
+    }
+
+    @Nested
+    class FindPayloadByIds {
+
+        @Test
+        void happyPath() {
+            List<PayloadRow> rows = repository.findPayloadByIds(List.of(25L, 40L, 41L));
+            assertThat(rows).hasSize(3);
+            PayloadRow leafItem = rows.stream()
+                    .filter(r -> r.itemTreeId() == 25L)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(leafItem.json()).contains("\"name\":\"leaf\"");
+            assertThat(leafItem.xml()).contains("<report>");
+        }
+
+        @Test
+        void emptyInputReturnsEmptyList() {
+            List<PayloadRow> rows = repository.findPayloadByIds(List.of());
+            assertThat(rows).isEmpty();
+        }
+
+        @Test
+        void unknownIdsAreSilentlyOmitted() {
+            List<PayloadRow> rows = repository.findPayloadByIds(List.of(25L, 999_999L));
+            assertThat(rows).hasSize(1);
+            assertThat(rows.get(0).itemTreeId()).isEqualTo(25L);
+        }
+
+        @Test
+        void chunksLargeIdSets() {
+            // Insert 1001 rows to force chunking (CHUNK_SIZE=1000)
+            List<Long> insertedIds = new ArrayList<>();
+            for (long i = 200_000L; i < 201_001L; i++) {
+                jdbcClient.sql("""
+                                INSERT INTO ITEMTREE
+                                  (ITEMTREEID, PARENTID, NAME, TYPE, JSON, XML, LASTUPDATE, LASTUPDATEUSER)
+                                VALUES (:id, 1, :name, 'View', :json, NULL,
+                                        TIMESTAMP '2026-05-01 10:00:00', 'test')
+                                """)
+                        .param("id", i)
+                        .param("name", "bulk" + i)
+                        .param("json", "{\"n\":" + i + "}")
+                        .update();
+                insertedIds.add(i);
+            }
+
+            List<PayloadRow> rows = repository.findPayloadByIds(insertedIds);
+
+            assertThat(rows).hasSize(1001);
         }
     }
 }

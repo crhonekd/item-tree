@@ -65,7 +65,17 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
 
     @Override
     public List<PayloadRow> findPayloadByIds(Collection<Long> ids) {
-        throw new UnsupportedOperationException("not yet implemented");
+        if (ids.isEmpty()) return Collections.emptyList();
+        List<PayloadRow> result = new ArrayList<>();
+        for (List<Long> chunk : partition(ids)) {
+            result.addAll(
+                    jdbcClient.sql("SELECT ITEMTREEID, JSON, XML FROM ITEMTREE WHERE ITEMTREEID IN (:ids)")
+                            .param("ids", chunk)
+                            .query(payloadRowMapper)
+                            .list()
+            );
+        }
+        return result;
     }
 
     @Override
