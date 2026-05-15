@@ -213,7 +213,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 5 — Type policy & conversion ⬅ NEXT
+## Phase 5 — Type policy & conversion ✅ COMPLETE (2026-05-15)
 
 **Goal:** `TypePolicy` validates at startup; `XmlJsonConverter` interface available; Phase A stub backed by Jackson.
 
@@ -230,9 +230,15 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Stub converter round-trips for representative payloads.
 - Note in tests that the stub is not byte-identical with the production converter; assertions check structural equivalence, not exact XML strings.
 
+**Deviations from plan (reviewed and approved):**
+- `catch (java.io.IOException e)` clauses removed from `JacksonXmlJsonConverter` — `JsonProcessingException` extends `IOException`, making them dead code. Jackson's `getOriginalMessage()` used for clean error messages.
+- Round-trip test (`roundTripXmlPreservesElementTree`) compares `XmlMapper.readTree()` output rather than raw XML strings, since `XmlMapper.readTree()` strips root element names — confirmed acceptable stub behaviour.
+
+**Actual done state:** 192 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+
 ---
 
-## Phase 6 — `getTreeView` algorithm + path resolution
+## Phase 6 — `getTreeView` algorithm + path resolution ⬅ NEXT
 
 **Goal:** the trimmed tree view assembly proven across all edge cases.
 
