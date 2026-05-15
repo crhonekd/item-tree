@@ -32,6 +32,7 @@ public interface TreeCache {
     void applyMetadataUpdate(long id, Instant lastUpdate, String lastUpdateUser);
     void applyMove(long id, long newParentId, Instant lastUpdate, String lastUpdateUser);
     void applyRename(long id, String newName, Instant lastUpdate, String lastUpdateUser);
+    /** Caller must pass the complete descendant set; partial sets leave dangling childrenByParent entries. */
     void applyDelete(Set<Long> ids);
     void replaceAll(TreeSnapshot newSnapshot);
 }

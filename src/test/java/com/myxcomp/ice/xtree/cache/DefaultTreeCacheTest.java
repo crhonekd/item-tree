@@ -97,6 +97,14 @@ class DefaultTreeCacheTest {
             assertThat(cache.getChildren(0L)).extracting(CachedNode::itemTreeId).contains(2L);
             assertThat(cache.getChildren(1L)).extracting(CachedNode::itemTreeId).doesNotContain(2L);
         }
+
+        @Test
+        void upsertWithNewNameUpdatesFoldersByName() {
+            cache.applyCreate(folder(1L, 0L, "OldName"));
+            cache.applyCreate(folder(1L, 0L, "NewName"));
+            assertThat(cache.findHomeFolder("OldName")).isEmpty();
+            assertThat(cache.findHomeFolder("NewName")).isPresent();
+        }
     }
 
     @Nested
