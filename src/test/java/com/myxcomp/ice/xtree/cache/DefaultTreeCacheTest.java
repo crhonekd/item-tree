@@ -10,6 +10,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
@@ -422,6 +426,125 @@ class DefaultTreeCacheTest {
             assertThat(cache.findHomeFolder("specialFolder")).isPresent();
             // "Users" was in the old tree but not in the snapshot — must be gone
             assertThat(cache.findHomeFolder("Users")).isEmpty();
+        }
+    }
+
+    @Nested
+    class Concurrency {
+
+        private DefaultTreeCache buildCacheWith(int nodeCount) {
+            DefaultTreeCache c = new DefaultTreeCache();
+            SnapshotBuilder b = new SnapshotBuilder();
+            b.accept(new StructuralRow(1L, 0L, "root", "Folder", T, "sys"));
+            for (int i = 2; i <= nodeCount; i++) {
+                b.accept(new StructuralRow((long) i, 1L, "node" + i, "Report", T, "sys"));
+            }
+            c.replaceAll(b.build());
+            return c;
+        }
+
+        @Test
+        void stressReadersAndWriterProduceNoExceptions() throws InterruptedException {
+            DefaultTreeCache stressCache = buildCacheWith(500);
+            AtomicReference<Throwable> error = new AtomicReference<>();
+            CountDownLatch startLatch = new CountDownLatch(1);
+            int threadCount = 9; // 8 readers + 1 writer
+            CountDownLatch doneLatch = new CountDownLatch(threadCount);
+
+            Runnable reader = () -> {
+                try {
+                    startLatch.await();
+                    long deadline = System.currentTimeMillis() + 2_000;
+                    while (System.currentTimeMillis() < deadline) {
+                        stressCache.getById(1L);
+                        stressCache.getChildren(1L);
+                        stressCache.size();
+                        stressCache.exists(2L);
+                        stressCache.isFolder(1L);
+                    }
+                } catch (Throwable t) {
+                    error.compareAndSet(null, t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            };
+
+            Runnable writer = () -> {
+                try {
+                    startLatch.await();
+                    long deadline = System.currentTimeMillis() + 2_000;
+                    long id = 1_000_000L;
+                    while (System.currentTimeMillis() < deadline) {
+                        long newId = id++;
+                        stressCache.applyCreate(new CachedNode(newId, 1L, "stress" + newId, "Report", T, "sys"));
+                        stressCache.applyDelete(Set.of(newId));
+                    }
+                } catch (Throwable t) {
+                    error.compareAndSet(null, t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            };
+
+            for (int i = 0; i < 8; i++) new Thread(reader, "reader-" + i).start();
+            new Thread(writer, "writer").start();
+
+            startLatch.countDown();
+            boolean finished = doneLatch.await(10, TimeUnit.SECONDS);
+
+            assertThat(finished).as("All threads must finish within 10 s").isTrue();
+            assertThat(error.get()).as("No thread should throw").isNull();
+            assertThat(stressCache.size()).isGreaterThan(0);
+        }
+
+        @Test
+        void replaceAllIsAtomicFromReadersView() throws InterruptedException {
+            // Snapshot A: root (id=1) + 50 leaves (ids 2..51)
+            DefaultTreeCache atomicCache = buildCacheWith(51);
+
+            // Snapshot B: root (id=1) + 50 different leaves (ids 1000..1049)
+            SnapshotBuilder builderB = new SnapshotBuilder();
+            builderB.accept(new StructuralRow(1L, 0L, "root", "Folder", T, "sys"));
+            for (int i = 1000; i < 1050; i++) {
+                builderB.accept(new StructuralRow((long) i, 1L, "node" + i, "Report", T, "sys"));
+            }
+            TreeSnapshot snapB = builderB.build();
+
+            AtomicBoolean inconsistencyFound = new AtomicBoolean(false);
+            AtomicBoolean stop = new AtomicBoolean(false);
+
+            // Reader verifies that a single getChildren(1) call never returns a mixed-snapshot result.
+            // replaceAll swaps byId and childrenByParent atomically under the write lock, so within
+            // one read-lock acquisition getChildren must see either all snap-A children (ids 2..51)
+            // or all snap-B children (ids 1000..1049) — never a mix of both.
+            // Snap-A IDs are in [2, 51]; snap-B IDs are in [1000, 1049].  Any overlap would mean
+            // a child from one snapshot appeared alongside a child from the other snapshot in the
+            // same call, which would prove a non-atomic swap.
+            Thread reader = new Thread(() -> {
+                while (!stop.get()) {
+                    List<CachedNode> children = atomicCache.getChildren(1L);
+                    if (children.isEmpty()) continue;
+                    boolean hasSnapA = children.stream().anyMatch(n -> n.itemTreeId() >= 2   && n.itemTreeId() <= 51);
+                    boolean hasSnapB = children.stream().anyMatch(n -> n.itemTreeId() >= 1000 && n.itemTreeId() <= 1049);
+                    if (hasSnapA && hasSnapB) {
+                        inconsistencyFound.set(true);
+                        return;
+                    }
+                }
+            }, "atomicity-reader");
+            reader.start();
+
+            Thread.sleep(10);
+            atomicCache.replaceAll(snapB);
+            stop.set(true);
+            reader.join(2_000);
+
+            assertThat(inconsistencyFound.get())
+                    .as("getChildren must never return children from two different snapshots in one call")
+                    .isFalse();
+            assertThat(atomicCache.size()).isEqualTo(51); // root + 50 B-leaves
+            assertThat(atomicCache.exists(1000L)).isTrue();
+            assertThat(atomicCache.exists(2L)).isFalse();
         }
     }
 }
