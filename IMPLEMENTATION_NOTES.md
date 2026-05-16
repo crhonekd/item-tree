@@ -276,26 +276,20 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 7 — Services ⬅ NEXT
+## Phase 7 — Services ✅ COMPLETE (2026-05-16)
 
-**Goal:** business logic complete; services don't depend on the HTTP layer or messaging impl.
+**Deviations from plan (reviewed and approved):**
+- `EventPublisher` interface and `SequenceGenerator` moved from Phase 10 into Phase 7 (services are the first caller). Phase 10 still owns the production JMS-backed implementations.
+- Added a Phase-A `@Profile("dev")` `NoOpEventPublisher` in `messaging/dev/` so the Spring context boots before Phase 10 lands; Phase 10 will replace it with `LocalLoopbackEventPublisher`.
+- `TimeMapper.now()` added as the application-wide clock entry point so all service-layer time calls are mockable in tests.
+- Service-layer exception model: abstract `ItemTreeException` base + `NotFoundException` (404) + `ValidationException` (400), all carrying an `ErrorCode` enum. Phase 8 maps these to RFC 7807.
+- Async backfill uses a dedicated `ThreadPoolTaskExecutor` (`backfillExecutor`, core/max=1, queue=100, `AbortPolicy`). Bounded queue + abort gives visible backpressure rather than silent OOM.
 
-- `ItemService` — create, delete, move, rename, updateData. Validates against cache; persists via repository; updates cache; publishes via `EventPublisher` interface.
-- `TreeService` — `getTree`, `getSubtree`. Calls `TreeCache` then `PathResolver`.
-- `SearchService` — by id or name; uses cache.
-- `HomeFolderService` — wraps `cache.findHomeFolder`.
-- `PathResolver` impl (interface from Phase 6).
-- All services take `UserContext` explicitly as a method parameter.
-- Async backfill `TaskExecutor` configured (single-threaded, bounded queue).
-
-**Tests:**
-- Service unit tests with mocked cache / repository / publisher / type policy.
-- Cover validation rejection paths: `TYPE_CANNOT_HAVE_DATA`, `DATA_REQUIRED`, `PARENT_NOT_FOUND`, `PARENT_NOT_FOLDER`, `MOVE_INTO_DESCENDANT`, `NEW_PARENT_NOT_FOLDER`.
-- Verify event publish is called *after* DB write and cache update.
+**Actual done state:** 286 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
-## Phase 8 — HTTP layer
+## Phase 8 — HTTP layer ⬅ NEXT
 
 **Goal:** end-to-end request flow works; error responses follow RFC 7807.
 
