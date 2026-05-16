@@ -14,6 +14,7 @@ import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
+import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
@@ -132,6 +133,33 @@ public class ItemService {
         Instant now = timeMapper.now();
         publisher.publish(buildEvent(userContext, OperationType.DELETE,
                 new DeletePayload(List.copyOf(deletedIds)), now));
+    }
+
+    /**
+     * Renames {@code id} to {@code newName}.
+     *
+     * @throws NotFoundException {@code ITEM_NOT_FOUND} if {@code id} is unknown
+     */
+    @Transactional
+    public CachedNode renameItem(long id, String newName, UserContext userContext) {
+        Objects.requireNonNull(newName, "newName");
+        Objects.requireNonNull(userContext, "userContext");
+
+        if (cache.getById(id).isEmpty()) {
+            throw new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found");
+        }
+
+        Instant now = timeMapper.now();
+        String stampUser = userContext.effectiveUser();
+
+        repository.updateName(id, newName, now, stampUser);
+        cache.applyRename(id, newName, now, stampUser);
+
+        publisher.publish(buildEvent(userContext, OperationType.RENAME,
+                new RenamePayload(id, newName, now, stampUser), now));
+
+        return cache.getById(id).orElseThrow(() -> new IllegalStateException(
+                "Cache lost id " + id + " after applyRename"));
     }
 
     private TreeMutationEvent buildEvent(UserContext ctx, OperationType op,
