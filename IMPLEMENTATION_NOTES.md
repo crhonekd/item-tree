@@ -248,7 +248,17 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 **Deviations from plan:** none.
 
-**Actual done state:** 229 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+**Actual done state:** 231 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+
+**Post-completion quality fixes (applied after audit, same phase):**
+- `DefaultPathResolver.walkToRoot` eliminated; `pathOf` now delegates to `pathFor(id, new HashMap<>())` so all ancestor-walk logic lives in one place, removing DRY hazard.
+- Cycle test in `DefaultPathResolverTest` strengthened: `isNotNull()` (vacuous on `String`) replaced with `isNotEmpty()`.
+- `pathsOf` coverage extended: orphan-parent and cycle tests added to `DefaultPathResolverTest.PathsOf`.
+- Four identical-behaviour `pathOf` happy-path tests collapsed into one `@ParameterizedTest @MethodSource`.
+- `chainAppearsInRootToHomeOrder` test hardened: replaced `ConcurrentHashMap` bucket-order-dependent position check with a subsequence extraction that compares only chain ids in result order.
+- Manual stream-count assertion replaced with `containsOnlyOnce(2L)`.
+- `MAX_TREE_DEPTH = 10_000` deviation from design §8 "cap of 100" documented on both constant declarations.
+- Lock trade-off on `PathResolver` (each `getById` independently locked, not a single snapshot) documented in interface Javadoc.
 
 **Goal:** the trimmed tree view assembly proven across all edge cases.
 
