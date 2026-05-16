@@ -12,6 +12,7 @@ import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
+import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
@@ -26,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -111,6 +114,24 @@ public class ItemService {
                 new CreatePayload(id, parentId, name, type, now, stampUser), now));
 
         return node;
+    }
+
+    /**
+     * Cascade-deletes {@code id} and all descendants. Silent no-op if {@code id} is unknown.
+     * Order: DB cascade → cache.applyDelete → event.
+     */
+    @Transactional
+    public void deleteItem(long id, UserContext userContext) {
+        Objects.requireNonNull(userContext, "userContext");
+        List<Long> deletedIds = repository.cascadeDeleteSubtree(id);
+        if (deletedIds.isEmpty()) {
+            log.info("deleteItem: id={} not present in DB; no-op", id);
+            return;
+        }
+        cache.applyDelete(new HashSet<>(deletedIds));
+        Instant now = timeMapper.now();
+        publisher.publish(buildEvent(userContext, OperationType.DELETE,
+                new DeletePayload(List.copyOf(deletedIds)), now));
     }
 
     private TreeMutationEvent buildEvent(UserContext ctx, OperationType op,
