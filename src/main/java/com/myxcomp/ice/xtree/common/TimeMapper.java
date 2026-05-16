@@ -18,4 +18,13 @@ public class TimeMapper {
         if (localDateTime == null) return null;
         return localDateTime.toInstant(ZoneOffset.UTC);
     }
+
+    /**
+     * Returns the current UTC instant. Sole entry-point for "now" across the application —
+     * services and bootstrap collaborators MUST NOT call {@code Instant.now()} directly so
+     * that time can be controlled in tests via Mockito.
+     */
+    public Instant now() {
+        return Instant.now();
+    }
 }
