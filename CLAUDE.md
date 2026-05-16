@@ -83,7 +83,7 @@ If a task seems to require any of these, **stop and ask** rather than improvisin
 
 These hold across the codebase. Violating them produces silent bugs that aren't caught by tests.
 
-1. **All persisted timestamps are UTC.** Use `TimeMapper` at every JDBC boundary. Do not call `LocalDateTime.now()` or `Instant.now().atZone(...)` anywhere outside `TimeMapper`. Internal canonical type is `java.time.Instant`. Defence in depth: JVM is launched with `-Duser.timezone=UTC`.
+1. **All persisted timestamps are UTC.** Use `TimeMapper` at every JDBC boundary. Do not call `LocalDateTime.now()`, `Instant.now()`, or `Instant.now().atZone(...)` anywhere outside `TimeMapper`. Use `TimeMapper.now()` as the sole application-wide clock entry point — it makes time injectable in tests via Mockito. Internal canonical type is `java.time.Instant`. Defence in depth: JVM is launched with `-Duser.timezone=UTC`.
 
 2. **`apply*` methods on `TreeCache` are idempotent and tolerant.** They never throw on missing parent or missing id. `applyCreate` is upsert. `applyMetadataUpdate`, `applyMove`, `applyRename` log and skip on missing id/reference. `applyDelete` ignores missing ids. See design §4 "apply* idempotency contract." Tests asserting that bad input throws are wrong.
 
@@ -115,18 +115,19 @@ All under `com.myxcomp.ice.xtree`:
 | `api/advice` | `GlobalExceptionHandler`, `ProblemFactory` (RFC 7807) |
 | `api/mapper` | `CachedNode` ↔ generated DTOs |
 | `api/filter` | `CacheReadinessFilter`, `UserContextInterceptor` |
-| `service` | `ItemService`, `TreeService`, `SearchService`, `HomeFolderService`, `PathResolver` |
+| `service` | `ItemService`, `TreeService`, `SearchService`, `HomeFolderService`, `PathResolver`, `TreeNodeView`, `ItemWithData` |
+| `service/exception` | `ErrorCode` (enum), `ItemTreeException` (abstract base), `ValidationException` (400), `NotFoundException` (404) |
 | `cache` | `TreeCache`, `DefaultTreeCache`, `CachedNode`, `TreeSnapshot`, `SnapshotBuilder`, `CacheReadinessGate` |
 | `persistence` | `ItemTreeRepository`, `JdbcItemTreeRepository`, row records, `rowmapper/` |
 | `messaging` | `EventPublisher` interface, `EventConsumerService`, `EventDispatcher`, `ConnectionRecoveryListener` interface, `ConnectionStateTracker`, `ReconnectReconciler`, `SequenceGenerator` |
 | `messaging/event`, `messaging/event/payload` | Event envelope + per-op payload records |
-| `messaging/dev` *(Phase A only)* | `InMemoryEventBus`, `LocalLoopbackEventPublisher`, `LocalLoopbackEventConsumer`, `StubConnectionExceptionListener` — all gated on `@Profile("dev")` |
+| `messaging/dev` *(Phase A only)* | `NoOpEventPublisher` (Phase 7 placeholder, replaced by `LocalLoopbackEventPublisher` in Phase 10), `InMemoryEventBus`, `LocalLoopbackEventPublisher`, `LocalLoopbackEventConsumer`, `StubConnectionExceptionListener` — all gated on `@Profile("dev")` |
 | `bootstrap` | `TreeCacheBootstrap` (@Order 1), `MessagingStarter` (@Order 2) |
 | `refresh` | `RefreshScheduler`, `RefreshOrchestrator`, `DeltaReconciler`, `RefreshResult`, `RefreshActuatorEndpoint` |
 | `conversion` | `XmlJsonConverter` interface |
 | `conversion/dev` *(Phase A only)* | `JacksonXmlJsonConverter` — Jackson XML mapper backed stub, `@Profile("dev")` |
 | `policy` | `TypePolicy`, `ConfigurableTypePolicy` |
-| `config` | `@ConfigurationProperties` and `@Configuration` beans |
+| `config` | `@ConfigurationProperties` and `@Configuration` beans; `AsyncConfig` (declares `backfillExecutor` — single-threaded, queue=100, `AbortPolicy`) |
 | `common` | `TreeConstants`, `InstanceIdProvider`, `TimeMapper`, `UserContext`, `Types` |
 
 The `*/dev` sub-packages contain Phase A stubs. They are NOT deleted when moving to Phase B — they remain available for testing. Phase B adds `*/prod` sub-packages (or equivalent `@Profile("prod")` beans in `config/`) that supply the real-library-backed implementations.
@@ -196,7 +197,7 @@ Tests mirror these packages, plus an `e2e/` package for `@SpringBootTest` agains
 - Touch `LASTUPDATE` / `LASTUPDATEUSER` in the silent XML→JSON backfill.
 - Hold the cache write lock across I/O (DB calls, network calls, anything that can block).
 - Return live references to internal cache structures from read methods.
-- Call time-of-day APIs (`LocalDateTime.now`, `LocalDate.now`, `ZonedDateTime.now`) outside `TimeMapper`.
+- Call time-of-day APIs (`LocalDateTime.now`, `LocalDate.now`, `ZonedDateTime.now`, `Instant.now`) outside `TimeMapper`. Always use `TimeMapper.now()`.
 - Import from `com.myxcomp.ice.xtree.generated.*` outside `api/mapper/`.
 - Import from `com.barcap.ice.service.jms.*` or the in-house XML/JSON converter package anywhere — those imports belong in the Phase B prod-profile bean configuration only (not yet written).
 - Write production database DDL files (the schema is DBA-owned). H2 `schema.sql` for Phase A development is fine and expected.
