@@ -18,6 +18,8 @@ import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
+import com.myxcomp.ice.xtree.persistence.JsonBackfillRow;
+import com.myxcomp.ice.xtree.persistence.PayloadRow;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
@@ -30,8 +32,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -246,6 +253,111 @@ public class ItemService {
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
                 "Cache lost id " + id + " after applyMetadataUpdate"));
+    }
+
+    /**
+     * Bulk fetch by id (POST /items/get). Missing ids are silently omitted. Folders are
+     * expanded one level (children carry their own shaped payload). Non-folder data-bearing
+     * nodes consult the DB; rows with {@code JSON IS NULL AND XML IS NOT NULL} are converted
+     * for the response and queued for async backfill (design §11).
+     */
+    public List<ItemWithData> getItemsWithData(List<Long> ids) {
+        Objects.requireNonNull(ids, "ids");
+        if (ids.isEmpty()) return List.of();
+
+        List<CachedNode> requested = new ArrayList<>();
+        Map<Long, List<CachedNode>> folderChildren = new LinkedHashMap<>();
+        for (Long id : ids) {
+            if (id == null) continue;
+            Optional<CachedNode> opt = cache.getById(id);
+            if (opt.isEmpty()) continue;
+            CachedNode n = opt.get();
+            requested.add(n);
+            if (Types.isFolder(n.type())) {
+                folderChildren.put(n.itemTreeId(), cache.getChildren(n.itemTreeId()));
+            }
+        }
+
+        LinkedHashSet<Long> payloadIds = new LinkedHashSet<>();
+        for (CachedNode n : requested) {
+            if (!Types.isFolder(n.type()) && policy.hasData(n.type())) {
+                payloadIds.add(n.itemTreeId());
+            }
+        }
+        for (List<CachedNode> children : folderChildren.values()) {
+            for (CachedNode c : children) {
+                if (!Types.isFolder(c.type()) && policy.hasData(c.type())) {
+                    payloadIds.add(c.itemTreeId());
+                }
+            }
+        }
+
+        Map<Long, PayloadRow> payloadById = new HashMap<>();
+        if (!payloadIds.isEmpty()) {
+            for (PayloadRow row : repository.findPayloadByIds(List.copyOf(payloadIds))) {
+                payloadById.put(row.itemTreeId(), row);
+            }
+        }
+
+        List<JsonBackfillRow> backfillBatch = new ArrayList<>();
+        List<ItemWithData> out = new ArrayList<>(requested.size());
+        for (CachedNode n : requested) {
+            if (Types.isFolder(n.type())) {
+                List<ItemWithData> shapedChildren = new ArrayList<>();
+                for (CachedNode c : folderChildren.get(n.itemTreeId())) {
+                    shapedChildren.add(shape(c, payloadById, backfillBatch, List.of()));
+                }
+                out.add(shape(n, payloadById, backfillBatch, List.copyOf(shapedChildren)));
+            } else {
+                out.add(shape(n, payloadById, backfillBatch, List.of()));
+            }
+        }
+
+        if (!backfillBatch.isEmpty()) {
+            List<JsonBackfillRow> snapshot = List.copyOf(backfillBatch);
+            backfillExecutor.execute(() -> {
+                try {
+                    repository.backfillJsonWhereNull(snapshot);
+                } catch (RuntimeException e) {
+                    log.warn("Backfill failed for {} rows: {}", snapshot.size(), e.getMessage());
+                }
+            });
+        }
+
+        return List.copyOf(out);
+    }
+
+    private ItemWithData shape(CachedNode n,
+                               Map<Long, PayloadRow> payloadById,
+                               List<JsonBackfillRow> backfillBatch,
+                               List<ItemWithData> children) {
+        if (Types.isFolder(n.type()) || !policy.hasData(n.type())) {
+            return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                    n.lastUpdate(), n.lastUpdateUser(), null, null, children);
+        }
+
+        PayloadRow row = payloadById.get(n.itemTreeId());
+        String json = row != null ? row.json() : null;
+        String xml  = row != null ? row.xml()  : null;
+
+        if (policy.isSentAsXmlToUi(n.type())) {
+            String shippedXml = xml != null ? xml : (json != null ? converter.jsonToXml(json) : null);
+            return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                    n.lastUpdate(), n.lastUpdateUser(), null, shippedXml, children);
+        }
+
+        if (json != null) {
+            return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                    n.lastUpdate(), n.lastUpdateUser(), json, null, children);
+        }
+        if (xml != null) {
+            String convertedJson = converter.xmlToJson(xml);
+            backfillBatch.add(new JsonBackfillRow(n.itemTreeId(), convertedJson));
+            return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                    n.lastUpdate(), n.lastUpdateUser(), convertedJson, null, children);
+        }
+        return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                n.lastUpdate(), n.lastUpdateUser(), null, null, children);
     }
 
     private TreeMutationEvent buildEvent(UserContext ctx, OperationType op,
