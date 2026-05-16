@@ -16,6 +16,7 @@ import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
+import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
@@ -204,6 +205,47 @@ public class ItemService {
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
                 "Cache lost id " + id + " after applyMove"));
+    }
+
+    /**
+     * Replaces the JSON payload on {@code id}. Cache stores no payload, only the metadata
+     * stamp; the JSON is broadcast as metadata-only in the {@code UPDATE} event (§6).
+     */
+    @Transactional
+    public CachedNode updateItemData(long id, String dataJson, UserContext userContext) {
+        Objects.requireNonNull(userContext, "userContext");
+
+        CachedNode existing = cache.getById(id).orElseThrow(() -> new NotFoundException(
+                ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found"));
+
+        if (Types.isFolder(existing.type())) {
+            throw new ValidationException(ErrorCode.FOLDER_CANNOT_HAVE_DATA,
+                    "Folder " + id + " cannot carry data");
+        }
+        if (!policy.hasData(existing.type())) {
+            throw new ValidationException(ErrorCode.TYPE_CANNOT_HAVE_DATA,
+                    "Type '" + existing.type() + "' cannot carry data");
+        }
+        if (dataJson == null) {
+            throw new ValidationException(ErrorCode.DATA_REQUIRED,
+                    "Update of id=" + id + " requires data");
+        }
+
+        String xmlOrNull = policy.isAlsoPersistedAsXmlOnWrite(existing.type())
+                ? converter.jsonToXml(dataJson)
+                : null;
+
+        Instant now = timeMapper.now();
+        String stampUser = userContext.effectiveUser();
+
+        repository.updateJson(id, dataJson, xmlOrNull, now, stampUser);
+        cache.applyMetadataUpdate(id, now, stampUser);
+
+        publisher.publish(buildEvent(userContext, OperationType.UPDATE,
+                new UpdatePayload(id, now, stampUser), now));
+
+        return cache.getById(id).orElseThrow(() -> new IllegalStateException(
+                "Cache lost id " + id + " after applyMetadataUpdate"));
     }
 
     private TreeMutationEvent buildEvent(UserContext ctx, OperationType op,
