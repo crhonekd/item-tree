@@ -285,7 +285,12 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Service-layer exception model: abstract `ItemTreeException` base + `NotFoundException` (404) + `ValidationException` (400), all carrying an `ErrorCode` enum. Phase 8 maps these to RFC 7807.
 - Async backfill uses a dedicated `ThreadPoolTaskExecutor` (`backfillExecutor`, core/max=1, queue=100, `AbortPolicy`). Bounded queue + abort gives visible backpressure rather than silent OOM.
 
-**Actual done state:** 286 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+**Actual done state:** 293 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+
+**Post-completion quality fixes (applied after audit, same phase):**
+- Outer catch in `ItemService.getItemsWithData` backfill block narrowed from `RuntimeException` to `TaskRejectedException`; two tests added covering queue-saturation and inner repository-failure paths.
+- All five mutation methods (`createItem`, `deleteItem`, `renameItem`, `moveItem`, `updateItemData`) now wrap `publisher.publish(...)` in try-catch that logs at ERROR level (with Throwable for stack trace) and continues — prevents a misbehaving `EventPublisher` from rolling back the DB transaction after the cache has already been updated.
+- `getItemsWithData` annotated `@Transactional(readOnly = true)` for shared read snapshot across chunked `findPayloadByIds` SELECTs and better HikariCP connection reuse.
 
 ---
 
