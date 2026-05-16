@@ -125,7 +125,7 @@ public class ItemService {
             publisher.publish(buildEvent(userContext, OperationType.CREATE,
                     new CreatePayload(id, parentId, name, type, now, stampUser), now));
         } catch (RuntimeException e) {
-            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.CREATE.name(), e.getMessage());
+            log.error("EventPublisher threw on {}; event dropped", OperationType.CREATE, e);
         }
 
         return node;
@@ -149,7 +149,7 @@ public class ItemService {
             publisher.publish(buildEvent(userContext, OperationType.DELETE,
                     new DeletePayload(List.copyOf(deletedIds)), now));
         } catch (RuntimeException e) {
-            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.DELETE.name(), e.getMessage());
+            log.error("EventPublisher threw on {}; event dropped", OperationType.DELETE, e);
         }
     }
 
@@ -177,7 +177,7 @@ public class ItemService {
             publisher.publish(buildEvent(userContext, OperationType.RENAME,
                     new RenamePayload(id, newName, now, stampUser), now));
         } catch (RuntimeException e) {
-            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.RENAME.name(), e.getMessage());
+            log.error("EventPublisher threw on {}; event dropped", OperationType.RENAME, e);
         }
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
@@ -224,7 +224,7 @@ public class ItemService {
             publisher.publish(buildEvent(userContext, OperationType.MOVE,
                     new MovePayload(id, oldParentId, newParentId, now, stampUser), now));
         } catch (RuntimeException e) {
-            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.MOVE.name(), e.getMessage());
+            log.error("EventPublisher threw on {}; event dropped", OperationType.MOVE, e);
         }
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
@@ -269,7 +269,7 @@ public class ItemService {
             publisher.publish(buildEvent(userContext, OperationType.UPDATE,
                     new UpdatePayload(id, now, stampUser), now));
         } catch (RuntimeException e) {
-            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.UPDATE.name(), e.getMessage());
+            log.error("EventPublisher threw on {}; event dropped", OperationType.UPDATE, e);
         }
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
