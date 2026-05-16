@@ -121,8 +121,12 @@ public class ItemService {
         CachedNode node = new CachedNode(id, parentId, name, type, now, stampUser);
         cache.applyCreate(node);
 
-        publisher.publish(buildEvent(userContext, OperationType.CREATE,
-                new CreatePayload(id, parentId, name, type, now, stampUser), now));
+        try {
+            publisher.publish(buildEvent(userContext, OperationType.CREATE,
+                    new CreatePayload(id, parentId, name, type, now, stampUser), now));
+        } catch (RuntimeException e) {
+            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.CREATE.name(), e.getMessage());
+        }
 
         return node;
     }
@@ -141,8 +145,12 @@ public class ItemService {
         }
         cache.applyDelete(new HashSet<>(deletedIds));
         Instant now = timeMapper.now();
-        publisher.publish(buildEvent(userContext, OperationType.DELETE,
-                new DeletePayload(List.copyOf(deletedIds)), now));
+        try {
+            publisher.publish(buildEvent(userContext, OperationType.DELETE,
+                    new DeletePayload(List.copyOf(deletedIds)), now));
+        } catch (RuntimeException e) {
+            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.DELETE.name(), e.getMessage());
+        }
     }
 
     /**
@@ -165,8 +173,12 @@ public class ItemService {
         repository.updateName(id, newName, now, stampUser);
         cache.applyRename(id, newName, now, stampUser);
 
-        publisher.publish(buildEvent(userContext, OperationType.RENAME,
-                new RenamePayload(id, newName, now, stampUser), now));
+        try {
+            publisher.publish(buildEvent(userContext, OperationType.RENAME,
+                    new RenamePayload(id, newName, now, stampUser), now));
+        } catch (RuntimeException e) {
+            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.RENAME.name(), e.getMessage());
+        }
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
                 "Cache lost id " + id + " after applyRename"));
@@ -208,8 +220,12 @@ public class ItemService {
         repository.updateParent(id, newParentId, now, stampUser);
         cache.applyMove(id, newParentId, now, stampUser);
 
-        publisher.publish(buildEvent(userContext, OperationType.MOVE,
-                new MovePayload(id, oldParentId, newParentId, now, stampUser), now));
+        try {
+            publisher.publish(buildEvent(userContext, OperationType.MOVE,
+                    new MovePayload(id, oldParentId, newParentId, now, stampUser), now));
+        } catch (RuntimeException e) {
+            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.MOVE.name(), e.getMessage());
+        }
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
                 "Cache lost id " + id + " after applyMove"));
@@ -249,8 +265,12 @@ public class ItemService {
         repository.updateJson(id, dataJson, xmlOrNull, now, stampUser);
         cache.applyMetadataUpdate(id, now, stampUser);
 
-        publisher.publish(buildEvent(userContext, OperationType.UPDATE,
-                new UpdatePayload(id, now, stampUser), now));
+        try {
+            publisher.publish(buildEvent(userContext, OperationType.UPDATE,
+                    new UpdatePayload(id, now, stampUser), now));
+        } catch (RuntimeException e) {
+            log.error("EventPublisher threw on {}; event dropped: {}", OperationType.UPDATE.name(), e.getMessage());
+        }
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
                 "Cache lost id " + id + " after applyMetadataUpdate"));

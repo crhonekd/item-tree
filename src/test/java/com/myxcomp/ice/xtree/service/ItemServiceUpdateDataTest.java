@@ -29,7 +29,10 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -173,5 +176,27 @@ class ItemServiceUpdateDataTest {
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void publisherThrowDoesNotPropagateOnUpdate() {
+        CachedNode before = new CachedNode(7L, 1L, "Doc", "Report", Instant.EPOCH, "u");
+        CachedNode after  = new CachedNode(7L, 1L, "Doc", "Report", NOW, "alice");
+        when(cache.getById(7L)).thenReturn(Optional.of(before), Optional.of(after));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("Report")).thenReturn(false);
+        when(timeMapper.now()).thenReturn(NOW);
+        when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+        when(sequenceGenerator.next()).thenReturn(1L);
+        doThrow(new RuntimeException("bus down")).when(publisher).publish(any());
+
+        CachedNode[] result = new CachedNode[1];
+        assertThatCode(() -> result[0] = service.updateItemData(7L, "{\"a\":2}", CTX))
+                .doesNotThrowAnyException();
+
+        assertThat(result[0]).isEqualTo(after);
+        verify(repository).updateJson(7L, "{\"a\":2}", null, NOW, "alice");
+        verify(cache).applyMetadataUpdate(7L, NOW, "alice");
+        verify(publisher).publish(any());
     }
 }

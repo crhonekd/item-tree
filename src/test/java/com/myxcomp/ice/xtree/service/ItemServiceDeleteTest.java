@@ -26,7 +26,9 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -87,5 +89,20 @@ class ItemServiceDeleteTest {
         verify(repository).cascadeDeleteSubtree(999L);
         verifyNoInteractions(publisher);
         verify(cache, never()).applyDelete(any());
+    }
+
+    @Test
+    void publisherThrowDoesNotPropagateOnDelete() {
+        when(repository.cascadeDeleteSubtree(50L)).thenReturn(List.of(50L));
+        when(timeMapper.now()).thenReturn(Instant.parse("2026-05-16T12:00:00Z"));
+        when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+        when(sequenceGenerator.next()).thenReturn(1L);
+        doThrow(new RuntimeException("bus down")).when(publisher).publish(any());
+
+        assertThatCode(() -> service.deleteItem(50L, CTX)).doesNotThrowAnyException();
+
+        verify(repository).cascadeDeleteSubtree(50L);
+        verify(cache).applyDelete(Set.of(50L));
+        verify(publisher).publish(any());
     }
 }

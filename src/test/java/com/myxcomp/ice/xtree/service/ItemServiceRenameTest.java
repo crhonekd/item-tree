@@ -28,7 +28,10 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -98,5 +101,24 @@ class ItemServiceRenameTest {
                         org.mockito.ArgumentMatchers.anyString(),
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void publisherThrowDoesNotPropagateOnRename() {
+        CachedNode before = new CachedNode(7L, 1L, "Old", "Report", Instant.EPOCH, "u");
+        CachedNode after  = new CachedNode(7L, 1L, "New", "Report", NOW, "alice");
+        when(cache.getById(7L)).thenReturn(Optional.of(before), Optional.of(after));
+        when(timeMapper.now()).thenReturn(NOW);
+        when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+        when(sequenceGenerator.next()).thenReturn(1L);
+        doThrow(new RuntimeException("bus down")).when(publisher).publish(any());
+
+        CachedNode[] result = new CachedNode[1];
+        assertThatCode(() -> result[0] = service.renameItem(7L, "New", CTX)).doesNotThrowAnyException();
+
+        assertThat(result[0]).isEqualTo(after);
+        verify(repository).updateName(7L, "New", NOW, "alice");
+        verify(cache).applyRename(7L, "New", NOW, "alice");
+        verify(publisher).publish(any());
     }
 }

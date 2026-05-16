@@ -29,11 +29,13 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -225,5 +227,27 @@ class ItemServiceCreateTest {
         verify(repository, never()).insert(anyLong(), anyString(), anyString(),
                 any(), any(), any(), anyString());
         verifyNoInteractions(publisher);
+    }
+
+    @Test
+    void publisherThrowDoesNotPropagateOnCreate() {
+        when(cache.getById(2L)).thenReturn(Optional.of(folder(2L, 1L, "Users")));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("Report")).thenReturn(false);
+        when(timeMapper.now()).thenReturn(NOW);
+        when(repository.insert(eq(2L), eq("R"), eq("Report"), eq("{}"), eq(null), eq(NOW), eq("alice")))
+                .thenReturn(600L);
+        when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+        when(sequenceGenerator.next()).thenReturn(1L);
+        doThrow(new RuntimeException("bus down")).when(publisher).publish(any());
+
+        CachedNode[] result = new CachedNode[1];
+        assertThatCode(() -> result[0] = service.createItem(2L, "R", "Report", "{}", CTX_DIRECT))
+                .doesNotThrowAnyException();
+
+        assertThat(result[0].itemTreeId()).isEqualTo(600L);
+        verify(repository).insert(eq(2L), eq("R"), eq("Report"), eq("{}"), eq(null), eq(NOW), eq("alice"));
+        verify(cache).applyCreate(result[0]);
+        verify(publisher).publish(any());
     }
 }

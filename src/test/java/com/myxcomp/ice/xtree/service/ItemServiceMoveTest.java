@@ -29,7 +29,10 @@ import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -176,5 +179,27 @@ class ItemServiceMoveTest {
                           org.mockito.ArgumentMatchers.anyLong(),
                           org.mockito.ArgumentMatchers.any(),
                           org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void publisherThrowDoesNotPropagateOnMove() {
+        CachedNode item = new CachedNode(7L, 2L, "doc", "Report", Instant.EPOCH, "u");
+        CachedNode newParentNode = folder(3L, 1L, "Archive");
+        CachedNode itemAfter = new CachedNode(7L, 3L, "doc", "Report", NOW, "alice");
+        when(cache.getById(7L)).thenReturn(Optional.of(item), Optional.of(itemAfter));
+        when(cache.getById(3L)).thenReturn(Optional.of(newParentNode));
+        when(cache.isAncestor(7L, 3L)).thenReturn(false);
+        when(timeMapper.now()).thenReturn(NOW);
+        when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+        when(sequenceGenerator.next()).thenReturn(1L);
+        doThrow(new RuntimeException("bus down")).when(publisher).publish(any());
+
+        CachedNode[] result = new CachedNode[1];
+        assertThatCode(() -> result[0] = service.moveItem(7L, 3L, CTX)).doesNotThrowAnyException();
+
+        assertThat(result[0]).isEqualTo(itemAfter);
+        verify(repository).updateParent(7L, 3L, NOW, "alice");
+        verify(cache).applyMove(7L, 3L, NOW, "alice");
+        verify(publisher).publish(any());
     }
 }
