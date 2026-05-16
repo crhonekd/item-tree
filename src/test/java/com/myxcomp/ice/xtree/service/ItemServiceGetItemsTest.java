@@ -64,6 +64,7 @@ class ItemServiceGetItemsTest {
     void emptyInputReturnsEmptyList() {
         assertThat(service.getItemsWithData(List.of())).isEmpty();
         verifyNoInteractions(repository);
+        verifyNoInteractions(publisher);
     }
 
     @Test
@@ -201,5 +202,62 @@ class ItemServiceGetItemsTest {
         ArgumentCaptor<Collection<JsonBackfillRow>> cap = ArgumentCaptor.forClass(Collection.class);
         verify(repository).backfillJsonWhereNull(cap.capture());
         assertThat(cap.getValue()).containsExactly(new JsonBackfillRow(7L, "{}"));
+    }
+
+    @Test
+    void xmlToUiTypeSendXmlWhenPresent() {
+        CachedNode node = leaf(7L, 1L, "Doc", "LegacyType");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.hasData("LegacyType")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("LegacyType")).thenReturn(true);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(7L, null, "<x>1</x>")));
+
+        List<ItemWithData> result = service.getItemsWithData(List.of(7L));
+
+        assertThat(result).hasSize(1);
+        ItemWithData out = result.get(0);
+        assertThat(out.dataXml()).isEqualTo("<x>1</x>");
+        assertThat(out.dataJson()).isNull();
+        verify(repository, never()).backfillJsonWhereNull(anyCollection());
+    }
+
+    @Test
+    void xmlToUiTypeFallsBackToConvertingJsonWhenXmlAbsent() {
+        CachedNode node = leaf(7L, 1L, "Doc", "LegacyType");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.hasData("LegacyType")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("LegacyType")).thenReturn(true);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(7L, "{\"j\":1}", null)));
+        when(converter.jsonToXml("{\"j\":1}")).thenReturn("<j>1</j>");
+
+        List<ItemWithData> result = service.getItemsWithData(List.of(7L));
+
+        assertThat(result).hasSize(1);
+        ItemWithData out = result.get(0);
+        assertThat(out.dataXml()).isEqualTo("<j>1</j>");
+        assertThat(out.dataJson()).isNull();
+        verify(repository, never()).backfillJsonWhereNull(anyCollection());
+    }
+
+    @Test
+    void nullElementsInInputListAreSilentlySkipped() {
+        CachedNode node = leaf(7L, 1L, "Doc", "Report");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(7L, "{\"a\":1}", null)));
+
+        // List contains a null element alongside a valid id
+        List<Long> idsWithNull = new java.util.ArrayList<>();
+        idsWithNull.add(null);
+        idsWithNull.add(7L);
+
+        List<ItemWithData> result = service.getItemsWithData(idsWithNull);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).itemTreeId()).isEqualTo(7L);
     }
 }
