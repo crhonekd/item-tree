@@ -280,6 +280,7 @@ class ItemServiceGetItemsTest {
         List<ItemWithData> result = saturatingService.getItemsWithData(List.of(7L));
 
         assertThat(result).hasSize(1);
+        assertThat(result.get(0).itemTreeId()).isEqualTo(7L);
         assertThat(result.get(0).dataJson()).isEqualTo("{\"a\":1}");
         assertThat(result.get(0).dataXml()).isNull();
         verify(repository, never()).backfillJsonWhereNull(anyCollection());
@@ -300,7 +301,9 @@ class ItemServiceGetItemsTest {
         List<ItemWithData> result = service.getItemsWithData(List.of(7L));
 
         assertThat(result).hasSize(1);
+        assertThat(result.get(0).itemTreeId()).isEqualTo(7L);
         assertThat(result.get(0).dataJson()).isEqualTo("{\"a\":1}");
         assertThat(result.get(0).dataXml()).isNull();
+        verify(repository).backfillJsonWhereNull(anyCollection());
     }
 }

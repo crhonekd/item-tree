@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -323,7 +324,7 @@ public class ItemService {
                         log.warn("Backfill failed for {} rows: {}", snapshot.size(), e.getMessage());
                     }
                 });
-            } catch (org.springframework.core.task.TaskRejectedException e) {
+            } catch (TaskRejectedException e) {
                 log.warn("Backfill queue saturated; dropped {} rows: {}", snapshot.size(), e.getMessage());
             }
         }
