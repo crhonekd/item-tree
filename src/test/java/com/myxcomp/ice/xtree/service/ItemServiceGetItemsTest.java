@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.task.SyncTaskExecutor;
+import org.springframework.core.task.TaskRejectedException;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -259,5 +260,47 @@ class ItemServiceGetItemsTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).itemTreeId()).isEqualTo(7L);
+    }
+
+    @Test
+    void backfillQueueSaturationDoesNotLeakExceptionAndResultIsCorrect() {
+        CachedNode node = leaf(7L, 1L, "Doc", "Report");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(7L, null, "<a>1</a>")));
+        when(converter.xmlToJson("<a>1</a>")).thenReturn("{\"a\":1}");
+
+        ItemService saturatingService = new ItemService(
+                cache, repository, policy, converter, publisher,
+                timeMapper, instanceIdProvider, sequenceGenerator,
+                task -> { throw new TaskRejectedException("queue full"); });
+
+        List<ItemWithData> result = saturatingService.getItemsWithData(List.of(7L));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).dataJson()).isEqualTo("{\"a\":1}");
+        assertThat(result.get(0).dataXml()).isNull();
+        verify(repository, never()).backfillJsonWhereNull(anyCollection());
+    }
+
+    @Test
+    void backfillInnerFailureIsSwallowedAndResultIsCorrect() {
+        CachedNode node = leaf(7L, 1L, "Doc", "Report");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(7L, null, "<a>1</a>")));
+        when(converter.xmlToJson("<a>1</a>")).thenReturn("{\"a\":1}");
+        when(repository.backfillJsonWhereNull(anyCollection()))
+                .thenThrow(new RuntimeException("db gone"));
+
+        List<ItemWithData> result = service.getItemsWithData(List.of(7L));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).dataJson()).isEqualTo("{\"a\":1}");
+        assertThat(result.get(0).dataXml()).isNull();
     }
 }

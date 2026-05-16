@@ -323,7 +323,7 @@ public class ItemService {
                         log.warn("Backfill failed for {} rows: {}", snapshot.size(), e.getMessage());
                     }
                 });
-            } catch (RuntimeException e) {
+            } catch (org.springframework.core.task.TaskRejectedException e) {
                 log.warn("Backfill queue saturated; dropped {} rows: {}", snapshot.size(), e.getMessage());
             }
         }
