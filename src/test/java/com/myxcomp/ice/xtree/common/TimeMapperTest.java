@@ -71,6 +71,20 @@ class TimeMapperTest {
                 .isEqualTo(LocalDateTime.of(1970, 1, 1, 0, 0, 0));
     }
 
+    @Test
+    void nowReturnsCurrentInstantAndIsMonotonicNonDecreasing() throws InterruptedException {
+        TimeMapper mapper = new TimeMapper();
+        Instant before = Instant.now();
+        Thread.sleep(2);
+        Instant got = mapper.now();
+        Thread.sleep(2);
+        Instant after = Instant.now();
+
+        assertThat(got).isNotNull();
+        assertThat(got).isAfterOrEqualTo(before);
+        assertThat(got).isBeforeOrEqualTo(after);
+    }
+
     @Nested
     class NullHandling {
 
