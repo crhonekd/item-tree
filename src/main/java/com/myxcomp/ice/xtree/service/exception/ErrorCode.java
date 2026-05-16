@@ -1,0 +1,14 @@
+package com.myxcomp.ice.xtree.service.exception;
+
+public enum ErrorCode {
+    PARENT_NOT_FOUND,
+    PARENT_NOT_FOLDER,
+    MOVE_INTO_DESCENDANT,
+    NEW_PARENT_NOT_FOUND,
+    NEW_PARENT_NOT_FOLDER,
+    TYPE_CANNOT_HAVE_DATA,
+    DATA_REQUIRED,
+    FOLDER_CANNOT_HAVE_DATA,
+    ITEM_NOT_FOUND,
+    HOME_FOLDER_NOT_FOUND
+}
