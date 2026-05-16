@@ -282,6 +282,7 @@ public class ItemService {
      * nodes consult the DB; rows with {@code JSON IS NULL AND XML IS NOT NULL} are converted
      * for the response and queued for async backfill (design §11).
      */
+    @Transactional(readOnly = true)
     public List<ItemWithData> getItemsWithData(List<Long> ids) {
         Objects.requireNonNull(ids, "ids");
         if (ids.isEmpty()) return List.of();
