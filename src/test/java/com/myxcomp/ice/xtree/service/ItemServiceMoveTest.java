@@ -31,6 +31,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -96,6 +97,11 @@ class ItemServiceMoveTest {
                 .satisfies(t -> assertThat(((NotFoundException) t).errorCode())
                         .isEqualTo(ErrorCode.ITEM_NOT_FOUND));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateParent(org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -109,6 +115,11 @@ class ItemServiceMoveTest {
                 .satisfies(t -> assertThat(((NotFoundException) t).errorCode())
                         .isEqualTo(ErrorCode.NEW_PARENT_NOT_FOUND));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateParent(org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -121,6 +132,11 @@ class ItemServiceMoveTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.MOVE_INTO_DESCENDANT));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateParent(org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -135,6 +151,11 @@ class ItemServiceMoveTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.NEW_PARENT_NOT_FOLDER));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateParent(org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -150,5 +171,10 @@ class ItemServiceMoveTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.MOVE_INTO_DESCENDANT));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateParent(org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.anyLong(),
+                          org.mockito.ArgumentMatchers.any(),
+                          org.mockito.ArgumentMatchers.anyString());
     }
 }

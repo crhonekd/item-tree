@@ -315,13 +315,17 @@ public class ItemService {
 
         if (!backfillBatch.isEmpty()) {
             List<JsonBackfillRow> snapshot = List.copyOf(backfillBatch);
-            backfillExecutor.execute(() -> {
-                try {
-                    repository.backfillJsonWhereNull(snapshot);
-                } catch (RuntimeException e) {
-                    log.warn("Backfill failed for {} rows: {}", snapshot.size(), e.getMessage());
-                }
-            });
+            try {
+                backfillExecutor.execute(() -> {
+                    try {
+                        repository.backfillJsonWhereNull(snapshot);
+                    } catch (RuntimeException e) {
+                        log.warn("Backfill failed for {} rows: {}", snapshot.size(), e.getMessage());
+                    }
+                });
+            } catch (RuntimeException e) {
+                log.warn("Backfill queue saturated; dropped {} rows: {}", snapshot.size(), e.getMessage());
+            }
         }
 
         return List.copyOf(out);

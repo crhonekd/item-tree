@@ -92,9 +92,11 @@ class ItemServiceRenameTest {
                 .satisfies(t -> assertThat(((NotFoundException) t).errorCode())
                         .isEqualTo(ErrorCode.ITEM_NOT_FOUND));
 
-        verify(repository, never()).updateName(org.mockito.ArgumentMatchers.anyLong(),
-                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.anyString());
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateName(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyString());
     }
 }

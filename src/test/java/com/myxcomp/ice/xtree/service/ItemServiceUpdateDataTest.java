@@ -111,6 +111,12 @@ class ItemServiceUpdateDataTest {
                 .satisfies(t -> assertThat(((NotFoundException) t).errorCode())
                         .isEqualTo(ErrorCode.ITEM_NOT_FOUND));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateJson(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -123,6 +129,12 @@ class ItemServiceUpdateDataTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.FOLDER_CANNOT_HAVE_DATA));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateJson(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -136,6 +148,12 @@ class ItemServiceUpdateDataTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.TYPE_CANNOT_HAVE_DATA));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateJson(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
@@ -149,5 +167,11 @@ class ItemServiceUpdateDataTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.DATA_REQUIRED));
         verifyNoInteractions(publisher);
+        verify(repository, org.mockito.Mockito.never())
+            .updateJson(org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyString());
     }
 }
