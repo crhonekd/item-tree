@@ -192,6 +192,8 @@ class ItemServiceCreateTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.PARENT_NOT_FOLDER));
 
+        verify(repository, never()).insert(anyLong(), anyString(), anyString(),
+                any(), any(), any(), anyString());
         verifyNoInteractions(publisher);
     }
 
@@ -205,6 +207,8 @@ class ItemServiceCreateTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.TYPE_CANNOT_HAVE_DATA));
 
+        verify(repository, never()).insert(anyLong(), anyString(), anyString(),
+                any(), any(), any(), anyString());
         verifyNoInteractions(publisher);
     }
 
@@ -218,6 +222,8 @@ class ItemServiceCreateTest {
                 .satisfies(t -> assertThat(((ValidationException) t).errorCode())
                         .isEqualTo(ErrorCode.DATA_REQUIRED));
 
+        verify(repository, never()).insert(anyLong(), anyString(), anyString(),
+                any(), any(), any(), anyString());
         verifyNoInteractions(publisher);
     }
 }
