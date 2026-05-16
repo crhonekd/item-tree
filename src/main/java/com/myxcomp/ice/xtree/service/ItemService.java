@@ -14,6 +14,7 @@ import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
+import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
@@ -160,6 +161,49 @@ public class ItemService {
 
         return cache.getById(id).orElseThrow(() -> new IllegalStateException(
                 "Cache lost id " + id + " after applyRename"));
+    }
+
+    /**
+     * Moves {@code id} under {@code newParentId}. Validation order:
+     * ITEM_NOT_FOUND, MOVE_INTO_DESCENDANT (self), NEW_PARENT_NOT_FOUND, NEW_PARENT_NOT_FOLDER, MOVE_INTO_DESCENDANT (ancestor walk).
+     */
+    @Transactional
+    public CachedNode moveItem(long id, long newParentId, UserContext userContext) {
+        Objects.requireNonNull(userContext, "userContext");
+
+        CachedNode item = cache.getById(id).orElseThrow(() -> new NotFoundException(
+                ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found"));
+
+        if (id == newParentId) {
+            throw new ValidationException(ErrorCode.MOVE_INTO_DESCENDANT,
+                    "Cannot move item into itself (id=" + id + ")");
+        }
+
+        CachedNode newParent = cache.getById(newParentId).orElseThrow(() -> new NotFoundException(
+                ErrorCode.NEW_PARENT_NOT_FOUND, "New parent " + newParentId + " not found"));
+
+        if (!Types.isFolder(newParent.type())) {
+            throw new ValidationException(ErrorCode.NEW_PARENT_NOT_FOLDER,
+                    "New parent " + newParentId + " is not a folder (type=" + newParent.type() + ")");
+        }
+
+        if (cache.isAncestor(id, newParentId)) {
+            throw new ValidationException(ErrorCode.MOVE_INTO_DESCENDANT,
+                    "Cannot move id=" + id + " under its own descendant " + newParentId);
+        }
+
+        Instant now = timeMapper.now();
+        String stampUser = userContext.effectiveUser();
+        long oldParentId = item.parentId();
+
+        repository.updateParent(id, newParentId, now, stampUser);
+        cache.applyMove(id, newParentId, now, stampUser);
+
+        publisher.publish(buildEvent(userContext, OperationType.MOVE,
+                new MovePayload(id, oldParentId, newParentId, now, stampUser), now));
+
+        return cache.getById(id).orElseThrow(() -> new IllegalStateException(
+                "Cache lost id " + id + " after applyMove"));
     }
 
     private TreeMutationEvent buildEvent(UserContext ctx, OperationType op,
