@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +19,10 @@ public class DefaultPathResolver implements PathResolver {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultPathResolver.class);
 
-    /** Defensive cap on the parent walk; a healthy tree is well under this. */
+    /**
+     * Defensive cap on the parent walk. Design §8 specifies 100; 10_000 is intentionally
+     * larger to tolerate deep-but-valid trees without premature truncation.
+     */
     private static final int MAX_TREE_DEPTH = 10_000;
 
     private static final String SEPARATOR = "/";
@@ -33,9 +35,7 @@ public class DefaultPathResolver implements PathResolver {
 
     @Override
     public String pathOf(long itemTreeId) {
-        List<String> namesRootFirst = walkToRoot(itemTreeId);
-        if (namesRootFirst.isEmpty()) return "";
-        return String.join(SEPARATOR, namesRootFirst);
+        return pathFor(itemTreeId, new HashMap<>());
     }
 
     @Override
@@ -102,36 +102,4 @@ public class DefaultPathResolver implements PathResolver {
         return memo.getOrDefault(itemTreeId, "");
     }
 
-    /**
-     * Walks the parent chain from {@code itemTreeId} up to (but not including) the conceptual
-     * root-parent (id 0). Returns the collected names in root-first order. Returns an empty list
-     * if {@code itemTreeId} is not in the cache.
-     */
-    private List<String> walkToRoot(long itemTreeId) {
-        Optional<CachedNode> start = cache.getById(itemTreeId);
-        if (start.isEmpty()) return List.of();
-
-        List<String> namesLeafFirst = new ArrayList<>();
-        CachedNode cursor = start.get();
-        int steps = 0;
-        while (cursor != null) {
-            namesLeafFirst.add(cursor.name());
-            if (cursor.parentId() == TreeConstants.ROOT_PARENT_ID) {
-                break;
-            }
-            if (++steps > MAX_TREE_DEPTH) {
-                log.warn("PathResolver: walk cap reached at id={}, possible cycle", itemTreeId);
-                break;
-            }
-            CachedNode parent = cache.getById(cursor.parentId()).orElse(null);
-            if (parent == null) {
-                log.warn("PathResolver: missing ancestor parentId={} for id={} (originating id={})",
-                        cursor.parentId(), cursor.itemTreeId(), itemTreeId);
-                break;
-            }
-            cursor = parent;
-        }
-        Collections.reverse(namesLeafFirst);
-        return namesLeafFirst;
-    }
 }

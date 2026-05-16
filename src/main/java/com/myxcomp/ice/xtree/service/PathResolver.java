@@ -11,6 +11,11 @@ import java.util.Map;
  * endpoints. Walks are bounded; cycles and missing ancestors degrade to a partial path with a WARN log
  * rather than throwing.
  *
+ * <p><b>Locking:</b> each {@link com.myxcomp.ice.xtree.cache.TreeCache#getById} call acquires and
+ * releases the cache read lock independently. A concurrent rename or move may therefore be visible
+ * mid-walk, producing a chimeric path for that response. This is an accepted trade-off: paths are
+ * recomputed per request and the cache converges at the next refresh.
+ *
  * <p>Behaviour for unknown / orphan inputs:
  * <ul>
  *   <li>If the input id is not in the cache, {@link #pathOf(long)} returns the empty string and

@@ -5,6 +5,11 @@ import com.myxcomp.ice.xtree.cache.DefaultTreeCache;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import java.time.Instant;
 import java.util.List;
@@ -47,29 +52,20 @@ class DefaultPathResolverTest {
     @Nested
     class PathOf {
 
-        @Test
-        void rootReturnsItsName() {
-            loadFixture(cache);
-            assertThat(resolver.pathOf(1L)).isEqualTo("root");
+        static Stream<Arguments> happyPathCases() {
+            return Stream.of(
+                    Arguments.of(1L,   "root"),
+                    Arguments.of(2L,   "root/Users"),
+                    Arguments.of(10L,  "root/Users/testuser1"),
+                    Arguments.of(210L, "root/Users/deepuser/L2/L3/L4/DeepReport")
+            );
         }
 
-        @Test
-        void depth1ReturnsRootSlashName() {
+        @ParameterizedTest
+        @MethodSource("happyPathCases")
+        void pathOfKnownIdReturnsFullPath(long id, String expectedPath) {
             loadFixture(cache);
-            assertThat(resolver.pathOf(2L)).isEqualTo("root/Users");
-        }
-
-        @Test
-        void depth2ReturnsThreeSegments() {
-            loadFixture(cache);
-            assertThat(resolver.pathOf(10L)).isEqualTo("root/Users/testuser1");
-        }
-
-        @Test
-        void deepLeafReturnsFullPath() {
-            loadFixture(cache);
-            assertThat(resolver.pathOf(210L))
-                    .isEqualTo("root/Users/deepuser/L2/L3/L4/DeepReport");
+            assertThat(resolver.pathOf(id)).isEqualTo(expectedPath);
         }
 
         @Test
@@ -94,9 +90,9 @@ class DefaultPathResolverTest {
             cache.applyCreate(folder(100L, 200L, "A"));
             cache.applyCreate(folder(200L, 100L, "B"));
 
-            // Must terminate (cap hit) without throwing. Result is non-null.
-            assertThat(resolver.pathOf(100L)).isNotNull();
-            assertThat(resolver.pathOf(200L)).isNotNull();
+            // Must terminate (cap hit) without throwing. Result contains at least the node's own name.
+            assertThat(resolver.pathOf(100L)).isNotEmpty();
+            assertThat(resolver.pathOf(200L)).isNotEmpty();
         }
     }
 
@@ -148,6 +144,29 @@ class DefaultPathResolverTest {
             assertThat(result).containsOnly(
                     Map.entry(10L,  "root/Users/testuser1"),
                     Map.entry(999L, ""));
+        }
+
+        @Test
+        void orphanIdMapsToPartialPath() {
+            // OrphanA's parent (999) is not in the cache — walk collects "OrphanA", then stops.
+            cache.applyCreate(folder(50L, 999L, "OrphanA"));
+
+            Map<Long, String> result = resolver.pathsOf(List.of(50L));
+
+            assertThat(result).containsOnlyKeys(50L);
+            assertThat(result.get(50L)).isEqualTo("OrphanA");
+        }
+
+        @Test
+        void cycleInInputTerminatesWithNonEmptyEntry() {
+            cache.applyCreate(folder(100L, 200L, "A"));
+            cache.applyCreate(folder(200L, 100L, "B"));
+
+            Map<Long, String> result = resolver.pathsOf(List.of(100L, 200L));
+
+            assertThat(result).containsOnlyKeys(100L, 200L);
+            assertThat(result.get(100L)).isNotEmpty();
+            assertThat(result.get(200L)).isNotEmpty();
         }
 
         @Test

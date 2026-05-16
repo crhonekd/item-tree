@@ -125,16 +125,12 @@ class DefaultTreeCacheGetTreeViewTest {
 
             List<Long> ids = cache.getTreeView(24L).stream().map(CachedNode::itemTreeId).toList();
 
-            // Chain root→L6: 1, 2, 12, 20, 21, 22, 23, 24. They must appear in that relative order.
-            // (Not necessarily contiguous — skeleton elements 3, 4, 6, 10, 30 may be interleaved.)
+            // Chain root→L6: 1, 2, 12, 20, 21, 22, 23, 24. Extract only chain elements from the
+            // result (in result order) and verify they appear in that exact sequence. This avoids
+            // relying on ConcurrentHashMap bucket ordering for skeleton-only ids.
             List<Long> chainOrder = List.of(1L, 2L, 12L, 20L, 21L, 22L, 23L, 24L);
-            List<Integer> positions = chainOrder.stream().map(ids::indexOf).toList();
-            assertThat(positions).doesNotContain(-1); // every chain id is present
-            for (int i = 1; i < positions.size(); i++) {
-                assertThat(positions.get(i))
-                        .as("chain element %s must appear after %s", chainOrder.get(i), chainOrder.get(i - 1))
-                        .isGreaterThan(positions.get(i - 1));
-            }
+            List<Long> chainInResult = ids.stream().filter(chainOrder::contains).toList();
+            assertThat(chainInResult).containsExactlyElementsOf(chainOrder);
         }
     }
 
@@ -183,8 +179,7 @@ class DefaultTreeCacheGetTreeViewTest {
             // Must appear exactly once.
             List<CachedNode> view = cache.getTreeView(10L);
 
-            long usersCount = view.stream().filter(n -> n.itemTreeId() == 2L).count();
-            assertThat(usersCount).isEqualTo(1);
+            assertThat(view).extracting(CachedNode::itemTreeId).containsOnlyOnce(2L);
         }
 
         @Test

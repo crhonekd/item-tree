@@ -27,7 +27,10 @@ public class DefaultTreeCache implements TreeCache {
     /** Ceiling for ancestor-walk cycle detection; effective cap is min(cache-size+1, this). */
     private static final int MAX_ANCESTOR_WALK = 10_000;
 
-    /** Defensive cap for the chain walk in {@link #getTreeView}; effective cap is min(cache-size+1, this). */
+    /**
+     * Ceiling for the getTreeView chain walk; effective cap is min(cache-size+1, this).
+     * Design §8 specifies 100; 10_000 is intentionally larger to tolerate deep-but-valid trees.
+     */
     private static final int MAX_TREE_DEPTH = 10_000;
 
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
