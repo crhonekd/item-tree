@@ -294,7 +294,16 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 8 — HTTP layer ⬅ NEXT
+## Phase 8 — HTTP layer ✅ COMPLETE (2026-05-17)
+
+**Deviations from plan (reviewed and approved):**
+- `UserContextInterceptor` implemented as MDC-only (sets `iceUser` / `impersonatedUser` keys). The generated OpenAPI controller interfaces already supply the validated headers as method parameters, so controllers construct `UserContext` themselves; the interceptor adds value purely as a logging-scope helper.
+- Added `TreeService.getSubtree` `ITEM_NOT_FOUND` guard so `/tree/{rootId}/subtree` returns 404 when the root id is missing from the cache. Existing `TreeServiceTest` updated to match the new throw behaviour.
+- `GlobalExceptionHandlerTest.methodArgumentNotValidMapsTo400WithFieldDetail` uses `MapBindingResult` instead of `BeanPropertyBindingResult` to avoid `NotReadablePropertyException` on a plain `Object` target. Same observable behaviour; assertions unchanged.
+- `@WebMvcTest` controller slices add `@MockBean CacheReadinessGate` with a `@BeforeEach` stub `isReady()→true` because `WebMvcConfig` is on the classpath and the `FilterRegistrationBean` `@Bean` requires the gate.
+- `CacheReadinessFilter` extends `OncePerRequestFilter` (avoids double-firing on async dispatch) and uses `shouldNotFilter` to bypass `/actuator/`, `/v3/api-docs`, `/swagger-ui`.
+
+**Actual done state:** 359 tests green; `./gradlew clean build` → BUILD SUCCESSFUL. App starts in ~2 s; `/actuator/health` returns 200; `/api/v1/itemtree/tree` returns 503 with `application/problem+json` body `{"status":503,"title":"Service Unavailable","detail":"Cache not ready"}` (cache gate stays closed until Phase 9 bootstrap flips it).
 
 **Goal:** end-to-end request flow works; error responses follow RFC 7807.
 
@@ -312,7 +321,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 9 — Bootstrap & refresh
+## Phase 9 — Bootstrap & refresh ⬅ NEXT
 
 **Goal:** instance loads cache on startup; periodic refresh works; readiness flips correctly.
 
