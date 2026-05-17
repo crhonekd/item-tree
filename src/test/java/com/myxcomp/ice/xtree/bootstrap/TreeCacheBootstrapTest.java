@@ -9,6 +9,7 @@ import com.myxcomp.ice.xtree.persistence.StructuralRow;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 import java.time.Duration;
@@ -55,8 +56,9 @@ class TreeCacheBootstrapTest {
 
         bootstrap.run(null);
 
-        verify(cache).replaceAll(any(TreeSnapshot.class));
-        verify(gate).markReady();
+        InOrder inOrder = inOrder(cache, gate);
+        inOrder.verify(cache).replaceAll(any(TreeSnapshot.class));
+        inOrder.verify(gate).markReady();
         verify(sleeper, never()).sleep(any());
         assertThat(meterRegistry.counter("itemtree.cache.bootstrap.attempts").count()).isEqualTo(1.0);
     }
@@ -103,6 +105,20 @@ class TreeCacheBootstrapTest {
 
         verify(gate).markReady();
         verify(cache).replaceAll(any());
+    }
+
+    @Test
+    void indexCheckExceptionIsNonFatal() throws Exception {
+        doAnswer(inv -> {
+            Consumer<StructuralRow> handler = inv.getArgument(0);
+            handler.accept(new StructuralRow(1L, 0L, "root", "Folder", Instant.EPOCH, "sys"));
+            return null;
+        }).when(repo).streamAllStructural(any());
+        when(repo.lastUpdateIndexExists()).thenThrow(new RuntimeException("index-check boom"));
+
+        bootstrap.run(null);
+
+        verify(gate).markReady();
     }
 
     @Test

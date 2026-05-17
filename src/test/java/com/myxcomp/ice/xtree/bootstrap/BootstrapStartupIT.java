@@ -35,6 +35,14 @@ class BootstrapStartupIT {
     }
 
     @Test
+    void rootNodeIsPresentInCacheAfterStartup() {
+        var root = cache.getById(1L);
+        assertThat(root).isPresent();
+        assertThat(root.get().name()).isEqualTo("root");
+        assertThat(root.get().parentId()).isEqualTo(0L);
+    }
+
+    @Test
     void applicationReadinessStateIsAcceptingTraffic() {
         assertThat(availability.getReadinessState()).isEqualTo(ReadinessState.ACCEPTING_TRAFFIC);
     }
