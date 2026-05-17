@@ -14,6 +14,8 @@ public class UserContextInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        request.setAttribute(MDC_ICE_USER, MDC.get(MDC_ICE_USER));
+        request.setAttribute(MDC_IMPERSONATED_USER, MDC.get(MDC_IMPERSONATED_USER));
         String iceUser = request.getHeader(HEADER_ICE_USER);
         if (iceUser != null) MDC.put(MDC_ICE_USER, iceUser);
         String impersonated = request.getHeader(HEADER_IMPERSONATED_USER);
@@ -24,7 +26,16 @@ public class UserContextInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
                                 Object handler, Exception ex) {
-        MDC.remove(MDC_ICE_USER);
-        MDC.remove(MDC_IMPERSONATED_USER);
+        restoreMdc(request, MDC_ICE_USER);
+        restoreMdc(request, MDC_IMPERSONATED_USER);
+    }
+
+    private void restoreMdc(HttpServletRequest request, String key) {
+        String prior = (String) request.getAttribute(key);
+        if (prior == null) {
+            MDC.remove(key);
+        } else {
+            MDC.put(key, prior);
+        }
     }
 }

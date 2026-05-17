@@ -66,4 +66,22 @@ class UserContextInterceptorTest {
                 new MockHttpServletRequest(), new MockHttpServletResponse(), new Object())).isTrue();
         assertThat(MDC.get("iceUser")).isNull();
     }
+
+    @Test
+    void afterCompletionRestoresPriorMdcValues() {
+        // Simulate an upstream component (e.g. Micrometer Tracing) having set iceUser before
+        // the interceptor runs.
+        MDC.put("iceUser", "prior");
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Ice-User", "alice");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        interceptor.preHandle(request, response, new Object());
+        assertThat(MDC.get("iceUser")).isEqualTo("alice");
+
+        interceptor.afterCompletion(request, response, new Object(), null);
+
+        assertThat(MDC.get("iceUser")).isEqualTo("prior");
+    }
 }
