@@ -286,7 +286,7 @@ class ItemControllerTest {
     void getItemsReturns200AndListWithJsonInflatedAsMap() throws Exception {
         ItemWithData item = new ItemWithData(
                 42L, 2L, "Report-1", "Report", T, "alice",
-                "{\"foo\":\"bar\"}", null, List.of());
+                "{\"foo\":\"bar\"}", null, null);
         when(itemService.getItemsWithData(List.of(42L))).thenReturn(List.of(item));
 
         mvc.perform(post("/api/v1/itemtree/items/get")
