@@ -75,10 +75,12 @@ public class RefreshOrchestrator {
         Timer.Sample sample = Timer.start(meterRegistry);
         long startNs = System.nanoTime();
         try {
-            TreeSnapshot oldSnap = cache.snapshot();
             SnapshotBuilder builder = new SnapshotBuilder();
             repository.streamAllStructural(builder::accept);
             TreeSnapshot newSnap = builder.build();
+            // Snapshot the cache immediately before the swap to minimise the concurrent-write
+            // window that would appear as false drift (gap is now nanoseconds, not seconds).
+            TreeSnapshot oldSnap = cache.snapshot();
             DriftCounters drift = SnapshotDiff.diff(oldSnap, newSnap);
             cache.replaceAll(newSnap);
             lastRefreshInstant.set(timeMapper.now());

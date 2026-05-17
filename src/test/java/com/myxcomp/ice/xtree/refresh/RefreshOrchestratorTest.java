@@ -107,7 +107,6 @@ class RefreshOrchestratorTest {
 
     @Test
     void fullReloadFailureLeavesCacheUntouched() {
-        when(cache.snapshot()).thenReturn(new TreeSnapshot(Map.of(), Map.of(), Map.of()));
         doThrow(new DataAccessResourceFailureException("db down"))
                 .when(repo).streamAllStructural(any());
 
