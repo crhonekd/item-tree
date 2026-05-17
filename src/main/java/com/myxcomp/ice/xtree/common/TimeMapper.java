@@ -4,10 +4,16 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 @Component
 public class TimeMapper {
+
+    public OffsetDateTime toOffsetDateTime(Instant instant) {
+        if (instant == null) return null;
+        return instant.atOffset(ZoneOffset.UTC);
+    }
 
     public LocalDateTime toLocalDateTime(Instant instant) {
         if (instant == null) return null;

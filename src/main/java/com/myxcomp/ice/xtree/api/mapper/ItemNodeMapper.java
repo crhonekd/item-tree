@@ -1,16 +1,22 @@
 package com.myxcomp.ice.xtree.api.mapper;
 
 import com.myxcomp.ice.xtree.cache.CachedNode;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.generated.model.ItemNode;
 import com.myxcomp.ice.xtree.service.TreeNodeView;
 import org.springframework.stereotype.Component;
 
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
 @Component
 public class ItemNodeMapper {
+
+    private final TimeMapper timeMapper;
+
+    public ItemNodeMapper(TimeMapper timeMapper) {
+        this.timeMapper = timeMapper;
+    }
 
     public ItemNode toDto(CachedNode node) {
         return new ItemNode(
@@ -18,7 +24,7 @@ public class ItemNodeMapper {
                 node.parentId(),
                 node.name(),
                 node.type(),
-                node.lastUpdate().atOffset(ZoneOffset.UTC),
+                timeMapper.toOffsetDateTime(node.lastUpdate()),
                 node.lastUpdateUser());
     }
 

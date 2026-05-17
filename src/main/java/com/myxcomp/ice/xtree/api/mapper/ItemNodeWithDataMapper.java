@@ -3,11 +3,11 @@ package com.myxcomp.ice.xtree.api.mapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.generated.model.ItemNodeWithData;
 import com.myxcomp.ice.xtree.service.ItemWithData;
 import org.springframework.stereotype.Component;
 
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,9 +18,11 @@ public class ItemNodeWithDataMapper {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
+    private final TimeMapper timeMapper;
 
-    public ItemNodeWithDataMapper(ObjectMapper objectMapper) {
+    public ItemNodeWithDataMapper(ObjectMapper objectMapper, TimeMapper timeMapper) {
         this.objectMapper = objectMapper;
+        this.timeMapper = timeMapper;
     }
 
     public ItemNodeWithData toDto(ItemWithData src) {
@@ -29,7 +31,7 @@ public class ItemNodeWithDataMapper {
                 src.parentId(),
                 src.name(),
                 src.type(),
-                src.lastUpdate().atOffset(ZoneOffset.UTC),
+                timeMapper.toOffsetDateTime(src.lastUpdate()),
                 src.lastUpdateUser());
 
         if (src.dataJson() != null) {

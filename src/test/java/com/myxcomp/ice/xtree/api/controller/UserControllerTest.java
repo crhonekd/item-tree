@@ -4,6 +4,7 @@ import com.myxcomp.ice.xtree.api.advice.GlobalExceptionHandler;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
 import com.myxcomp.ice.xtree.api.mapper.ItemNodeMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.service.HomeFolderService;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
@@ -24,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
-@Import({GlobalExceptionHandler.class, ProblemFactory.class, ItemNodeMapper.class})
+@Import({GlobalExceptionHandler.class, ProblemFactory.class, ItemNodeMapper.class, TimeMapper.class})
 class UserControllerTest {
 
     @Autowired MockMvc mvc;

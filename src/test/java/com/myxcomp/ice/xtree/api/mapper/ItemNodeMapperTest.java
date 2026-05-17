@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.api.mapper;
 
 import com.myxcomp.ice.xtree.cache.CachedNode;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.generated.model.ItemNode;
 import com.myxcomp.ice.xtree.service.TreeNodeView;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ItemNodeMapperTest {
 
-    private final ItemNodeMapper mapper = new ItemNodeMapper();
+    private final ItemNodeMapper mapper = new ItemNodeMapper(new TimeMapper());
 
     private static final Instant T = Instant.parse("2026-05-16T12:34:56Z");
 
