@@ -440,6 +440,23 @@ public class DefaultTreeCache implements TreeCache {
         }
     }
 
+    @Override
+    public TreeSnapshot snapshot() {
+        lock.readLock().lock();
+        try {
+            Map<Long, Set<Long>> childrenCopy = new HashMap<>(childrenByParent.size());
+            childrenByParent.forEach((k, v) -> childrenCopy.put(k, Set.copyOf(v)));
+            Map<String, Set<Long>> foldersCopy = new HashMap<>(foldersByName.size());
+            foldersByName.forEach((k, v) -> foldersCopy.put(k, Set.copyOf(v)));
+            return new TreeSnapshot(
+                    Map.copyOf(byId),
+                    Map.copyOf(childrenCopy),
+                    Map.copyOf(foldersCopy));
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private void removeFromChildren(long parentId, long childId) {

@@ -35,4 +35,10 @@ public interface TreeCache {
     /** Caller must pass the complete descendant set; partial sets leave dangling childrenByParent entries. */
     void applyDelete(Set<Long> ids);
     void replaceAll(TreeSnapshot newSnapshot);
+
+    /**
+     * Returns an immutable copy of the current cache state, captured under the read lock.
+     * Used by the full-reload drift diff (design §7) and by tests that need a frozen view.
+     */
+    TreeSnapshot snapshot();
 }

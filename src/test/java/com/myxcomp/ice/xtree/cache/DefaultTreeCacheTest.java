@@ -548,6 +548,35 @@ class DefaultTreeCacheTest {
     }
 
     @Nested
+    class SnapshotAccessor {
+
+        @Test
+        void snapshotReflectsCurrentState() {
+            DefaultTreeCache cache = new DefaultTreeCache();
+            cache.applyCreate(new CachedNode(1L, 0L, "root", "Folder", Instant.EPOCH, "sys"));
+            cache.applyCreate(new CachedNode(2L, 1L, "child", "Folder", Instant.EPOCH, "sys"));
+
+            TreeSnapshot snap = cache.snapshot();
+
+            assertThat(snap.byId()).containsOnlyKeys(1L, 2L);
+            assertThat(snap.childrenByParent().get(0L)).containsExactly(1L);
+            assertThat(snap.childrenByParent().get(1L)).containsExactly(2L);
+            assertThat(snap.foldersByName()).containsOnlyKeys("root", "child");
+        }
+
+        @Test
+        void snapshotMapsAreUnmodifiable() {
+            DefaultTreeCache cache = new DefaultTreeCache();
+            cache.applyCreate(new CachedNode(1L, 0L, "root", "Folder", Instant.EPOCH, "sys"));
+            TreeSnapshot snap = cache.snapshot();
+            assertThatThrownBy(() -> snap.byId().put(99L, null))
+                    .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> snap.childrenByParent().get(0L).add(99L))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+    }
+
+    @Nested
     class Concurrency {
 
         private DefaultTreeCache buildCacheWith(int nodeCount) {
