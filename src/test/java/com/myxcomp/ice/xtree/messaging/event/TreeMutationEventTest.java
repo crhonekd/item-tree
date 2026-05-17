@@ -289,4 +289,32 @@ class TreeMutationEventTest {
         TreeMutationEvent restored = roundTrip(event);
         assertThat(restored.getImpersonatedUser()).isNull();
     }
+
+    @Nested
+    class ForwardCompat {
+
+        @Test
+        void unknown_envelope_fields_are_ignored() throws Exception {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,
+                     "occurredAt":"2026-05-13T14:30:00Z","iceUser":"alice",
+                     "futureField":"someValue","operationType":"UPDATE",
+                     "payload":{"itemTreeId":1,"lastUpdate":"2026-05-13T14:30:00Z","lastUpdateUser":"alice"}}
+                    """;
+            TreeMutationEvent restored = mapper.readValue(json, TreeMutationEvent.class);
+            assertThat(restored.getOperationType()).isEqualTo(OperationType.UPDATE);
+        }
+
+        @Test
+        void unknown_payload_fields_are_ignored() throws Exception {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,
+                     "occurredAt":"2026-05-13T14:30:00Z","iceUser":"alice","operationType":"UPDATE",
+                     "payload":{"itemTreeId":1,"lastUpdate":"2026-05-13T14:30:00Z",
+                                "lastUpdateUser":"alice","newField":"x"}}
+                    """;
+            TreeMutationEvent restored = mapper.readValue(json, TreeMutationEvent.class);
+            assertThat(((com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload) restored.getPayload()).itemTreeId()).isEqualTo(1L);
+        }
+    }
 }
