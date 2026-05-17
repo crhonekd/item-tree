@@ -562,6 +562,8 @@ class DefaultTreeCacheTest {
             assertThat(snap.childrenByParent().get(0L)).containsExactly(1L);
             assertThat(snap.childrenByParent().get(1L)).containsExactly(2L);
             assertThat(snap.foldersByName()).containsOnlyKeys("root", "child");
+            assertThat(snap.foldersByName().get("root")).containsExactly(1L);
+            assertThat(snap.foldersByName().get("child")).containsExactly(2L);
         }
 
         @Test
@@ -573,6 +575,20 @@ class DefaultTreeCacheTest {
                     .isInstanceOf(UnsupportedOperationException.class);
             assertThatThrownBy(() -> snap.childrenByParent().get(0L).add(99L))
                     .isInstanceOf(UnsupportedOperationException.class);
+            assertThatThrownBy(() -> snap.foldersByName().put("x", Set.of()))
+                    .isInstanceOf(UnsupportedOperationException.class);
+        }
+
+        @Test
+        void snapshotIsIsolatedFromSubsequentMutations() {
+            DefaultTreeCache cache = new DefaultTreeCache();
+            cache.applyCreate(new CachedNode(1L, 0L, "root", "Folder", Instant.EPOCH, "sys"));
+            TreeSnapshot snap = cache.snapshot();
+
+            cache.applyCreate(new CachedNode(2L, 1L, "child", "Folder", Instant.EPOCH, "sys"));
+
+            assertThat(snap.byId()).containsOnlyKeys(1L);
+            assertThat(snap.childrenByParent().get(0L)).containsExactly(1L);
         }
     }
 
