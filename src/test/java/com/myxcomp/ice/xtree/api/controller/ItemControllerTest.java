@@ -361,7 +361,8 @@ class ItemControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$[0].itemTreeId").value(42))
-                .andExpect(jsonPath("$[0].dataJson.foo").value("bar"));
+                .andExpect(jsonPath("$[0].dataJson.foo").value("bar"))
+                .andExpect(jsonPath("$[0].children").value(org.hamcrest.Matchers.nullValue()));
     }
 
     @Test
