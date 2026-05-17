@@ -38,4 +38,12 @@ public interface ItemTreeRepository {
 
     /** Deletes rootId and all descendants in a single transaction using BFS; returns the full set of deleted ids (including rootId); returns empty list if rootId does not exist. */
     List<Long> cascadeDeleteSubtree(long rootId);
+
+    /**
+     * Returns {@code true} iff the {@code ITEMTREE} table has at least one index whose
+     * column list includes {@code LASTUPDATE}. Implemented via JDBC {@code DatabaseMetaData}
+     * for portability across H2 and Oracle. If the metadata lookup fails for any reason, the
+     * implementation logs WARN and returns {@code false}.
+     */
+    boolean lastUpdateIndexExists();
 }
