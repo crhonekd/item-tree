@@ -104,4 +104,21 @@ class TreeCacheBootstrapTest {
         verify(gate).markReady();
         verify(cache).replaceAll(any());
     }
+
+    @Test
+    void interruptedDuringBackoffSetsInterruptFlag() throws Exception {
+        doThrow(new DataAccessResourceFailureException("db down"))
+                .when(repo).streamAllStructural(any());
+        doThrow(new InterruptedException("interrupted"))
+                .when(sleeper).sleep(any());
+
+        try {
+            assertThatThrownBy(() -> bootstrap.run(null))
+                    .isInstanceOf(Exception.class);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        } finally {
+            // Clear the interrupt flag so it does not bleed into other tests.
+            Thread.interrupted();
+        }
+    }
 }

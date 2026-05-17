@@ -57,9 +57,9 @@ public class TreeCacheBootstrap implements ApplicationRunner {
         Timer timer = meterRegistry.timer("itemtree.cache.bootstrap.duration");
 
         Throwable last = null;
-        long start = System.nanoTime();
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             meterRegistry.counter("itemtree.cache.bootstrap.attempts").increment();
+            long start = System.nanoTime();
             try {
                 SnapshotBuilder builder = new SnapshotBuilder();
                 AtomicInteger count = new AtomicInteger();
@@ -84,7 +84,12 @@ public class TreeCacheBootstrap implements ApplicationRunner {
                     Duration sleep = attempt - 1 < backoff.size()
                             ? backoff.get(attempt - 1) : Duration.ofSeconds(25);
                     log.info("Sleeping {} before next bootstrap attempt", sleep);
-                    sleeper.sleep(sleep);
+                    try {
+                        sleeper.sleep(sleep);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Cache bootstrap interrupted during backoff sleep", ie);
+                    }
                 }
             }
         }
