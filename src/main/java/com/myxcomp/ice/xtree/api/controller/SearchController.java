@@ -34,6 +34,10 @@ public class SearchController implements SearchApi {
             throw new ValidationException(ErrorCode.INVALID_SEARCH_PARAMS,
                     "Search requires exactly one of 'id' or 'name'");
         }
+        if (limit != null && limit <= 0) {
+            throw new ValidationException(ErrorCode.INVALID_SEARCH_PARAMS,
+                    "limit must be a positive integer");
+        }
         if (hasId) {
             Optional<CachedNode> found = searchService.searchById(id);
             return ResponseEntity.ok(found.map(searchHitMapper::toDto)

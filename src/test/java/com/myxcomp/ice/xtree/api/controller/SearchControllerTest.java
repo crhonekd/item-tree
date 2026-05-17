@@ -8,6 +8,8 @@ import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.service.SearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -109,5 +111,16 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.detail").value(
                         org.hamcrest.Matchers.containsString("exactly one")))
                 .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void searchWithNonPositiveLimitReturns400(int limit) throws Exception {
+        mvc.perform(get("/api/v1/itemtree/search?name=Repo&limit=" + limit)
+                        .header("X-Ice-User", "alice"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"))
+                .andExpect(jsonPath("$.detail").value(
+                        org.hamcrest.Matchers.containsString("positive integer")));
     }
 }
