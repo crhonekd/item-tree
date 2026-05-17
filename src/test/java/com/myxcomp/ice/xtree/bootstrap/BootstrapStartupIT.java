@@ -36,7 +36,7 @@ class BootstrapStartupIT {
 
     @Test
     void rootNodeIsPresentInCacheAfterStartup() {
-        var root = cache.getById(1L);
+        var root = cache.getById(1L); // id=1 is the root row defined in db/data.sql
         assertThat(root).isPresent();
         assertThat(root.get().name()).isEqualTo("root");
         assertThat(root.get().parentId()).isEqualTo(0L);

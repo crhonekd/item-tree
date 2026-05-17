@@ -118,6 +118,7 @@ class TreeCacheBootstrapTest {
 
         bootstrap.run(null);
 
+        verify(cache).replaceAll(any(TreeSnapshot.class));
         verify(gate).markReady();
     }
 
