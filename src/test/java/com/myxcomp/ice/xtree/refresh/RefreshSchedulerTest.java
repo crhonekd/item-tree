@@ -45,5 +45,8 @@ class RefreshSchedulerTest {
         Scheduled fullReloadScheduled = AnnotationUtils.findAnnotation(fullReloadMethod, Scheduled.class);
         assertThat(fullReloadScheduled).isNotNull();
         assertThat(fullReloadScheduled.cron()).isEqualTo("${itemtree.cache.refresh.full-reload-cron}");
+
+        assertThat(deltaScheduled.zone()).isEqualTo("UTC");
+        assertThat(fullReloadScheduled.zone()).isEqualTo("UTC");
     }
 }

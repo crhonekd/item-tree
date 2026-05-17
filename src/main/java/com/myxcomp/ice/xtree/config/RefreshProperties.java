@@ -27,7 +27,7 @@ public record RefreshProperties(
         @Min(0) int deltaOverlapSeconds,
         @NotNull String fullReloadCron,
         @Min(1) int bootstrapRetries,
-        @NotNull List<Duration> bootstrapBackoff
+        List<Duration> bootstrapBackoff
 ) {
     public RefreshProperties {
         bootstrapBackoff = bootstrapBackoff == null ? List.of() : List.copyOf(bootstrapBackoff);

@@ -64,9 +64,13 @@ class RefreshPropertiesTest {
                         if (t.getMessage() != null) allMessages.append(t.getMessage()).append('\n');
                         t = t.getCause();
                     }
-                    assertThat(allMessages.toString())
-                            .containsAnyOf("bootstrapRetries", "bootstrap-retries",
-                                    "must be greater", "Validation failed", "ConstraintViolation");
+                    String combined = allMessages.toString();
+                    assertThat(combined)
+                            .as("Expected field name in validation failure")
+                            .containsAnyOf("bootstrapRetries", "bootstrap-retries");
+                    assertThat(combined)
+                            .as("Expected constraint phrase in validation failure")
+                            .containsAnyOf("must be", "constraint", "ConstraintViolation");
                 });
     }
 
