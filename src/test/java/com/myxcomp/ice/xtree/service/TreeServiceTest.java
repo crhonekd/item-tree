@@ -3,6 +3,7 @@ package com.myxcomp.ice.xtree.service;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.common.UserContext;
+import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,8 +13,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +89,7 @@ class TreeServiceTest {
     void getSubtreeReturnsPairsForEveryNodeInSubtree() {
         CachedNode parent = folder(20L, 1L, "Group");
         CachedNode child  = folder(21L, 20L, "Sub");
+        when(cache.getById(20L)).thenReturn(Optional.of(parent));
         when(cache.getSubtreeFlat(20L)).thenReturn(List.of(parent, child));
         when(pathResolver.pathsOf(List.of(20L, 21L))).thenReturn(Map.of(
                 20L, "root/Group",
@@ -101,17 +105,18 @@ class TreeServiceTest {
     }
 
     @Test
-    void getSubtreeReturnsEmptyListForUnknownRoot() {
-        when(cache.getSubtreeFlat(999L)).thenReturn(List.of());
+    void getSubtreeThrowsNotFoundForUnknownRoot() {
+        when(cache.getById(999L)).thenReturn(Optional.empty());
 
-        List<TreeNodeView> result = service.getSubtree(999L);
-
-        assertThat(result).isEmpty();
+        assertThatThrownBy(() -> service.getSubtree(999L))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("999");
     }
 
     @Test
     void getSubtreeFallsBackToEmptyStringPathWhenResolverOmitsId() {
         CachedNode node = folder(30L, 1L, "X");
+        when(cache.getById(30L)).thenReturn(Optional.of(node));
         when(cache.getSubtreeFlat(30L)).thenReturn(List.of(node));
         when(pathResolver.pathsOf(anyCollection())).thenReturn(Map.of());
 

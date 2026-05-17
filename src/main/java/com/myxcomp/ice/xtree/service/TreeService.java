@@ -3,6 +3,8 @@ package com.myxcomp.ice.xtree.service;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.common.UserContext;
+import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -36,8 +38,16 @@ public class TreeService {
         return pairWithPaths(nodes);
     }
 
-    /** Returns every node in the subtree rooted at {@code rootId}, each paired with its path. */
+    /**
+     * Returns every node in the subtree rooted at {@code rootId}, each paired with its path.
+     *
+     * @throws NotFoundException (ITEM_NOT_FOUND) when no item with {@code rootId} exists in the cache
+     */
     public List<TreeNodeView> getSubtree(long rootId) {
+        if (cache.getById(rootId).isEmpty()) {
+            throw new NotFoundException(ErrorCode.ITEM_NOT_FOUND,
+                    "Item " + rootId + " not found");
+        }
         List<CachedNode> nodes = cache.getSubtreeFlat(rootId);
         return pairWithPaths(nodes);
     }
