@@ -11,6 +11,8 @@ public final class SnapshotDiff {
     private SnapshotDiff() {}
 
     public static DriftCounters diff(TreeSnapshot oldSnap, TreeSnapshot newSnap) {
+        Objects.requireNonNull(oldSnap, "oldSnap");
+        Objects.requireNonNull(newSnap, "newSnap");
         DriftCounters d = new DriftCounters();
         Map<Long, CachedNode> oldById = oldSnap.byId();
         Map<Long, CachedNode> newById = newSnap.byId();

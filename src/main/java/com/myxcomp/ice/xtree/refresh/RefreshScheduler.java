@@ -16,13 +16,13 @@ public class RefreshScheduler {
         this.orchestrator = orchestrator;
     }
 
-    @Scheduled(cron = "${itemtree.cache.refresh.delta-cron}")
+    @Scheduled(cron = "${itemtree.cache.refresh.delta-cron}", zone = "UTC")
     public void scheduledDelta() {
         log.debug("scheduledDelta fired");
         orchestrator.runDelta();
     }
 
-    @Scheduled(cron = "${itemtree.cache.refresh.full-reload-cron}")
+    @Scheduled(cron = "${itemtree.cache.refresh.full-reload-cron}", zone = "UTC")
     public void scheduledFullReload() {
         log.debug("scheduledFullReload fired");
         orchestrator.runFullReload();

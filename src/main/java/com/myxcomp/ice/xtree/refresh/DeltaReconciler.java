@@ -21,6 +21,11 @@ public class DeltaReconciler {
         this.cache = cache;
     }
 
+    /**
+     * Reconciles a single DB row into the live cache. Type changes are not handled; design §5
+     * treats item type as immutable post-creation. A type change would only be reflected on the
+     * next full reload.
+     */
     public void reconcileRow(StructuralRow row, DeltaCounters counters) {
         Optional<CachedNode> existing = cache.getById(row.itemTreeId());
         if (existing.isEmpty()) {

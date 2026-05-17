@@ -43,4 +43,34 @@ class RefreshPropertiesTest {
         RefreshProperties p = new RefreshProperties("0 * * * * *", 60, "0 0 2 * * *", 3, null);
         assertThat(p.bootstrapBackoff()).isEmpty();
     }
+
+    @Test
+    void bootstrapRetriesZeroFailsValidation() {
+        new org.springframework.boot.test.context.runner.ApplicationContextRunner()
+                .withUserConfiguration(ValidationConfig.class)
+                .withPropertyValues(
+                        "itemtree.cache.refresh.delta-cron=0 */30 * * * *",
+                        "itemtree.cache.refresh.delta-overlap-seconds=60",
+                        "itemtree.cache.refresh.full-reload-cron=0 0 2 * * MON-FRI",
+                        "itemtree.cache.refresh.bootstrap-retries=0",
+                        "itemtree.cache.refresh.bootstrap-backoff=PT1S"
+                )
+                .run(ctx -> {
+                    assertThat(ctx).hasFailed();
+                    // Walk the cause chain — the validation detail is nested inside
+                    Throwable t = ctx.getStartupFailure();
+                    StringBuilder allMessages = new StringBuilder();
+                    while (t != null) {
+                        if (t.getMessage() != null) allMessages.append(t.getMessage()).append('\n');
+                        t = t.getCause();
+                    }
+                    assertThat(allMessages.toString())
+                            .containsAnyOf("bootstrapRetries", "bootstrap-retries",
+                                    "must be greater", "Validation failed", "ConstraintViolation");
+                });
+    }
+
+    @org.springframework.boot.SpringBootConfiguration
+    @EnableConfigurationProperties(RefreshProperties.class)
+    static class ValidationConfig {}
 }

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 
 class SnapshotDiffTest {
 
@@ -57,6 +58,20 @@ class SnapshotDiffTest {
         Map<Long, CachedNode> byId = Map.of(1L, node(1L, 0L, "a", T1), 2L, node(2L, 0L, "b", T1));
         DriftCounters d = SnapshotDiff.diff(snapshot(byId), snapshot(byId));
         assertThat(d.total()).isZero();
+    }
+
+    @Test
+    void nullOldSnapThrows() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> SnapshotDiff.diff(null, snapshot(Map.of())))
+                .withMessage("oldSnap");
+    }
+
+    @Test
+    void nullNewSnapThrows() {
+        assertThatNullPointerException()
+                .isThrownBy(() -> SnapshotDiff.diff(snapshot(Map.of()), null))
+                .withMessage("newSnap");
     }
 
     @Test
