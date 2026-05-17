@@ -6,9 +6,12 @@ import java.util.List;
 /**
  * Service-layer shape for {@code POST /items/get} response items.
  * For folder nodes: {@code dataJson} and {@code dataXml} are null, and {@code children} is
- * populated one level deep (each child's {@code children} is empty list).
+ * a non-null list populated one level deep (each child's {@code children} is null, because
+ * child-of-folder nodes are never themselves expanded).
  * For non-folder, data-bearing nodes: at most one of {@code dataJson}/{@code dataXml} is
- * populated, and {@code children} is empty list.
+ * populated, and {@code children} is {@code null} (never an empty list).
+ * Callers must use {@code children() == null} to distinguish non-folder nodes from
+ * empty-folder nodes.
  */
 public record ItemWithData(
         long itemTreeId,

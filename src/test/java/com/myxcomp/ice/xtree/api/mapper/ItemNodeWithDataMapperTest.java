@@ -23,9 +23,10 @@ class ItemNodeWithDataMapperTest {
 
     @Test
     void mapsJsonStringIntoMap() {
+        // Non-folder node: children == null
         ItemWithData input = new ItemWithData(
                 42L, 7L, "Report-1", "Report", T, "alice",
-                "{\"foo\":\"bar\",\"n\":1}", null, List.of());
+                "{\"foo\":\"bar\",\"n\":1}", null, null);
 
         ItemNodeWithData dto = mapper.toDto(input);
 
@@ -37,23 +38,39 @@ class ItemNodeWithDataMapperTest {
         assertThat(dto.getLastUpdateUser()).isEqualTo("alice");
         assertThat(dto.getDataJson()).containsEntry("foo", "bar").containsEntry("n", 1);
         assertThat(dto.getDataXml()).isNull();
-        assertThat(dto.getChildren()).isEmpty();
+        assertThat(dto.getChildren()).isNull();
     }
 
     @Test
     void preservesRawXmlPayload() {
+        // Non-folder node: children == null
         ItemWithData input = new ItemWithData(
                 42L, 7L, "Bucket-1", "Bucket.Collection", T, "alice",
-                null, "<bucket/>", List.of());
+                null, "<bucket/>", null);
 
         ItemNodeWithData dto = mapper.toDto(input);
 
         assertThat(dto.getDataXml()).isEqualTo("<bucket/>");
         assertThat(dto.getDataJson()).isNull();
+        assertThat(dto.getChildren()).isNull();
     }
 
     @Test
-    void nullPayloadProducesNullFields() {
+    void nonFolderNodeProducesNullChildren() {
+        // Non-folder with no data payload: children == null marks it as non-folder
+        ItemWithData input = new ItemWithData(
+                42L, 7L, "Shortcut-1", "Shortcut", T, "alice", null, null, null);
+
+        ItemNodeWithData dto = mapper.toDto(input);
+
+        assertThat(dto.getDataJson()).isNull();
+        assertThat(dto.getDataXml()).isNull();
+        assertThat(dto.getChildren()).isNull();
+    }
+
+    @Test
+    void emptyFolderProducesEmptyChildrenList() {
+        // Folder with no children: children == List.of() (non-null empty list)
         ItemWithData input = new ItemWithData(
                 42L, 7L, "MyFolder", "Folder", T, "alice", null, null, List.of());
 
@@ -61,14 +78,15 @@ class ItemNodeWithDataMapperTest {
 
         assertThat(dto.getDataJson()).isNull();
         assertThat(dto.getDataXml()).isNull();
-        assertThat(dto.getChildren()).isEmpty();
+        assertThat(dto.getChildren()).isNotNull().isEmpty();
     }
 
     @Test
     void folderRecursesChildrenOneLevel() {
+        // Child nodes are non-folders: children == null
         ItemWithData childA = new ItemWithData(
                 10L, 1L, "child-A", "Report", T, "alice",
-                "{\"k\":\"v\"}", null, List.of());
+                "{\"k\":\"v\"}", null, null);
         ItemWithData childB = new ItemWithData(
                 11L, 1L, "child-B", "Folder", T, "alice", null, null, List.of());
         ItemWithData folder = new ItemWithData(
@@ -79,8 +97,9 @@ class ItemNodeWithDataMapperTest {
         assertThat(dto.getChildren()).hasSize(2);
         assertThat(dto.getChildren().get(0).getItemTreeId()).isEqualTo(10L);
         assertThat(dto.getChildren().get(0).getDataJson()).containsEntry("k", "v");
+        assertThat(dto.getChildren().get(0).getChildren()).isNull();
         assertThat(dto.getChildren().get(1).getItemTreeId()).isEqualTo(11L);
-        assertThat(dto.getChildren().get(1).getChildren()).isEmpty();
+        assertThat(dto.getChildren().get(1).getChildren()).isNotNull().isEmpty();
     }
 
     @Test
@@ -97,7 +116,7 @@ class ItemNodeWithDataMapperTest {
     void malformedJsonProducesIllegalStateException() {
         ItemWithData input = new ItemWithData(
                 42L, 7L, "Report-1", "Report", T, "alice",
-                "{not-json", null, List.of());
+                "{not-json", null, null);
 
         assertThatThrownBy(() -> mapper.toDto(input))
                 .isInstanceOf(IllegalStateException.class)

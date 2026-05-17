@@ -38,7 +38,11 @@ public class ItemNodeWithDataMapper {
         if (src.dataXml() != null) {
             dto.setDataXml(src.dataXml());
         }
-        if (src.children() != null && !src.children().isEmpty()) {
+        if (src.children() == null) {
+            // non-folder node: override the DTO default (new ArrayList<>()) with null
+            dto.setChildren(null);
+        } else {
+            // folder node: map children list (may be empty for an empty folder)
             List<ItemNodeWithData> shaped = new ArrayList<>(src.children().size());
             for (ItemWithData c : src.children()) shaped.add(toDto(c));
             dto.setChildren(shaped);

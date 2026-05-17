@@ -327,11 +327,11 @@ public class ItemService {
             if (Types.isFolder(n.type())) {
                 List<ItemWithData> shapedChildren = new ArrayList<>();
                 for (CachedNode c : folderChildren.get(n.itemTreeId())) {
-                    shapedChildren.add(shape(c, payloadById, backfillBatch, List.of()));
+                    shapedChildren.add(shape(c, payloadById, backfillBatch, null));
                 }
                 out.add(shape(n, payloadById, backfillBatch, List.copyOf(shapedChildren)));
             } else {
-                out.add(shape(n, payloadById, backfillBatch, List.of()));
+                out.add(shape(n, payloadById, backfillBatch, null));
             }
         }
 

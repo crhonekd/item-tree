@@ -94,7 +94,7 @@ class ItemServiceGetItemsTest {
         assertThat(out.itemTreeId()).isEqualTo(7L);
         assertThat(out.dataJson()).isEqualTo("{\"a\":1}");
         assertThat(out.dataXml()).isNull();
-        assertThat(out.children()).isEmpty();
+        assertThat(out.children()).isNull();
         verify(repository, never()).backfillJsonWhereNull(anyCollection());
     }
 
@@ -175,13 +175,13 @@ class ItemServiceGetItemsTest {
         ItemWithData childData = folderItem.children().stream()
                 .filter(c -> c.itemTreeId() == 3L).findFirst().orElseThrow();
         assertThat(childData.dataJson()).isEqualTo("{\"k\":1}");
-        assertThat(childData.children()).isEmpty();
+        assertThat(childData.children()).isNull();
 
         ItemWithData childNoData = folderItem.children().stream()
                 .filter(c -> c.itemTreeId() == 4L).findFirst().orElseThrow();
         assertThat(childNoData.dataJson()).isNull();
         assertThat(childNoData.dataXml()).isNull();
-        assertThat(childNoData.children()).isEmpty();
+        assertThat(childNoData.children()).isNull();
     }
 
     @Test
