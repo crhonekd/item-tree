@@ -26,7 +26,7 @@ management:
 
 # ── Placeholder config sections from design §17 ──────────────────────────────
 # Filled in by later phases:
-#   itemtree.cache.refresh.*       (Phase 9)
+#   itemtree.cache.refresh.*       (Phase 9 — done)
 #   itemtree.cache.name-search.*   (Phase 7)
 #   itemtree.solace.*              (Phases 10/11)
 #   itemtree.oracle.sequence-name  (Phase 3)

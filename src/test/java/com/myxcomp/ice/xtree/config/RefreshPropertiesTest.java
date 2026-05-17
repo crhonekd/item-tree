@@ -36,4 +36,11 @@ class RefreshPropertiesTest {
         assertThat(props.bootstrapBackoff())
                 .containsExactly(Duration.ofSeconds(1), Duration.ofSeconds(5), Duration.ofSeconds(25));
     }
+
+    @Test
+    void absentBootstrapBackoffDefaultsToEmptyList() {
+        // Tests the compact constructor null-guard — no Spring context needed
+        RefreshProperties p = new RefreshProperties("0 * * * * *", 60, "0 0 2 * * *", 3, null);
+        assertThat(p.bootstrapBackoff()).isEmpty();
+    }
 }

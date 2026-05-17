@@ -24,4 +24,8 @@ public record RefreshProperties(
         String fullReloadCron,
         int bootstrapRetries,
         List<Duration> bootstrapBackoff
-) {}
+) {
+    public RefreshProperties {
+        bootstrapBackoff = bootstrapBackoff == null ? List.of() : List.copyOf(bootstrapBackoff);
+    }
+}
