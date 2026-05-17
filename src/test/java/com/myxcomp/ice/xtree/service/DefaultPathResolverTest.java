@@ -232,5 +232,6 @@ class DefaultPathResolverTest {
         @Override public void applyRename(long id, String newName, java.time.Instant lastUpdate, String lastUpdateUser) { delegate.applyRename(id, newName, lastUpdate, lastUpdateUser); }
         @Override public void applyDelete(java.util.Set<Long> ids) { delegate.applyDelete(ids); }
         @Override public void replaceAll(com.myxcomp.ice.xtree.cache.TreeSnapshot newSnapshot) { delegate.replaceAll(newSnapshot); }
+        @Override public com.myxcomp.ice.xtree.cache.TreeSnapshot snapshot() { return delegate.snapshot(); }
     }
 }

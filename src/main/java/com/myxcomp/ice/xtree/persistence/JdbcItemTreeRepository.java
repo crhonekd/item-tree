@@ -6,12 +6,18 @@ import com.myxcomp.ice.xtree.persistence.rowmapper.StructuralRowMapper;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -20,6 +26,8 @@ import java.util.function.Consumer;
 
 @Repository
 public class JdbcItemTreeRepository implements ItemTreeRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(JdbcItemTreeRepository.class);
 
     private static final int CHUNK_SIZE = 1000;
     private static final String PARAM_LAST_UPDATE = "lastUpdate";
@@ -219,6 +227,29 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
         }
 
         return allIds;
+    }
+
+    @Override
+    public boolean lastUpdateIndexExists() {
+        DataSource ds = jdbcTemplate.getDataSource();
+        if (ds == null) {
+            log.warn("DataSource is null — cannot check LASTUPDATE index");
+            return false;
+        }
+        try (Connection conn = ds.getConnection()) {
+            DatabaseMetaData meta = conn.getMetaData();
+            try (ResultSet rs = meta.getIndexInfo(null, null, "ITEMTREE", false, true)) {
+                while (rs.next()) {
+                    String column = rs.getString("COLUMN_NAME");
+                    if ("LASTUPDATE".equalsIgnoreCase(column)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("Index-presence check failed: {}", e.getMessage());
+        }
+        return false;
     }
 
     private List<List<Long>> partition(Collection<Long> ids) {

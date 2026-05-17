@@ -6,6 +6,10 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  task:
+    scheduling:
+      pool:
+        size: 1
 
 server:
   port: 8080
@@ -17,7 +21,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,prometheus,itemtree-refresh
   endpoint:
     health:
       probes:
@@ -26,14 +30,19 @@ management:
 
 # ── Placeholder config sections from design §17 ──────────────────────────────
 # Filled in by later phases:
-#   itemtree.cache.refresh.*       (Phase 9)
+#   itemtree.cache.refresh.*       (Phase 9 — done)
 #   itemtree.cache.name-search.*   (Phase 7)
 #   itemtree.solace.*              (Phases 10/11)
 #   itemtree.oracle.sequence-name  (Phase 3)
 #   itemtree.data.*                (Phase 5)
 itemtree:
   cache:
-    refresh: {}
+    refresh:
+      delta-cron:             "0 */30 * * * *"
+      delta-overlap-seconds:  60
+      full-reload-cron:       "0 0 2 * * MON-FRI"
+      bootstrap-retries:      3
+      bootstrap-backoff:      PT1S,PT5S,PT25S
     name-search: {}
   solace: {}
   oracle: {}

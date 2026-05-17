@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -37,8 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TreeControllerTest {
 
     @Autowired MockMvc mvc;
-    @MockBean TreeService treeService;
-    @MockBean CacheReadinessGate cacheReadinessGate;
+    @MockitoBean TreeService treeService;
+    @MockitoBean CacheReadinessGate cacheReadinessGate;
 
     private static final Instant T = Instant.parse("2026-05-16T12:00:00Z");
 

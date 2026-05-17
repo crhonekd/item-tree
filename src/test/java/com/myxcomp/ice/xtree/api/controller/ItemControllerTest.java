@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -49,9 +49,9 @@ class ItemControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper objectMapper;
 
-    @MockBean ItemService itemService;
+    @MockitoBean ItemService itemService;
     // Required by WebMvcConfig.cacheReadinessFilterRegistration bean
-    @MockBean CacheReadinessGate cacheReadinessGate;
+    @MockitoBean CacheReadinessGate cacheReadinessGate;
 
     private static final Instant T = Instant.parse("2026-05-16T12:00:00Z");
 
