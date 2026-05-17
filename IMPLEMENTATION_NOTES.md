@@ -303,7 +303,18 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `@WebMvcTest` controller slices add `@MockBean CacheReadinessGate` with a `@BeforeEach` stub `isReady()→true` because `WebMvcConfig` is on the classpath and the `FilterRegistrationBean` `@Bean` requires the gate.
 - `CacheReadinessFilter` extends `OncePerRequestFilter` (avoids double-firing on async dispatch) and uses `shouldNotFilter` to bypass `/actuator/`, `/v3/api-docs`, `/swagger-ui`.
 
-**Actual done state:** 359 tests green; `./gradlew clean build` → BUILD SUCCESSFUL. App starts in ~2 s; `/actuator/health` returns 200; `/api/v1/itemtree/tree` returns 503 with `application/problem+json` body `{"status":503,"title":"Service Unavailable","detail":"Cache not ready"}` (cache gate stays closed until Phase 9 bootstrap flips it).
+**Actual done state:** 369 tests green; `./gradlew clean build` → BUILD SUCCESSFUL. App starts in ~2 s; `/actuator/health` returns 200; `/api/v1/itemtree/tree` returns 503 with `application/problem+json` body `{"status":503,"title":"Service Unavailable","detail":"Cache not ready"}` (cache gate stays closed until Phase 9 bootstrap flips it).
+
+**Post-completion quality fixes (applied after audit, same phase):**
+- `ItemNodeWithDataMapper`: non-folder nodes now explicitly set `children = null` on the DTO (the generated class initialises to `new ArrayList<>()`, so without the explicit set, non-folders serialised as `"children": []`). Discriminant: `src.children() == null` means non-folder; `ItemService.getItemsWithData` passes `null` for non-folders and a (possibly empty) list for folders. Wire-format assertion added to `ItemControllerTest`.
+- `ErrorCode.INVALID_SEARCH_PARAMS` added; `SearchController` uses it instead of the semantically wrong `DATA_REQUIRED` for "exactly one of id/name" validation. `SearchControllerTest` now asserts `$.errorCode`.
+- `TimeMapper.toOffsetDateTime(Instant)` added; `ItemNodeMapper` and `ItemNodeWithDataMapper` route through it instead of calling `instant.atOffset(ZoneOffset.UTC)` directly, preserving the "TimeMapper is the sole timezone-conversion point" invariant. `@WebMvcTest` slices that `@Import` these mappers were updated to also import `TimeMapper.class`.
+- `UserContextInterceptor.afterCompletion` now saves prior MDC values as request attributes in `preHandle` and restores them (put back non-null priors; remove null priors) instead of blindly calling `MDC.remove`. Test added for the restore path.
+- `GlobalExceptionHandler.handleUnreadable` no longer leaks Jackson cause messages; returns fixed string `"Request body could not be parsed"` and logs the original exception at WARN.
+- `SearchController` rejects `limit ≤ 0` with 400 + `INVALID_SEARCH_PARAMS`.
+- `ItemController.serializeOrNull` throws `ValidationException(DATA_NOT_SERIALISABLE)` instead of `IllegalStateException` so bad request data maps to 400 rather than 500. `ErrorCode.DATA_NOT_SERIALISABLE` added.
+- `ItemControllerTest` backfilled: `NEW_PARENT_NOT_FOUND`/`NEW_PARENT_NOT_FOLDER` on move; `ITEM_NOT_FOUND` on delete/rename/updateData; missing-`ids`-field behaviour documented (returns 200 + empty list because the generated DTO initialises `ids = new ArrayList<>()`).
+- Report fixture in `ItemControllerTest` corrected to pass `null` children for a `Report`-typed `ItemWithData` node.
 
 **Goal:** end-to-end request flow works; error responses follow RFC 7807.
 
