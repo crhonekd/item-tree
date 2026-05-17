@@ -114,7 +114,8 @@ class TreeCacheBootstrapTest {
 
         try {
             assertThatThrownBy(() -> bootstrap.run(null))
-                    .isInstanceOf(Exception.class);
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasCauseInstanceOf(InterruptedException.class);
             assertThat(Thread.currentThread().isInterrupted()).isTrue();
         } finally {
             // Clear the interrupt flag so it does not bleed into other tests.
