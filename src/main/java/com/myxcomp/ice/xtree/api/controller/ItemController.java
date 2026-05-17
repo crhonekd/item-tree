@@ -7,6 +7,10 @@ import com.myxcomp.ice.xtree.api.mapper.ItemNodeWithDataMapper;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.generated.api.ItemsApi;
+import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ValidationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.myxcomp.ice.xtree.generated.model.CreateItemRequest;
 import com.myxcomp.ice.xtree.generated.model.GetItemsRequest;
 import com.myxcomp.ice.xtree.generated.model.ItemNode;
@@ -25,6 +29,8 @@ import java.util.Map;
 
 @RestController
 public class ItemController implements ItemsApi {
+
+    private static final Logger log = LoggerFactory.getLogger(ItemController.class);
 
     private final ItemService itemService;
     private final ItemNodeMapper itemNodeMapper;
@@ -90,8 +96,9 @@ public class ItemController implements ItemsApi {
         try {
             return objectMapper.writeValueAsString(map);
         } catch (JsonProcessingException e) {
-            throw new IllegalStateException(
-                    "Failed to serialize request field '" + fieldName + "'", e);
+            log.warn("Failed to serialise request field '{}'", fieldName, e);
+            throw new ValidationException(ErrorCode.DATA_NOT_SERIALISABLE,
+                    "Request 'data' field could not be serialised");
         }
     }
 }
