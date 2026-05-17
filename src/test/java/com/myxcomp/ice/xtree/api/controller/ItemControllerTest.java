@@ -184,6 +184,17 @@ class ItemControllerTest {
                         org.hamcrest.Matchers.containsString("id")));
     }
 
+    @Test
+    void deleteItemNotFoundReturns404() throws Exception {
+        org.mockito.Mockito.doThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 42 not found"))
+                .when(itemService).deleteItem(eq(42L), any(UserContext.class));
+
+        mvc.perform(delete("/api/v1/itemtree/items/42")
+                        .header("X-Ice-User", "alice"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
+    }
+
     // ── move ─────────────────────────────────────────────────────────────
 
     @Test
@@ -226,6 +237,32 @@ class ItemControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
     }
 
+    @Test
+    void moveItemNewParentNotFoundReturns404() throws Exception {
+        when(itemService.moveItem(anyLong(), anyLong(), any(UserContext.class)))
+                .thenThrow(new NotFoundException(ErrorCode.NEW_PARENT_NOT_FOUND, "Parent 7 not found"));
+
+        mvc.perform(post("/api/v1/itemtree/items/42/move")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newParentId\":7}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("NEW_PARENT_NOT_FOUND"));
+    }
+
+    @Test
+    void moveItemNewParentNotFolderReturns400() throws Exception {
+        when(itemService.moveItem(anyLong(), anyLong(), any(UserContext.class)))
+                .thenThrow(new ValidationException(ErrorCode.NEW_PARENT_NOT_FOLDER, "Id 7 is not a folder"));
+
+        mvc.perform(post("/api/v1/itemtree/items/42/move")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newParentId\":7}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("NEW_PARENT_NOT_FOLDER"));
+    }
+
     // ── rename ───────────────────────────────────────────────────────────
 
     @Test
@@ -250,6 +287,19 @@ class ItemControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(
                         org.hamcrest.Matchers.containsString("newName")));
+    }
+
+    @Test
+    void renameItemNotFoundReturns404() throws Exception {
+        when(itemService.renameItem(anyLong(), any(), any(UserContext.class)))
+                .thenThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 42 not found"));
+
+        mvc.perform(post("/api/v1/itemtree/items/42/rename")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newName\":\"Report-2\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
     }
 
     // ── update data ──────────────────────────────────────────────────────
@@ -281,6 +331,19 @@ class ItemControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("FOLDER_CANNOT_HAVE_DATA"));
     }
 
+    @Test
+    void updateItemDataNotFoundReturns404() throws Exception {
+        when(itemService.updateItemData(anyLong(), any(), any(UserContext.class)))
+                .thenThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 42 not found"));
+
+        mvc.perform(put("/api/v1/itemtree/items/42/data")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"data\":{\"foo\":\"bar\"}}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
+    }
+
     // ── getItems ─────────────────────────────────────────────────────────
 
     @Test
@@ -309,6 +372,24 @@ class ItemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"ids\":[]}"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void getItemsWithMissingIdsFieldTreatedAsEmptyList() throws Exception {
+        // The generated GetItemsRequest initialises ids to new ArrayList<>(), so a missing
+        // "ids" field in the request body is treated as an empty list rather than null.
+        // The @NotNull on getIds() therefore never fires; the request succeeds with 200
+        // and an empty result list.
+        when(itemService.getItemsWithData(List.of())).thenReturn(List.of());
+
+        mvc.perform(post("/api/v1/itemtree/items/get")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(0));
     }
