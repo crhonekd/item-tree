@@ -66,7 +66,7 @@ public class RefreshOrchestrator {
             long durationMs = Duration.ofNanos(System.nanoTime() - startNs).toMillis();
             sample.stop(meterRegistry.timer("itemtree.cache.refresh.delta.duration"));
             meterRegistry.counter("itemtree.cache.refresh.delta.failure").increment();
-            log.warn("Delta refresh failed after {}ms: {}", durationMs, e.toString());
+            log.warn("Delta refresh failed after {}ms", durationMs, e);
             return RefreshResult.deltaFailure(durationMs, e.toString());
         }
     }
@@ -91,7 +91,7 @@ public class RefreshOrchestrator {
             long durationMs = Duration.ofNanos(System.nanoTime() - startNs).toMillis();
             sample.stop(meterRegistry.timer("itemtree.cache.refresh.full.duration"));
             meterRegistry.counter("itemtree.cache.refresh.full.failure").increment();
-            log.warn("Full reload failed after {}ms: {}", durationMs, e.toString());
+            log.warn("Full reload failed after {}ms", durationMs, e);
             return RefreshResult.fullFailure(durationMs, e.toString());
         }
     }
