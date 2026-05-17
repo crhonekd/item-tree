@@ -98,7 +98,7 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getDetail()).isEqualTo("Malformed JSON");
+        assertThat(response.getBody().getDetail()).isEqualTo("Request body could not be parsed");
     }
 
     @Test

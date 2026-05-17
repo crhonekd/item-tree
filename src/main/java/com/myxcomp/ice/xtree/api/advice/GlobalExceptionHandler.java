@@ -55,9 +55,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Problem> handleUnreadable(HttpMessageNotReadableException e) {
-        Throwable cause = e.getCause();
-        String detail = cause != null ? cause.getMessage() : e.getMessage();
-        return problemFactory.build(HttpStatus.BAD_REQUEST, null, detail);
+        log.warn("Unreadable request body", e);
+        return problemFactory.build(HttpStatus.BAD_REQUEST, null, "Request body could not be parsed");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
