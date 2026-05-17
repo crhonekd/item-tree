@@ -55,6 +55,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getErrorCode()).isEqualTo("MOVE_INTO_DESCENDANT");
+        assertThat(response.getBody().getDetail()).isEqualTo("Cannot move under descendant");
     }
 
     @Test
@@ -116,7 +117,7 @@ class GlobalExceptionHandlerTest {
     void constraintViolationMapsTo400() {
         ConstraintViolation<?> violation = mock(ConstraintViolation.class);
         when(violation.getMessage()).thenReturn("size must be between 1 and 20");
-        when(violation.getPropertyPath()).thenReturn(jakarta.validation.Path.class.cast(null));
+        when(violation.getPropertyPath()).thenReturn(null);
 
         ConstraintViolationException exception = new ConstraintViolationException(
                 "constraint violated", Set.of(violation));
