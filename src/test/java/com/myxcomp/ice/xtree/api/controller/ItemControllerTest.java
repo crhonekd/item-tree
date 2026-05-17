@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -186,7 +187,7 @@ class ItemControllerTest {
 
     @Test
     void deleteItemNotFoundReturns404() throws Exception {
-        org.mockito.Mockito.doThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 42 not found"))
+        doThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 42 not found"))
                 .when(itemService).deleteItem(eq(42L), any(UserContext.class));
 
         mvc.perform(delete("/api/v1/itemtree/items/42")
