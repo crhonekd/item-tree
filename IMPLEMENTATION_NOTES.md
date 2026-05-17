@@ -355,8 +355,11 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `TreeCacheBootstrap` calls `checkIndex()` before `gate.markReady()` (plan suggested reverse order). The implemented order is safer — the WARN about a missing index fires while the service is still warming up, not after it enters the LB rotation.
 - `RefreshActuatorEndpoint` uses `@Selector` (path-segment: `POST /actuator/itemtree-refresh/{type}`) rather than a query-parameter. Functionally equivalent and more RESTful; the design spec described the type parameter without prescribing the binding mechanism.
 - `ScheduleConfigTest` uses `tpts.getScheduledThreadPoolExecutor().getCorePoolSize()` rather than `tpts.getPoolSize()` because `getPoolSize()` returns live thread count (0 until a task runs), not configured pool size.
+- `JdbcItemTreeRepository.lastUpdateIndexExists()` uses JDBC `DatabaseMetaData.getIndexInfo(null, null, "ITEMTREE", false, true)` instead of the SQL query specified in the design (§7). This is more portable — it works on both H2 and Oracle without any driver-specific adjustments — but is an undocumented deviation.
 
-**Actual done state:** 406 tests green; `./gradlew clean build` → BUILD SUCCESSFUL. Application starts; `TreeCacheBootstrap` loads 33 rows from H2 seed data on first attempt; `CacheReadinessGate.isReady()` flips to `true`; Spring `ReadinessState` reaches `ACCEPTING_TRAFFIC`. `POST /actuator/itemtree-refresh/delta` and `.../full` both invoke the orchestrator and return a JSON `RefreshResult` body.
+**Actual done state:** 413 tests green; `./gradlew clean build` → BUILD SUCCESSFUL. Application starts; `TreeCacheBootstrap` loads 33 rows from H2 seed data on first attempt; `CacheReadinessGate.isReady()` flips to `true`; Spring `ReadinessState` reaches `ACCEPTING_TRAFFIC`. `POST /actuator/itemtree-refresh/delta` and `.../full` both invoke the orchestrator and return a JSON `RefreshResult` body.
+
+**Deferred (Phase 12):** The design (§7) specifies that `POST /actuator/itemtree-refresh` be gated to the management port and trusted CIDR via Spring Security's actuator config. The Phase 9 implementation exposes `itemtree-refresh` on the web port with no auth/CIDR gating because Spring Security integration is deferred to Phase 12.
 
 ---
 
