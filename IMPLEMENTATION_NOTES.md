@@ -332,7 +332,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 9 — Bootstrap & refresh ⬅ NEXT
+## Phase 9 — Bootstrap & refresh ✅ COMPLETE (2026-05-17)
 
 **Goal:** instance loads cache on startup; periodic refresh works; readiness flips correctly.
 
@@ -351,9 +351,16 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Delta reconciler dispatch — synthesized row deltas produce the expected `apply*` calls.
 - Full reload swap is atomic.
 
+**Deviations from plan (reviewed and approved):**
+- `TreeCacheBootstrap` calls `checkIndex()` before `gate.markReady()` (plan suggested reverse order). The implemented order is safer — the WARN about a missing index fires while the service is still warming up, not after it enters the LB rotation.
+- `RefreshActuatorEndpoint` uses `@Selector` (path-segment: `POST /actuator/itemtree-refresh/{type}`) rather than a query-parameter. Functionally equivalent and more RESTful; the design spec described the type parameter without prescribing the binding mechanism.
+- `ScheduleConfigTest` uses `tpts.getScheduledThreadPoolExecutor().getCorePoolSize()` rather than `tpts.getPoolSize()` because `getPoolSize()` returns live thread count (0 until a task runs), not configured pool size.
+
+**Actual done state:** 406 tests green; `./gradlew clean build` → BUILD SUCCESSFUL. Application starts; `TreeCacheBootstrap` loads 33 rows from H2 seed data on first attempt; `CacheReadinessGate.isReady()` flips to `true`; Spring `ReadinessState` reaches `ACCEPTING_TRAFFIC`. `POST /actuator/itemtree-refresh/delta` and `.../full` both invoke the orchestrator and return a JSON `RefreshResult` body.
+
 ---
 
-## Phase 10 — Messaging — implementable in Phase A via stubs
+## Phase 10 — Messaging ⬅ NEXT — implementable in Phase A via stubs
 
 **Goal:** events flow through the in-memory bus; self-echoes dropped; the contracts that the real JMS library will satisfy are exercised end-to-end.
 
