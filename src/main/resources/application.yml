@@ -33,7 +33,12 @@ management:
 #   itemtree.data.*                (Phase 5)
 itemtree:
   cache:
-    refresh: {}
+    refresh:
+      delta-cron:             "0 */30 * * * *"
+      delta-overlap-seconds:  60
+      full-reload-cron:       "0 0 2 * * MON-FRI"
+      bootstrap-retries:      3
+      bootstrap-backoff:      PT1S,PT5S,PT25S
     name-search: {}
   solace: {}
   oracle: {}
