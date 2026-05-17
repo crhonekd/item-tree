@@ -13,7 +13,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,8 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SearchControllerTest {
 
     @Autowired MockMvc mvc;
-    @MockBean SearchService searchService;
-    @MockBean CacheReadinessGate cacheReadinessGate;
+    @MockitoBean SearchService searchService;
+    @MockitoBean CacheReadinessGate cacheReadinessGate;
 
     @BeforeEach
     void gateReady() {
