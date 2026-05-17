@@ -97,7 +97,8 @@ class SearchControllerTest {
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(
-                        org.hamcrest.Matchers.containsString("exactly one")));
+                        org.hamcrest.Matchers.containsString("exactly one")))
+                .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"));
     }
 
     @Test
@@ -106,6 +107,7 @@ class SearchControllerTest {
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(
-                        org.hamcrest.Matchers.containsString("exactly one")));
+                        org.hamcrest.Matchers.containsString("exactly one")))
+                .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"));
     }
 }

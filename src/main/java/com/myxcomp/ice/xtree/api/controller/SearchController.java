@@ -31,7 +31,7 @@ public class SearchController implements SearchApi {
         boolean hasId = id != null;
         boolean hasName = name != null && !name.isEmpty();
         if (hasId == hasName) {
-            throw new ValidationException(ErrorCode.DATA_REQUIRED,
+            throw new ValidationException(ErrorCode.INVALID_SEARCH_PARAMS,
                     "Search requires exactly one of 'id' or 'name'");
         }
         if (hasId) {

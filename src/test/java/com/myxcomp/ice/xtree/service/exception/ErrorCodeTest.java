@@ -19,7 +19,8 @@ class ErrorCodeTest {
             "DATA_REQUIRED",
             "FOLDER_CANNOT_HAVE_DATA",
             "ITEM_NOT_FOUND",
-            "HOME_FOLDER_NOT_FOUND"
+            "HOME_FOLDER_NOT_FOUND",
+            "INVALID_SEARCH_PARAMS"
     );
 
     @Test
