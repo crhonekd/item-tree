@@ -48,6 +48,11 @@ itemtree:
     name-search: {}
   solace:
     topic: "BC/ICE/ITEMTREE"
+    reconnect:
+      short-threshold: PT1M
+      long-threshold:  PT1H
+    health:
+      mark-down-after: PT4H
   oracle: {}
   data:
     types-without-data:

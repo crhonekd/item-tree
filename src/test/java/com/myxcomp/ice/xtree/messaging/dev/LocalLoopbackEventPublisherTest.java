@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,7 +44,9 @@ class LocalLoopbackEventPublisherTest {
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         bus = mock(InMemoryEventBus.class);
         registry = new SimpleMeterRegistry();
-        publisher = new LocalLoopbackEventPublisher(mapper, bus, new SolaceProperties(TOPIC), registry);
+        publisher = new LocalLoopbackEventPublisher(mapper, bus, new SolaceProperties(TOPIC,
+                        new SolaceProperties.Reconnect(Duration.ofMinutes(1), Duration.ofHours(1)),
+                        new SolaceProperties.Health(Duration.ofHours(4))), registry);
     }
 
     private TreeMutationEvent updateEvent() {
@@ -69,7 +72,9 @@ class LocalLoopbackEventPublisherTest {
         given(failing.writeValueAsString(org.mockito.ArgumentMatchers.any()))
                 .willThrow(new JsonProcessingException("boom") {});
         LocalLoopbackEventPublisher p2 = new LocalLoopbackEventPublisher(
-                failing, bus, new SolaceProperties(TOPIC), registry);
+                failing, bus, new SolaceProperties(TOPIC,
+                        new SolaceProperties.Reconnect(Duration.ofMinutes(1), Duration.ofHours(1)),
+                        new SolaceProperties.Health(Duration.ofHours(4))), registry);
 
         assertThatCode(() -> p2.publish(updateEvent())).doesNotThrowAnyException();
 

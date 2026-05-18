@@ -5,6 +5,7 @@ import com.myxcomp.ice.xtree.messaging.EventConsumerService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.Duration;
 import java.util.function.Consumer;
 
 import static org.mockito.ArgumentMatchers.eq;
@@ -21,7 +22,9 @@ class LocalLoopbackEventConsumerStarterTest {
         InMemoryEventBus bus = mock(InMemoryEventBus.class);
         EventConsumerService consumer = mock(EventConsumerService.class);
         LocalLoopbackEventConsumerStarter starter = new LocalLoopbackEventConsumerStarter(
-                bus, consumer, new SolaceProperties(TOPIC));
+                bus, consumer, new SolaceProperties(TOPIC,
+                        new SolaceProperties.Reconnect(Duration.ofMinutes(1), Duration.ofHours(1)),
+                        new SolaceProperties.Health(Duration.ofHours(4))));
 
         starter.run(null);
 
