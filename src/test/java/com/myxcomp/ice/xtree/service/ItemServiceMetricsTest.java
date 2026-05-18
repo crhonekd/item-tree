@@ -17,11 +17,15 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.core.task.SyncTaskExecutor;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -179,52 +183,33 @@ class ItemServiceMetricsTest {
 
     // ─── A2: updateItemData instrumentation tests ─────────────────────────────
 
-    @Test
-    void updateItemData_onFolderNode_incrementsFolderCannotHaveDataCounter() {
-        CachedNode folder = new CachedNode(5L, 0L, "folder", Types.FOLDER, Instant.EPOCH, "u");
-        when(cache.getById(5L)).thenReturn(Optional.of(folder));
-        when(policy.isKnown(Types.FOLDER)).thenReturn(true);
-
-        assertThatThrownBy(() ->
-                service.updateItemData(5L, "{}", new UserContext("u", null))
-        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
-
-        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
-                .tag("reason", "FOLDER_CANNOT_HAVE_DATA").counter();
-        assertThat(counter).isNotNull();
-        assertThat(counter.count()).isEqualTo(1.0);
+    static Stream<Arguments> updateItemDataValidationRejections() {
+        // Each row: id, type, isFolder, hasData, dataJson, expectedReason
+        return Stream.of(
+            // Folder node — FOLDER_CANNOT_HAVE_DATA
+            Arguments.of(5L, Types.FOLDER, true,  false, "{}",  "FOLDER_CANNOT_HAVE_DATA"),
+            // Known type without data + data supplied — TYPE_CANNOT_HAVE_DATA
+            Arguments.of(6L, "NoDataType", false, false, "{}",  "TYPE_CANNOT_HAVE_DATA"),
+            // Known type with data + no data supplied — DATA_REQUIRED
+            Arguments.of(7L, "Report",     false, true,  null,  "DATA_REQUIRED")
+        );
     }
 
-    @Test
-    void updateItemData_onTypeWithoutData_incrementsTypeCannotHaveDataCounter() {
-        CachedNode node = new CachedNode(6L, 1L, "item", "NoDataType", Instant.EPOCH, "u");
-        when(cache.getById(6L)).thenReturn(Optional.of(node));
-        when(policy.isKnown("NoDataType")).thenReturn(true);
-        when(policy.hasData("NoDataType")).thenReturn(false);
+    @ParameterizedTest
+    @MethodSource("updateItemDataValidationRejections")
+    void updateItemData_validationRejection_incrementsCounter(long id, String type,
+            boolean isFolder, boolean hasData, String dataJson, String expectedReason) {
+        CachedNode node = new CachedNode(id, isFolder ? 0L : 1L, "item", type, Instant.EPOCH, "u");
+        when(cache.getById(id)).thenReturn(Optional.of(node));
+        when(policy.isKnown(type)).thenReturn(true);
+        when(policy.hasData(type)).thenReturn(hasData);
 
         assertThatThrownBy(() ->
-                service.updateItemData(6L, "{}", new UserContext("u", null))
+                service.updateItemData(id, dataJson, new UserContext("u", null))
         ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
 
         Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
-                .tag("reason", "TYPE_CANNOT_HAVE_DATA").counter();
-        assertThat(counter).isNotNull();
-        assertThat(counter.count()).isEqualTo(1.0);
-    }
-
-    @Test
-    void updateItemData_missingData_incrementsDataRequiredCounter() {
-        CachedNode node = new CachedNode(7L, 1L, "item", "Report", Instant.EPOCH, "u");
-        when(cache.getById(7L)).thenReturn(Optional.of(node));
-        when(policy.isKnown("Report")).thenReturn(true);
-        when(policy.hasData("Report")).thenReturn(true);
-
-        assertThatThrownBy(() ->
-                service.updateItemData(7L, null, new UserContext("u", null))
-        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
-
-        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
-                .tag("reason", "DATA_REQUIRED").counter();
+                .tag("reason", expectedReason).counter();
         assertThat(counter).isNotNull();
         assertThat(counter.count()).isEqualTo(1.0);
     }
@@ -254,11 +239,8 @@ class ItemServiceMetricsTest {
         CachedNode node = new CachedNode(9L, 1L, "item", "Exotic", Instant.EPOCH, "u");
         when(cache.getById(9L)).thenReturn(Optional.of(node));
         when(policy.isKnown("Exotic")).thenReturn(false);
-        when(policy.hasData("Exotic")).thenReturn(true);
+        when(policy.hasData("Exotic")).thenReturn(true);   // must be true to reach the write path
         when(policy.isAlsoPersistedAsXmlOnWrite("Exotic")).thenReturn(false);
-        doNothing().when(repository).updateJson(eq(9L), anyString(), isNull(), any(Instant.class), anyString());
-        doNothing().when(cache).applyMetadataUpdate(eq(9L), any(Instant.class), anyString());
-        when(cache.getById(9L)).thenReturn(Optional.of(node));
 
         service.updateItemData(9L, "{}", new UserContext("u", null));
 
