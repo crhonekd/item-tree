@@ -363,9 +363,16 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 10 — Messaging ⬅ NEXT — implementable in Phase A via stubs
+## Phase 10 — Messaging ✅ COMPLETE (2026-05-18)
 
-**Goal:** events flow through the in-memory bus; self-echoes dropped; the contracts that the real JMS library will satisfy are exercised end-to-end.
+**Goal achieved:** events flow through the in-memory bus end-to-end; self-echoes are dropped via `instanceId` match; per-instance sequence gaps are counted; all production-shape components (`EventDispatcher`, `EventConsumerService`, `ConnectionRecoveryListener`) are in place and ready for Phase B `prod`-profile bean wiring.
+
+**Deviations from plan (reviewed and approved):**
+- `ObjectMapperConfig` (separate `@Configuration` class) was not created — Spring Boot's default `ObjectMapper` (with `spring.jackson.serialization.write-dates-as-timestamps=false` in `application.yml`) already satisfies the requirement. `spring.jackson.deserialization.fail-on-unknown-properties=false` added to yaml instead. `@JsonIgnoreProperties(ignoreUnknown = true)` added to `TreeMutationEvent` and all five payload records as defence-in-depth (Phase 9 quality-review follow-up completed here).
+- `NoOpEventPublisher` (Phase 7 placeholder) deleted; replaced by `LocalLoopbackEventPublisher`. One `EventPublisher` bean in dev profile, as required.
+- `MessagingLoopbackIT` annotated `@Transactional` at class level to prevent the `itemService.createItem` call from polluting the shared H2 database for `JdbcItemTreeRepositoryIT`.
+
+**Actual done state:** 448 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ### Production-shape components (always present)
 
@@ -374,28 +381,28 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `EventDispatcher` — operation type → `TreeCache.apply*`.
 - `SequenceGenerator` — `AtomicLong` per JVM.
 - `ConnectionRecoveryListener` interface in `messaging/`.
-- `ObjectMapperConfig` — `Instant` ISO-8601 Z; JSR-310 module registered.
 
 ### Phase A stubs (in `messaging/dev/`, `@Profile("dev")`)
 
-- `InMemoryEventBus` — `@Component` with `publish(topic, payload)` and `subscribe(topic, Consumer<String>)`. Simple `Map<String, List<Consumer<String>>>` with synchronous dispatch. Self-publishes route back into the same JVM.
-- `LocalLoopbackEventPublisher implements EventPublisher` — calls `InMemoryEventBus.publish`. Increments the same `itemtree.event.published{op}` counters as the real publisher would.
-- `LocalLoopbackEventConsumerStarter` — `ApplicationRunner` that subscribes `eventConsumerService::processPayload` to the bus.
+- `InMemoryEventBus` — `@Component` with `publish(topic, payload)` and `subscribe(topic, Consumer<String>)`. `CopyOnWriteArrayList` per topic with synchronous dispatch. Throwing subscribers isolated.
+- `LocalLoopbackEventPublisher implements EventPublisher` — calls `InMemoryEventBus.publish`. Increments `itemtree.event.published{op}` counters.
+- `LocalLoopbackEventConsumerStarter` — `ApplicationRunner @Order(2)` that subscribes `eventConsumerService::processPayload` to the bus.
 - `StubConnectionExceptionListener` — exposes `addRecoveryListener(ConnectionRecoveryListener)` plus test-helper methods `simulateDisconnect()` and `simulateRecovery()`. Used by resilience tests in Phase 11.
 
 ### Tests (Phase A)
 
-- Round-trip: publish a `TreeMutationEvent` via `LocalLoopbackEventPublisher`; verify `EventDispatcher` is invoked with the right `apply*` call.
-- Self-echo drop verified.
-- Deserialize failure tolerated — logged + counter, payload dropped.
-- Apply failure tolerated — logged + counter, no rethrow.
-- The `EventConsumerService.processPayload(String)` is unit-testable in complete isolation from JMS.
-
-> **Follow-up (quality review):** Add `@JsonIgnoreProperties(ignoreUnknown = true)` to `TreeMutationEvent` (or configure the consumer `ObjectMapper` with `DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES = false`) before Phase 10 goes live. A newer producer adding envelope fields (e.g. trace metadata) must not break older consumer instances.
+- `EventDispatcherTest` — all 5 ops dispatch correctly, NPE guard, exception propagation, wrong-payload ClassCast.
+- `EventConsumerServiceTest` — happy path, self-echo drop, malformed JSON, dispatch failure, sequence gap, first-event non-gap, out-of-order non-gap, null NPE.
+- `InMemoryEventBusTest` — no-op publish, subscriber receive, multi-subscriber, topic isolation, exception isolation, null guards.
+- `LocalLoopbackEventPublisherTest` — happy path, serialization failure, bus exception.
+- `LocalLoopbackEventConsumerStarterTest` — subscribes consumer to correct topic.
+- `StubConnectionExceptionListenerTest` — disconnect/recovery broadcast, exception isolation.
+- `MessagingLoopbackIT` — peer event applied to cache, self-echo dropped, ItemService round-trip.
+- `TreeMutationEventTest` (extended) — forward-compat nested class: unknown envelope and payload fields ignored.
 
 ---
 
-## Phase 11 — Resilience — implementable in Phase A via stubs
+## Phase 11 — Resilience ⬅ NEXT — implementable in Phase A via stubs
 
 **Goal:** reconnect-driven reconciliation works against the stub exception listener; thresholds verified.
 
