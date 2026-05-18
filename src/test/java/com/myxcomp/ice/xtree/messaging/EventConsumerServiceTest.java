@@ -200,10 +200,9 @@ class EventConsumerServiceTest {
             }
 
             double gapCount = registry.counter("itemtree.event.sequence.gap").count();
-            // Gap count must be non-negative and cannot exceed (totalEvents - 1) since
-            // there are at most that many adjacent-pair comparisons for a single source.
-            assertThat(gapCount).isGreaterThanOrEqualTo(0.0);
-            assertThat(gapCount).isLessThan((double) totalEvents);
+            // At most n-1 gap comparisons for n sequential events from one source.
+            double maxPossibleGaps = (double) totalEvents - 1;
+            assertThat(gapCount).isLessThanOrEqualTo(maxPossibleGaps);
         }
     }
 }
