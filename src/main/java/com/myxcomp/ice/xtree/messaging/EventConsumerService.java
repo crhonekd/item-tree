@@ -30,6 +30,8 @@ public class EventConsumerService {
     private final InstanceIdProvider instanceIdProvider;
     private final MeterRegistry meterRegistry;
 
+    // Keyed by peer instance ID (UUID). Bounded in practice by the number of deployed instances
+    // (≤6 per deployment); stale entries from stopped instances persist but are harmless.
     private final ConcurrentHashMap<String, Long> lastSequenceByInstance = new ConcurrentHashMap<>();
 
     public EventConsumerService(ObjectMapper objectMapper,

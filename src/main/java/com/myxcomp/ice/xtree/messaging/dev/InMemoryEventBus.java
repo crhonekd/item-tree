@@ -38,6 +38,10 @@ public class InMemoryEventBus {
         }
     }
 
+    /**
+     * Subscribes {@code handler} to {@code topic}. The same handler instance may be subscribed
+     * multiple times; it will be called once per registration per published message.
+     */
     public void subscribe(String topic, Consumer<String> handler) {
         Objects.requireNonNull(topic, "topic");
         Objects.requireNonNull(handler, "handler");
