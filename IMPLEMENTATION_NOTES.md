@@ -435,24 +435,23 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 12 — Observability & polish ⬅ NEXT
+## Phase 12 — Observability & polish ✅ COMPLETE (2026-05-18)
 
-**Goal:** every metric from §18 is emitted; health endpoints accurate.
+**Goal achieved:** Every metric from §18 is wired at its correct boundary. Three required `HealthIndicator` beans are in place — `CacheHealthIndicator` (new), `MessagingHealthIndicator` (Phase 11), Spring Boot's auto-configured `DataSourceHealthIndicator`. `instanceId` is applied as a Micrometer common tag across the entire registry via `MicrometerConfig`. `traceId` is propagated into the Logback pattern via the new `micrometer-tracing-bridge-brave` dependency, and into `Problem` responses via the existing `ProblemFactory` MDC lookup. `/actuator/itemtree-refresh/**` is gated to a configurable CIDR allowlist via `RefreshEndpointAccessFilter` (Phase 9 deferral resolved). The new `ObservabilityExposureIT` proves every named metric appears on `/actuator/prometheus` after a representative workload.
 
-- Wire each Micrometer meter at the right boundary.
-- `HealthIndicator` beans for cache, Solace, DB.
-- Prometheus exposure verified via `/actuator/prometheus`.
-- Startup log line listing the loaded type policy in human-readable form.
-- Confirm Micrometer common tag `instanceId` applied across all metrics.
+**Deviations from plan (reviewed and approved):**
+- `RefreshEndpointAccessFilter` registered via `FilterRegistrationBean` in `WebMvcConfig` rather than `@Component` directly. This prevents the filter from being picked up by `@WebMvcTest` slices (which would fail because `SecurityProperties` is not available in the slice context). Same pattern as the existing `CacheReadinessFilter`. Controller `@WebMvcTest` slices each received `@MockitoBean SecurityProperties`.
+- `DeltaCounters` and `DriftCounters` records needed `@JsonAutoDetect(fieldVisibility=ANY, getterVisibility=NONE, isGetterVisibility=NONE)` to allow Jackson to serialise them from `RefreshActuatorEndpoint`. The records use non-JavaBean accessor methods (`created()` not `getCreated()`); without the annotation, `POST /actuator/itemtree-refresh/delta` was returning 500.
+- `management.prometheus.metrics.export.enabled: true` added to `application.yml`. Spring Boot 3.4 disables Prometheus metrics export by default (`management.defaults.metrics.export.enabled=false`); explicit opt-in is required for `/actuator/prometheus` to be registered.
+- `ObservabilityExposureIT` includes an `@AfterEach` cleanup to remove DB rows created during the test, preventing cross-test pollution in the shared H2 instance.
 
-**Tests:**
-- Smoke test that each named metric exists after a representative workload run.
+**Actual done state:** 527 tests green; `./gradlew clean test` → BUILD SUCCESSFUL.
 
-> **Follow-up (quality review):** Add Micrometer Tracing dependency and `%X{traceId}` to `logback-spring.xml` pattern when wiring Phase 12 observability. The `traceId` field is referenced in the RFC 7807 `Problem` schema (design §3) and the design notes it propagates via Micrometer Tracing (§17).
+**Post-completion quality fixes:** None.
 
 ---
 
-## Phase 13 — End-to-end (Phase A)
+## Phase 13 — End-to-end (Phase A) ⬅ NEXT
 
 **Goal:** two-instance integration test proves convergence via the in-memory bus.
 
