@@ -120,9 +120,16 @@ public class ItemService {
                     "Type '" + type + "' requires data");
         }
 
-        String xmlOrNull = (hasData && policy.isAlsoPersistedAsXmlOnWrite(type))
-                ? converter.jsonToXml(dataJson)
-                : null;
+        String xmlOrNull = null;
+        if (hasData && policy.isAlsoPersistedAsXmlOnWrite(type)) {
+            try {
+                xmlOrNull = converter.jsonToXml(dataJson);
+            } catch (RuntimeException e) {
+                meterRegistry.counter("itemtree.conversion.json_to_xml.failure",
+                        "type", type).increment();
+                throw e;
+            }
+        }
 
         Instant now = timeMapper.now();
         String stampUser = userContext.effectiveUser();
@@ -274,9 +281,16 @@ public class ItemService {
                     "Update of id=" + id + " requires data");
         }
 
-        String xmlOrNull = policy.isAlsoPersistedAsXmlOnWrite(existing.type())
-                ? converter.jsonToXml(dataJson)
-                : null;
+        String xmlOrNull = null;
+        if (policy.isAlsoPersistedAsXmlOnWrite(existing.type())) {
+            try {
+                xmlOrNull = converter.jsonToXml(dataJson);
+            } catch (RuntimeException e) {
+                meterRegistry.counter("itemtree.conversion.json_to_xml.failure",
+                        "type", existing.type()).increment();
+                throw e;
+            }
+        }
 
         Instant now = timeMapper.now();
         String stampUser = userContext.effectiveUser();
@@ -386,7 +400,20 @@ public class ItemService {
         String xml  = row != null ? row.xml()  : null;
 
         if (policy.isSentAsXmlToUi(n.type())) {
-            String shippedXml = xml != null ? xml : (json != null ? converter.jsonToXml(json) : null);
+            String shippedXml;
+            if (xml != null) {
+                shippedXml = xml;
+            } else if (json != null) {
+                try {
+                    shippedXml = converter.jsonToXml(json);
+                } catch (RuntimeException e) {
+                    meterRegistry.counter("itemtree.conversion.json_to_xml.failure",
+                            "type", n.type()).increment();
+                    throw e;
+                }
+            } else {
+                shippedXml = null;
+            }
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
                     n.lastUpdate(), n.lastUpdateUser(), null, shippedXml, children);
         }
@@ -396,7 +423,14 @@ public class ItemService {
                     n.lastUpdate(), n.lastUpdateUser(), json, null, children);
         }
         if (xml != null) {
-            String convertedJson = converter.xmlToJson(xml);
+            String convertedJson;
+            try {
+                convertedJson = converter.xmlToJson(xml);
+            } catch (RuntimeException e) {
+                meterRegistry.counter("itemtree.conversion.xml_to_json.failure",
+                        "type", n.type()).increment();
+                throw e;
+            }
             backfillBatch.add(new JsonBackfillRow(n.itemTreeId(), convertedJson));
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
                     n.lastUpdate(), n.lastUpdateUser(), convertedJson, null, children);

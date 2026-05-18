@@ -23,7 +23,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.myxcomp.ice.xtree.persistence.PayloadRow;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -126,6 +129,45 @@ class ItemServiceMetricsTest {
 
         assertThat(meterRegistry.find("itemtree.policy.unknown_type")
                 .tag("type", "MyExoticType").counter())
+                .isNotNull();
+    }
+
+    @Test
+    void createWithJsonToXmlFailureIncrementsTaggedCounter() {
+        when(cache.getById(1L)).thenReturn(Optional.of(
+                new CachedNode(1L, 0L, "root", Types.FOLDER, Instant.EPOCH, "u")));
+        when(policy.isKnown("Report")).thenReturn(true);
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("Report")).thenReturn(true);
+        when(converter.jsonToXml(anyString()))
+                .thenThrow(new IllegalArgumentException("bad json"));
+
+        assertThatThrownBy(() ->
+                service.createItem(1L, "r", "Report", "{\"k\":1}", new UserContext("u", null))
+        ).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(meterRegistry.find("itemtree.conversion.json_to_xml.failure")
+                .tag("type", "Report").counter())
+                .isNotNull();
+    }
+
+    @Test
+    void getItemsWithDataXmlToJsonFailureIncrementsTaggedCounter() {
+        CachedNode reportNode = new CachedNode(42L, 1L, "r", "Report", Instant.EPOCH, "u");
+        when(cache.getById(42L)).thenReturn(Optional.of(reportNode));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection())).thenReturn(
+                List.of(new PayloadRow(42L, null, "<root><k>1</k></root>")));
+        when(converter.xmlToJson(anyString()))
+                .thenThrow(new IllegalArgumentException("bad xml"));
+
+        assertThatThrownBy(() ->
+                service.getItemsWithData(List.of(42L))
+        ).isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(meterRegistry.find("itemtree.conversion.xml_to_json.failure")
+                .tag("type", "Report").counter())
                 .isNotNull();
     }
 }
