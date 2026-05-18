@@ -29,6 +29,10 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+  prometheus:
+    metrics:
+      export:
+        enabled: true   # Spring Boot 3.4+ disabled metrics export by default; opt in explicitly
   tracing:
     sampling:
       probability: 1.0
