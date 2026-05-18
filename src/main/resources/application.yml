@@ -35,7 +35,7 @@ management:
         enabled: true   # Spring Boot 3.4+ disabled metrics export by default; opt in explicitly
   tracing:
     sampling:
-      probability: 1.0
+      probability: 1.0  # Phase A: sample everything; TODO Phase B: reduce for production traffic
 
 # ── Placeholder config sections from design §17 ──────────────────────────────
 # Filled in by later phases:

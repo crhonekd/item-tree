@@ -441,17 +441,18 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 **Deviations from plan (reviewed and approved):**
 - `RefreshEndpointAccessFilter` registered via `FilterRegistrationBean` in `WebMvcConfig` rather than `@Component` directly. This prevents the filter from being picked up by `@WebMvcTest` slices (which would fail because `SecurityProperties` is not available in the slice context). Same pattern as the existing `CacheReadinessFilter`. Controller `@WebMvcTest` slices each received `@MockitoBean SecurityProperties`.
-- `DeltaCounters` and `DriftCounters` records needed `@JsonAutoDetect(fieldVisibility=ANY, getterVisibility=NONE, isGetterVisibility=NONE)` to allow Jackson to serialise them from `RefreshActuatorEndpoint`. The records use non-JavaBean accessor methods (`created()` not `getCreated()`); without the annotation, `POST /actuator/itemtree-refresh/delta` was returning 500.
+- `DeltaCounters` and `DriftCounters` mutable value classes (not records — they use `increment*()` mutators) needed `@JsonAutoDetect(fieldVisibility=ANY, getterVisibility=NONE, isGetterVisibility=NONE)` to allow Jackson to serialise them from `RefreshActuatorEndpoint`. The classes use non-JavaBean accessor methods (`created()` not `getCreated()`); without the annotation, `POST /actuator/itemtree-refresh/delta` was returning 500.
 - `management.prometheus.metrics.export.enabled: true` added to `application.yml`. Spring Boot 3.4 disables Prometheus metrics export by default (`management.defaults.metrics.export.enabled=false`); explicit opt-in is required for `/actuator/prometheus` to be registered.
 - `ObservabilityExposureIT` includes an `@AfterEach` cleanup to remove DB rows created during the test, preventing cross-test pollution in the shared H2 instance.
 
-**Actual done state:** 527 tests green; `./gradlew clean test` → BUILD SUCCESSFUL.
+**Actual done state:** 532 tests green; `./gradlew clean test` → BUILD SUCCESSFUL.
 
 **Post-completion quality fixes (applied after audit, same phase):**
 - `Objects.requireNonNull(meterRegistry, "meterRegistry")` guard added to `ItemService` constructor; `Objects.requireNonNull` guards added to all four fields of `TypePolicyStartupAuditor` constructor (previously all four were unguarded).
 - `CacheMetricsBinder`: lambda `c -> c.size()` replaced with `TreeCache::size` method reference (style consistency).
 - `ObservabilityExposureIT`: explanatory comment added documenting why `itemtree.conversion.*_failure` counters are excluded from the smoke test (error-path-only; covered by `ItemServiceMetricsTest` unit tests).
 - `ItemServiceMetricsTest.deleteOnUnknownIdDoesNotRecordCascadeSize`: replaced ambiguous `assertThat(summary == null || ...).isTrue()` with `assertThat(...summary()).isNull()` (semantic assertion).
+- Second-round post-audit fixes (2026-05-18): `ItemService.updateItemData` now also increments `itemtree.policy.validation_rejection{reason=FOLDER_CANNOT_HAVE_DATA}` before the Folder rejection throw (asymmetry vs the two sibling branches). Five new tests added to `ItemServiceMetricsTest` covering all `updateItemData` instrumentation paths; three structurally identical validation-rejection tests collapsed into a single `@ParameterizedTest` per CLAUDE.md convention; five existing counter assertions strengthened with `count() == 1.0` check. `ObservabilityExposureIT` gains assertions for `itemtree_event_published_total`, `itemtree_event_self_dropped_total`, `itemtree_cache_refresh_delta_rows_total`; workload step order corrected so delta refresh runs before the cascade delete (previously no delta rows were found). `RefreshEndpointAccessFilter.denied()` now uses `ProblemFactory` + `ObjectMapper` to build the 403 body — consistent with `CacheReadinessFilter`, adds `traceId` from MDC. Documentation: "DeltaCounters and DriftCounters records" corrected to "mutable value classes" in this file; `management.tracing.sampling.probability` annotated as Phase A only.
 
 ---
 
