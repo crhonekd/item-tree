@@ -215,5 +215,71 @@ class EventConsumerServiceTest {
             double maxPossibleGaps = (double) totalEvents - 1;
             assertThat(gapCount).isLessThanOrEqualTo(maxPossibleGaps);
         }
+
+        /**
+         * Eight threads each represent a distinct peer instance (peer-0 … peer-7).
+         * Every thread delivers 20 events in strict sequence (seq 1..20) for its own
+         * instance ID, so the sequence tracker operates on 8 different
+         * {@link java.util.concurrent.ConcurrentHashMap} keys simultaneously.
+         *
+         * <p>Asserts:
+         * <ul>
+         *   <li>No exception is thrown from any thread.</li>
+         *   <li>Total {@code itemtree.event.consumed} count == 8 * 20 = 160.</li>
+         * </ul>
+         */
+        @Test
+        void concurrent_events_from_distinct_peers_do_not_throw_and_all_events_consumed()
+                throws Exception {
+            int peerCount      = 8;
+            int eventsPerPeer  = 20;
+
+            // Pre-serialise all payloads outside the timed region.
+            List<List<String>> allPayloads = new ArrayList<>();
+            for (int p = 0; p < peerCount; p++) {
+                String instanceId = "peer-" + p;
+                List<String> payloads = new ArrayList<>(eventsPerPeer);
+                for (int seq = 1; seq <= eventsPerPeer; seq++) {
+                    TreeMutationEvent event = TreeMutationEvent.builder()
+                            .eventId("e-" + p + "-" + seq)
+                            .instanceId(instanceId)
+                            .sequence(seq)
+                            .occurredAt(T)
+                            .iceUser("u")
+                            .operationType(OperationType.CREATE)
+                            .payload(new CreatePayload(100L + seq, 1L, "N", "Folder", T, "u"))
+                            .build();
+                    payloads.add(mapper.writeValueAsString(event));
+                }
+                allPayloads.add(payloads);
+            }
+
+            CyclicBarrier startGate = new CyclicBarrier(peerCount);
+            ExecutorService pool = Executors.newFixedThreadPool(peerCount);
+            List<Future<Void>> futures = new ArrayList<>(peerCount);
+            try {
+                for (int p = 0; p < peerCount; p++) {
+                    final List<String> payloads = allPayloads.get(p);
+                    futures.add(pool.submit(() -> {
+                        startGate.await(5, TimeUnit.SECONDS);
+                        for (String payload : payloads) {
+                            consumer.processPayload(payload);
+                        }
+                        return null;
+                    }));
+                }
+                // Propagate any exception from any thread as a test failure.
+                for (Future<Void> f : futures) {
+                    f.get(10, TimeUnit.SECONDS);
+                }
+            } finally {
+                pool.shutdownNow();
+            }
+
+            double totalConsumed = registry.find("itemtree.event.consumed").counters().stream()
+                    .mapToDouble(c -> c.count())
+                    .sum();
+            assertThat(totalConsumed).isEqualTo((double) peerCount * eventsPerPeer);
+        }
     }
 }
