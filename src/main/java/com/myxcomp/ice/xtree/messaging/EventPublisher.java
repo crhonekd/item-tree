@@ -3,10 +3,11 @@ package com.myxcomp.ice.xtree.messaging;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 
 /**
- * Outbound side of the Solace broadcast contract (design §6).
+ * Outbound side of the broadcast contract (design §6).
  *
- * <p>Phase 7 creates the interface so {@code ItemService} has something to call;
- * Phase 10 supplies the production implementation backed by {@code JMSPublisherService}.
+ * <p>Phase A: {@code LocalLoopbackEventPublisher} (dev profile) serialises the event to JSON
+ * and publishes onto {@code InMemoryEventBus}. Phase B: a {@code prod}-profile bean backed by
+ * {@code JMSPublisherService.reliablePublish(String)}.
  *
  * <p>Implementations are best-effort: failure is logged and counted but never propagates
  * to the caller. The DB commit and the local cache update have already happened — peer
