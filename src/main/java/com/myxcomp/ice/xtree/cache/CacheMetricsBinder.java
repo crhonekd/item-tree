@@ -16,7 +16,7 @@ public class CacheMetricsBinder {
     public CacheMetricsBinder(TreeCache cache, MeterRegistry meterRegistry) {
         Objects.requireNonNull(cache, "cache");
         Objects.requireNonNull(meterRegistry, "meterRegistry");
-        Gauge.builder("itemtree.cache.size", cache, c -> c.size())
+        Gauge.builder("itemtree.cache.size", cache, TreeCache::size)
                 .description("Total number of nodes currently held by the in-memory tree cache")
                 .register(meterRegistry);
     }

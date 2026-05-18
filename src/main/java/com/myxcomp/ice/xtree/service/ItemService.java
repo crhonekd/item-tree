@@ -80,7 +80,7 @@ public class ItemService {
         this.instanceIdProvider = instanceIdProvider;
         this.sequenceGenerator = sequenceGenerator;
         this.backfillExecutor = backfillExecutor;
-        this.meterRegistry = meterRegistry;
+        this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
     }
 
     /**

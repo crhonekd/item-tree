@@ -220,6 +220,12 @@ class ObservabilityExposureIT {
         assertThat(body).contains("itemtree_policy_unknown_type_total");
         assertThat(body).contains("itemtree_policy_validation_rejection_total");
 
+        // itemtree.conversion.xml_to_json.failure and itemtree.conversion.json_to_xml.failure
+        // are error-path-only counters — they only appear in Prometheus after at least one
+        // conversion failure. They are covered by ItemServiceMetricsTest unit tests.
+        // Provoking a deliberate conversion failure in this IT would require seeding a
+        // malformed payload row which would pollute the H2 DB for other tests.
+
         // Common instanceId tag applied to every meter
         assertThat(body).contains("instanceId=\"");
 

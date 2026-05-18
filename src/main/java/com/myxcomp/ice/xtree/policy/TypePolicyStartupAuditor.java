@@ -3,6 +3,7 @@ package com.myxcomp.ice.xtree.policy;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -32,10 +33,10 @@ public class TypePolicyStartupAuditor implements ApplicationRunner {
                                     TypePolicy typePolicy,
                                     DataProperties dataProperties,
                                     MeterRegistry meterRegistry) {
-        this.jdbcClient = jdbcClient;
-        this.typePolicy = typePolicy;
-        this.dataProperties = dataProperties;
-        this.meterRegistry = meterRegistry;
+        this.jdbcClient = Objects.requireNonNull(jdbcClient, "jdbcClient");
+        this.typePolicy = Objects.requireNonNull(typePolicy, "typePolicy");
+        this.dataProperties = Objects.requireNonNull(dataProperties, "dataProperties");
+        this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
     }
 
     @Override

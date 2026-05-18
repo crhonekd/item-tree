@@ -80,7 +80,7 @@ class ItemServiceMetricsTest {
         service.deleteItem(999L, new UserContext("u", null));
 
         DistributionSummary summary = meterRegistry.find("itemtree.delete.cascade.size").summary();
-        assertThat(summary == null || summary.count() == 0L).isTrue();
+        assertThat(meterRegistry.find("itemtree.delete.cascade.size").summary()).isNull();
     }
 
     @Test
