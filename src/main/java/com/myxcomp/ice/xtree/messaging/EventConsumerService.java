@@ -65,6 +65,10 @@ public class EventConsumerService {
         try {
             dispatcher.dispatch(event);
             meterRegistry.counter("itemtree.event.consumed", "op", event.getOperationType().name()).increment();
+        } catch (ClassCastException e) {
+            meterRegistry.counter("itemtree.event.consume.payload.type.mismatch").increment();
+            log.warn("Payload type mismatch for event id={} op={}: {}",
+                    event.getEventId(), event.getOperationType(), e.toString());
         } catch (RuntimeException e) {
             meterRegistry.counter("itemtree.event.consume.apply.failure").increment();
             log.warn("Apply failed for event id={} op={}: {}",

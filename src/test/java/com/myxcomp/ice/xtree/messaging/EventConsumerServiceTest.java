@@ -110,6 +110,17 @@ class EventConsumerServiceTest {
     }
 
     @Test
+    void dispatcher_class_cast_exception_increments_payload_type_mismatch_counter() throws Exception {
+        willThrow(new ClassCastException("UpdatePayload cannot be cast to CreatePayload"))
+                .given(dispatcher).dispatch(any());
+        consumer.processPayload(json(peerCreate(1L)));
+
+        assertThat(registry.counter("itemtree.event.consume.payload.type.mismatch").count()).isOne();
+        assertThat(registry.counter("itemtree.event.consume.apply.failure").count()).isZero();
+        assertThat(registry.counter("itemtree.event.consumed", "op", "CREATE").count()).isZero();
+    }
+
+    @Test
     void sequence_gap_increments_counter_once_per_gap() throws Exception {
         consumer.processPayload(json(peerCreate(1L)));
         consumer.processPayload(json(peerCreate(2L)));
