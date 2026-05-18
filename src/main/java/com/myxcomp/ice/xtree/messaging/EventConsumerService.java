@@ -1,5 +1,6 @@
 package com.myxcomp.ice.xtree.messaging;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myxcomp.ice.xtree.common.InstanceIdProvider;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
@@ -16,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Single public method {@link #processPayload(String)} accepts a JSON-encoded envelope,
  * deserialises it, drops self-echoes by instanceId, tracks sequence gaps, and delegates
- * to {@link EventDispatcher}. Every failure path emits a metric; the method never throws.
+ * to {@link EventDispatcher}. Failure paths emit a metric and return — the method never
+ * throws on valid (non-null) input.
  */
 @Component
 public class EventConsumerService {
@@ -46,7 +48,7 @@ public class EventConsumerService {
         TreeMutationEvent event;
         try {
             event = objectMapper.readValue(payload, TreeMutationEvent.class);
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             meterRegistry.counter("itemtree.event.consume.deserialize.failure").increment();
             log.warn("Failed to deserialize event payload (prefix='{}'): {}",
                     payload.substring(0, Math.min(80, payload.length())), e.toString());

@@ -35,6 +35,7 @@ class TreeMutationEventDeserializer extends StdDeserializer<TreeMutationEvent> {
 
     @Override
     public TreeMutationEvent deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+        // Unknown envelope fields are silently ignored: only named fields are read from the JSON tree.
         JsonNode root = p.getCodec().readTree(p);
 
         // operationType is required; EXTERNAL_PROPERTY would embed it in the payload on serialization

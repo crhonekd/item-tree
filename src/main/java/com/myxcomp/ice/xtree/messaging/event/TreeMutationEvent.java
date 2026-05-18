@@ -1,6 +1,5 @@
 package com.myxcomp.ice.xtree.messaging.event;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
 import lombok.Builder;
@@ -20,7 +19,6 @@ import java.time.Instant;
  */
 @Value
 @Builder
-@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonDeserialize(using = TreeMutationEventDeserializer.class)
 public class TreeMutationEvent {
 
