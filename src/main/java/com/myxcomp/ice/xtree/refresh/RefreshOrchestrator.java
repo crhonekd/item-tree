@@ -7,6 +7,7 @@ import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.config.RefreshProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.persistence.StructuralRow;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
@@ -44,6 +45,9 @@ public class RefreshOrchestrator {
         this.timeMapper = timeMapper;
         this.meterRegistry = meterRegistry;
         this.props = props;
+        Gauge.builder("itemtree.cache.last_refresh_age_seconds", this, RefreshOrchestrator::lastRefreshAgeSeconds)
+                .description("Seconds since the last successful cache refresh; -1 before the first refresh")
+                .register(meterRegistry);
     }
 
     public RefreshResult runDelta() {
@@ -101,6 +105,16 @@ public class RefreshOrchestrator {
     /** Package-private accessor used by tests only. */
     Instant lastRefreshInstant() {
         return lastRefreshInstant.get();
+    }
+
+    /**
+     * Returns seconds since last successful refresh; -1.0 before any refresh.
+     * Read by the {@code itemtree.cache.last_refresh_age_seconds} gauge.
+     */
+    double lastRefreshAgeSeconds() {
+        Instant last = lastRefreshInstant.get();
+        if (last.equals(Instant.EPOCH)) return -1.0;
+        return (double) Duration.between(last, timeMapper.now()).toSeconds();
     }
 
     private void recordDeltaCounters(DeltaCounters c) {
