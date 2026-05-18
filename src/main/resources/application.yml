@@ -6,6 +6,8 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
   task:
     scheduling:
       pool:
@@ -44,7 +46,8 @@ itemtree:
       bootstrap-retries:      3
       bootstrap-backoff:      PT1S,PT5S,PT25S
     name-search: {}
-  solace: {}
+  solace:
+    topic: "BC/ICE/ITEMTREE"
   oracle: {}
   data:
     types-without-data:
