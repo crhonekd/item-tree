@@ -74,16 +74,16 @@ public class EventConsumerService {
         String src = event.getInstanceId();
         if (src == null) return;
         long current = event.getSequence();
-        Long previous = lastSequenceByInstance.get(src);
-        if (previous == null) {
-            lastSequenceByInstance.put(src, current);
-            return;
-        }
-        if (current > previous + 1) {
-            meterRegistry.counter("itemtree.event.sequence.gap").increment();
-        }
-        if (current > previous) {
-            lastSequenceByInstance.put(src, current);
-        }
+        lastSequenceByInstance.compute(src, (key, previous) -> {
+            if (previous == null) {
+                // First event seen from this instance — not a gap.
+                return current;
+            }
+            if (current > previous + 1) {
+                meterRegistry.counter("itemtree.event.sequence.gap").increment();
+            }
+            // Advance only if current is newer; ignore old/duplicate sequences.
+            return current > previous ? current : previous;
+        });
     }
 }

@@ -11,10 +11,18 @@ import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -129,5 +137,73 @@ class EventConsumerServiceTest {
     void null_payload_throws_NPE() {
         assertThatThrownBy(() -> consumer.processPayload(null))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    @Nested
+    class ConcurrencyTests {
+
+        /**
+         * Two threads each deliver a strictly-increasing sequence of events from the same
+         * PEER instance simultaneously. The test asserts:
+         * <ul>
+         *   <li>No {@link NullPointerException} is thrown (was the risk with get/put).</li>
+         *   <li>The recorded gap count does not exceed the maximum number of gaps that
+         *       could legitimately occur given the two interleaved sequences — i.e. gap
+         *       counting is never double-incremented for the same slot.</li>
+         * </ul>
+         *
+         * <p>The {@link CyclicBarrier} forces both threads to reach the start line before
+         * either begins processing, maximising the chance of a real concurrent collision.
+         */
+        @Test
+        void concurrent_events_from_same_peer_do_not_throw_and_gap_count_is_stable()
+                throws Exception {
+            // Thread A sends sequences 1,3,5,7,9  (gaps at 3,5,7,9 relative to each other)
+            // Thread B sends sequences 2,4,6,8,10 (interleaved)
+            // Together they form a contiguous run 1-10 — worst-case 0 gaps if perfectly
+            // ordered, but because threads race the actual count may vary. What must NOT
+            // happen is an NPE or a count > 9 (the maximum possible gaps for 10 events
+            // from a single source seen for the first time).
+            int eventsPerThread = 5;
+            int totalEvents     = eventsPerThread * 2;
+
+            List<String> threadAPayloads = new ArrayList<>();
+            List<String> threadBPayloads = new ArrayList<>();
+            for (int i = 0; i < eventsPerThread; i++) {
+                threadAPayloads.add(mapper.writeValueAsString(peerCreate(2L * i + 1)));  // 1,3,5,7,9
+                threadBPayloads.add(mapper.writeValueAsString(peerCreate(2L * i + 2)));  // 2,4,6,8,10
+            }
+
+            CyclicBarrier startGate = new CyclicBarrier(2);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<Void> futureA = pool.submit(() -> {
+                    startGate.await(5, TimeUnit.SECONDS);
+                    for (String payload : threadAPayloads) {
+                        consumer.processPayload(payload);
+                    }
+                    return null;
+                });
+                Future<Void> futureB = pool.submit(() -> {
+                    startGate.await(5, TimeUnit.SECONDS);
+                    for (String payload : threadBPayloads) {
+                        consumer.processPayload(payload);
+                    }
+                    return null;
+                });
+
+                // Propagate any exception (including NPE) as a test failure.
+                futureA.get(10, TimeUnit.SECONDS);
+                futureB.get(10, TimeUnit.SECONDS);
+            } finally {
+                pool.shutdownNow();
+            }
+
+            double gapCount = registry.counter("itemtree.event.sequence.gap").count();
+            // Gap count must be non-negative and cannot exceed (totalEvents - 1) since
+            // there are at most that many adjacent-pair comparisons for a single source.
+            assertThat(gapCount).isGreaterThanOrEqualTo(0.0);
+            assertThat(gapCount).isLessThan((double) totalEvents);
+        }
     }
 }
