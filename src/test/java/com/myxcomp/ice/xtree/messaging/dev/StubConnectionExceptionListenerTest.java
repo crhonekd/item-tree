@@ -55,4 +55,10 @@ class StubConnectionExceptionListenerTest {
         assertThatCode(listener::simulateRecovery).doesNotThrowAnyException();
         assertThat(calls).containsExactly("lost", "recovered");
     }
+
+    @Test
+    void implementsRecoveryListenerHook() {
+        StubConnectionExceptionListener listener = new StubConnectionExceptionListener();
+        assertThat(listener).isInstanceOf(com.myxcomp.ice.xtree.messaging.RecoveryListenerHook.class);
+    }
 }
