@@ -11,7 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -34,8 +34,8 @@ class MessagingResilienceIT {
 
     @Autowired StubConnectionExceptionListener stub;
     @Autowired ConnectionStateTracker tracker;
-    @MockBean RefreshOrchestrator orchestrator;
-    @MockBean TimeMapper timeMapper;
+    @MockitoBean RefreshOrchestrator orchestrator;
+    @MockitoBean TimeMapper timeMapper;
     @Autowired MeterRegistry meterRegistry;
 
     @BeforeEach
@@ -86,9 +86,7 @@ class MessagingResilienceIT {
     void longOutageTriggersFullReload() {
         stub.simulateRecovery();           // first connect
         stub.simulateDisconnect();
-        // Return T0+2h for onConnectionRecovered (outage calculation), then T0 (past instant)
-        // for taskScheduler.schedule(..., timeMapper.now()) so the task fires immediately.
-        when(timeMapper.now()).thenReturn(T0.plus(Duration.ofHours(2)), T0);
+        when(timeMapper.now()).thenReturn(T0.plus(Duration.ofHours(2)));
         stub.simulateRecovery();           // reconnect after 2h
 
         await().atMost(Duration.ofSeconds(5))
