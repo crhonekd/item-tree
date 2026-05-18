@@ -372,7 +372,19 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `NoOpEventPublisher` (Phase 7 placeholder) deleted; replaced by `LocalLoopbackEventPublisher`. One `EventPublisher` bean in dev profile, as required.
 - `MessagingLoopbackIT` annotated `@Transactional` at class level to prevent the `itemService.createItem` call from polluting the shared H2 database for `JdbcItemTreeRepositoryIT`.
 
-**Actual done state:** 448 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+**Post-completion quality fixes (applied after audit, same phase):**
+- `EventConsumerService.trackSequenceGap` rewritten with `ConcurrentHashMap.compute()` to eliminate TOCTOU race between `get()` and `put()`. Concurrency test added (two threads same peer + two threads distinct peers).
+- `MessagingLoopbackIT` given `@AfterEach cleanUpCacheNodes()` to remove test-injected `TreeCache` nodes after each test; `@Transactional` only rolled back the H2 DB, leaving cache state polluted.
+- `@JsonIgnoreProperties(ignoreUnknown = true)` removed from `TreeMutationEvent` — dead code when a custom `@JsonDeserialize` is in use; annotation is still load-bearing on the five payload records.
+- `catch (Exception e)` in `EventConsumerService.processPayload` narrowed to `catch (JsonProcessingException e)`; class Javadoc updated from "never throws" to accurately describe the null-throws contract.
+- `ClassCastException` from wrong-typed payload extracted from generic `consume.apply.failure` into distinct metric `itemtree.event.consume.payload.type.mismatch`; consumer-level test added.
+- `messaging/dev/package-info.java` added (previously the only `*/dev` package without one).
+- `MovePayload.oldParentId` documented via `@param` in record-level Javadoc (carried for log/debug context only; not passed to `applyMove`).
+- `lastSequenceByInstance` field comment added: keyed by peer UUID, bounded by deployed-instance count (≤6), stale entries harmless.
+- `InMemoryEventBus.subscribe` Javadoc notes no deduplication.
+- `JsonMappingException.from(p, msg)` static factory used throughout `TreeMutationEventDeserializer` (replaces deprecated direct constructor).
+
+**Actual done state:** 451 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ### Production-shape components (always present)
 
