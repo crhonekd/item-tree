@@ -122,4 +122,59 @@ class ItemTreeApplicationE2EIT {
             default -> throw new IllegalArgumentException("unknown op " + operation);
         }
     }
+
+    private long insertRowDirectlyIntoH2(long parentId, String name, String type) {
+        org.springframework.jdbc.core.simple.JdbcClient jdbc =
+                pair.b().getBean(org.springframework.jdbc.core.simple.JdbcClient.class);
+        Long newId = jdbc.sql("SELECT ITEMTREE_ID_SQN.NEXTVAL FROM DUAL")
+                .query(Long.class).single();
+        jdbc.sql("""
+                INSERT INTO ITEMTREE
+                (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON)
+                VALUES (:id, :pid, :name, :type, NULL, 'direct', CURRENT_TIMESTAMP, NULL)
+                """)
+                .param("id", newId)
+                .param("pid", parentId)
+                .param("name", name)
+                .param("type", type)
+                .update();
+        return newId;
+    }
+
+    @Test
+    void shortOutageReconcilesViaDeltaRefresh() {
+        com.myxcomp.ice.xtree.cache.TreeCache cacheB =
+                pair.b().getBean(com.myxcomp.ice.xtree.cache.TreeCache.class);
+        com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener stubB =
+                pair.b().getBean(com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener.class);
+        com.myxcomp.ice.xtree.common.TimeMapper clockB =
+                pair.b().getBean(com.myxcomp.ice.xtree.common.TimeMapper.class);
+        io.micrometer.core.instrument.MeterRegistry registryB =
+                pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+
+        // 1) First connect — establishes tracker baseline (no reconcile).
+        stubB.simulateRecovery();
+        assertThat(registryB.find("itemtree.solace.reconnect_reconcile").counters()).isEmpty();
+
+        // 2) Disconnect at T0.
+        java.time.Instant t0 = E2ETestConfig.DEFAULT_TEST_INSTANT;
+        org.mockito.Mockito.when(clockB.now()).thenReturn(t0);
+        stubB.simulateDisconnect();
+
+        // 3) Write directly to H2 — no event published, so B's cache is blind.
+        long missedId = insertRowDirectlyIntoH2(2L, "E2E_DeltaMissed", "Folder");
+        assertThat(cacheB.getById(missedId)).as("B blind before reconcile").isEmpty();
+
+        // 4) Reconnect 10 min later (> PT1M, < PT1H) → triggers delta refresh.
+        org.mockito.Mockito.when(clockB.now()).thenReturn(t0.plus(java.time.Duration.ofMinutes(10)));
+        stubB.simulateRecovery();
+
+        // 5) ReconnectReconciler submits runDelta() to the TaskScheduler (async) — await effect.
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(cacheB.getById(missedId)).isPresent());
+
+        assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "delta").count())
+                .as("delta reconcile counter ticked exactly once")
+                .isEqualTo(1.0);
+    }
 }

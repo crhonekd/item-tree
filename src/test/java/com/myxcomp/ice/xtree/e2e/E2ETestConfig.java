@@ -36,6 +36,8 @@ public class E2ETestConfig {
         TimeMapper mock = Mockito.mock(TimeMapper.class);
         when(mock.now()).thenReturn(DEFAULT_TEST_INSTANT);
         when(mock.toOffsetDateTime(Mockito.any())).thenCallRealMethod();
+        when(mock.toLocalDateTime(Mockito.any())).thenCallRealMethod();
+        when(mock.toInstant(Mockito.any())).thenCallRealMethod();
         return mock;
     }
 }
