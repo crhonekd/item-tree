@@ -1,8 +1,10 @@
 package com.myxcomp.ice.xtree.service;
 
+import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.common.InstanceIdProvider;
 import com.myxcomp.ice.xtree.common.TimeMapper;
+import com.myxcomp.ice.xtree.common.Types;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
 import com.myxcomp.ice.xtree.messaging.EventPublisher;
@@ -17,9 +19,14 @@ import org.springframework.core.task.SyncTaskExecutor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -71,5 +78,54 @@ class ItemServiceMetricsTest {
 
         DistributionSummary summary = meterRegistry.find("itemtree.delete.cascade.size").summary();
         assertThat(summary == null || summary.count() == 0L).isTrue();
+    }
+
+    @Test
+    void createRejectsDataOnTypeWithoutDataIncrementsValidationRejectionCounter() {
+        when(cache.getById(1L)).thenReturn(Optional.of(
+                new CachedNode(1L, 0L, "root", Types.FOLDER, Instant.EPOCH, "u")));
+        when(policy.isKnown("Folder")).thenReturn(true);
+        when(policy.hasData("Folder")).thenReturn(false);
+
+        assertThatThrownBy(() ->
+                service.createItem(1L, "child", "Folder", "{\"k\":1}", new UserContext("u", null))
+        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
+
+        assertThat(meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "TYPE_CANNOT_HAVE_DATA").counter())
+                .isNotNull();
+    }
+
+    @Test
+    void createRejectsMissingDataOnTypeWithDataIncrementsValidationRejectionCounter() {
+        when(cache.getById(1L)).thenReturn(Optional.of(
+                new CachedNode(1L, 0L, "root", Types.FOLDER, Instant.EPOCH, "u")));
+        when(policy.isKnown("Report")).thenReturn(true);
+        when(policy.hasData("Report")).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                service.createItem(1L, "child", "Report", null, new UserContext("u", null))
+        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
+
+        assertThat(meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "DATA_REQUIRED").counter())
+                .isNotNull();
+    }
+
+    @Test
+    void createWithUnknownTypeIncrementsUnknownTypeCounter() {
+        when(cache.getById(1L)).thenReturn(Optional.of(
+                new CachedNode(1L, 0L, "root", Types.FOLDER, Instant.EPOCH, "u")));
+        when(policy.isKnown("MyExoticType")).thenReturn(false);
+        when(policy.hasData("MyExoticType")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("MyExoticType")).thenReturn(false);
+        when(repository.insert(anyLong(), anyString(), anyString(), anyString(),
+                isNull(), any(Instant.class), anyString())).thenReturn(42L);
+
+        service.createItem(1L, "child", "MyExoticType", "{\"k\":1}", new UserContext("u", null));
+
+        assertThat(meterRegistry.find("itemtree.policy.unknown_type")
+                .tag("type", "MyExoticType").counter())
+                .isNotNull();
     }
 }

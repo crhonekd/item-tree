@@ -104,11 +104,18 @@ public class ItemService {
         }
 
         boolean hasData = policy.hasData(type);
+        if (!policy.isKnown(type)) {
+            meterRegistry.counter("itemtree.policy.unknown_type", "type", type).increment();
+        }
         if (!hasData && dataJson != null) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.TYPE_CANNOT_HAVE_DATA.name()).increment();
             throw new ValidationException(ErrorCode.TYPE_CANNOT_HAVE_DATA,
                     "Type '" + type + "' cannot carry data");
         }
         if (hasData && dataJson == null) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.DATA_REQUIRED.name()).increment();
             throw new ValidationException(ErrorCode.DATA_REQUIRED,
                     "Type '" + type + "' requires data");
         }
@@ -247,15 +254,22 @@ public class ItemService {
         CachedNode existing = cache.getById(id).orElseThrow(() -> new NotFoundException(
                 ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found"));
 
+        if (!policy.isKnown(existing.type())) {
+            meterRegistry.counter("itemtree.policy.unknown_type", "type", existing.type()).increment();
+        }
         if (Types.isFolder(existing.type())) {
             throw new ValidationException(ErrorCode.FOLDER_CANNOT_HAVE_DATA,
                     "Folder " + id + " cannot carry data");
         }
         if (!policy.hasData(existing.type())) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.TYPE_CANNOT_HAVE_DATA.name()).increment();
             throw new ValidationException(ErrorCode.TYPE_CANNOT_HAVE_DATA,
                     "Type '" + existing.type() + "' cannot carry data");
         }
         if (dataJson == null) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.DATA_REQUIRED.name()).increment();
             throw new ValidationException(ErrorCode.DATA_REQUIRED,
                     "Update of id=" + id + " requires data");
         }
