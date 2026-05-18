@@ -3,9 +3,11 @@ package com.myxcomp.ice.xtree.policy;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -25,17 +27,25 @@ public class TypePolicyStartupAuditor implements ApplicationRunner {
     private final JdbcClient jdbcClient;
     private final TypePolicy typePolicy;
     private final DataProperties dataProperties;
+    private final MeterRegistry meterRegistry;
 
     public TypePolicyStartupAuditor(JdbcClient jdbcClient,
                                     TypePolicy typePolicy,
-                                    DataProperties dataProperties) {
-        this.jdbcClient = jdbcClient;
-        this.typePolicy = typePolicy;
-        this.dataProperties = dataProperties;
+                                    DataProperties dataProperties,
+                                    MeterRegistry meterRegistry) {
+        this.jdbcClient = Objects.requireNonNull(jdbcClient, "jdbcClient");
+        this.typePolicy = Objects.requireNonNull(typePolicy, "typePolicy");
+        this.dataProperties = Objects.requireNonNull(dataProperties, "dataProperties");
+        this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
     }
 
     @Override
     public void run(ApplicationArguments args) {
+        log.info("Type policy loaded: types-without-data={}, types-also-persisted-as-xml-on-write={}, types-sent-as-xml-to-ui={}",
+                dataProperties.typesWithoutData(),
+                dataProperties.typesAlsoPersistedAsXmlOnWrite(),
+                dataProperties.typesSentAsXmlToUi());
+
         Set<String> typesInDb = new LinkedHashSet<>(
                 jdbcClient.sql(SELECT_DISTINCT_TYPES)
                           .query(String.class)
@@ -43,7 +53,10 @@ public class TypePolicyStartupAuditor implements ApplicationRunner {
 
         Set<String> unknownInDb = new TreeSet<>();
         for (String t : typesInDb) {
-            if (!typePolicy.isKnown(t)) unknownInDb.add(t);
+            if (!typePolicy.isKnown(t)) {
+                unknownInDb.add(t);
+                meterRegistry.counter("itemtree.policy.unknown_type", "type", t).increment();
+            }
         }
         if (!unknownInDb.isEmpty()) {
             log.info("itemtree.data: types seen in DB but absent from all configured lists "

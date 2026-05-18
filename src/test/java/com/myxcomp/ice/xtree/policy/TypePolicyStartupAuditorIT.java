@@ -48,7 +48,8 @@ class TypePolicyStartupAuditorIT {
     @Test
     void logsInfoForUnknownTypesSeenInDb() {
         TypePolicyStartupAuditor auditor =
-                new TypePolicyStartupAuditor(jdbcClient, typePolicy, dataProperties);
+                new TypePolicyStartupAuditor(jdbcClient, typePolicy, dataProperties,
+                        new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
         auditor.run(null);
 
         // The dev seed contains View, UDF.Context, Eval — none of which appear in
@@ -68,7 +69,8 @@ class TypePolicyStartupAuditorIT {
         jdbcClient.sql("DELETE FROM ITEMTREE").update();
 
         TypePolicyStartupAuditor auditor =
-                new TypePolicyStartupAuditor(jdbcClient, typePolicy, dataProperties);
+                new TypePolicyStartupAuditor(jdbcClient, typePolicy, dataProperties,
+                        new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
         auditor.run(null);
 
         List<ILoggingEvent> warnEvents = appender.list.stream()
@@ -99,10 +101,49 @@ class TypePolicyStartupAuditorIT {
         }
 
         TypePolicyStartupAuditor auditor =
-                new TypePolicyStartupAuditor(jdbcClient, typePolicy, dataProperties);
+                new TypePolicyStartupAuditor(jdbcClient, typePolicy, dataProperties,
+                        new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
         auditor.run(null);
 
         assertThat(appender.list).filteredOn(e -> e.getLevel() == Level.WARN).isEmpty();
-        assertThat(appender.list).filteredOn(e -> e.getLevel() == Level.INFO).isEmpty();
+        // The startup summary log is INFO; only "unknown types" INFO is unexpected here.
+        assertThat(appender.list)
+                .filteredOn(e -> e.getLevel() == Level.INFO)
+                .noneMatch(e -> e.getFormattedMessage().contains("absent from all configured lists"));
+    }
+
+    @Test
+    void unknownTypesInSeedDataIncrementUnknownTypeCounter() {
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry registry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        TypePolicyStartupAuditor auditor = new TypePolicyStartupAuditor(
+                jdbcClient, typePolicy, dataProperties, registry);
+
+        auditor.run(null);
+
+        // Dev seed contains View, UDF.Context, Eval — none are in any configured list
+        assertThat(registry.find("itemtree.policy.unknown_type")
+                .tag("type", "View").counter()).isNotNull();
+        assertThat(registry.find("itemtree.policy.unknown_type")
+                .tag("type", "UDF.Context").counter()).isNotNull();
+        assertThat(registry.find("itemtree.policy.unknown_type")
+                .tag("type", "Eval").counter()).isNotNull();
+    }
+
+    @Test
+    void startupLogsHumanReadablePolicySummary() {
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry registry =
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        TypePolicyStartupAuditor auditor = new TypePolicyStartupAuditor(
+                jdbcClient, typePolicy, dataProperties, registry);
+
+        auditor.run(null);
+
+        List<ILoggingEvent> infoEvents = appender.list.stream()
+                .filter(e -> e.getLevel() == Level.INFO)
+                .toList();
+        assertThat(infoEvents)
+                .anyMatch(e -> e.getFormattedMessage().contains("Type policy loaded")
+                            && e.getFormattedMessage().contains("types-without-data="));
     }
 }

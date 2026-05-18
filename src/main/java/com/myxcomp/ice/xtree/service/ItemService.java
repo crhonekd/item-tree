@@ -24,6 +24,7 @@ import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -58,6 +59,7 @@ public class ItemService {
     private final InstanceIdProvider instanceIdProvider;
     private final SequenceGenerator sequenceGenerator;
     private final TaskExecutor backfillExecutor;
+    private final MeterRegistry meterRegistry;
 
     public ItemService(TreeCache cache,
                        ItemTreeRepository repository,
@@ -67,7 +69,8 @@ public class ItemService {
                        TimeMapper timeMapper,
                        InstanceIdProvider instanceIdProvider,
                        SequenceGenerator sequenceGenerator,
-                       @Qualifier("backfillExecutor") TaskExecutor backfillExecutor) {
+                       @Qualifier("backfillExecutor") TaskExecutor backfillExecutor,
+                       MeterRegistry meterRegistry) {
         this.cache = cache;
         this.repository = repository;
         this.policy = policy;
@@ -77,6 +80,7 @@ public class ItemService {
         this.instanceIdProvider = instanceIdProvider;
         this.sequenceGenerator = sequenceGenerator;
         this.backfillExecutor = backfillExecutor;
+        this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
     }
 
     /**
@@ -100,18 +104,32 @@ public class ItemService {
         }
 
         boolean hasData = policy.hasData(type);
+        if (!policy.isKnown(type)) {
+            meterRegistry.counter("itemtree.policy.unknown_type", "type", type).increment();
+        }
         if (!hasData && dataJson != null) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.TYPE_CANNOT_HAVE_DATA.name()).increment();
             throw new ValidationException(ErrorCode.TYPE_CANNOT_HAVE_DATA,
                     "Type '" + type + "' cannot carry data");
         }
         if (hasData && dataJson == null) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.DATA_REQUIRED.name()).increment();
             throw new ValidationException(ErrorCode.DATA_REQUIRED,
                     "Type '" + type + "' requires data");
         }
 
-        String xmlOrNull = (hasData && policy.isAlsoPersistedAsXmlOnWrite(type))
-                ? converter.jsonToXml(dataJson)
-                : null;
+        String xmlOrNull = null;
+        if (hasData && policy.isAlsoPersistedAsXmlOnWrite(type)) {
+            try {
+                xmlOrNull = converter.jsonToXml(dataJson);
+            } catch (RuntimeException e) {
+                meterRegistry.counter("itemtree.conversion.json_to_xml.failure",
+                        "type", type).increment();
+                throw e;
+            }
+        }
 
         Instant now = timeMapper.now();
         String stampUser = userContext.effectiveUser();
@@ -143,6 +161,7 @@ public class ItemService {
             log.info("deleteItem: id={} not present in DB; no-op", id);
             return;
         }
+        meterRegistry.summary("itemtree.delete.cascade.size").record(deletedIds.size());
         cache.applyDelete(new HashSet<>(deletedIds));
         Instant now = timeMapper.now();
         try {
@@ -242,22 +261,38 @@ public class ItemService {
         CachedNode existing = cache.getById(id).orElseThrow(() -> new NotFoundException(
                 ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found"));
 
+        if (!policy.isKnown(existing.type())) {
+            meterRegistry.counter("itemtree.policy.unknown_type", "type", existing.type()).increment();
+        }
         if (Types.isFolder(existing.type())) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.FOLDER_CANNOT_HAVE_DATA.name()).increment();
             throw new ValidationException(ErrorCode.FOLDER_CANNOT_HAVE_DATA,
                     "Folder " + id + " cannot carry data");
         }
         if (!policy.hasData(existing.type())) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.TYPE_CANNOT_HAVE_DATA.name()).increment();
             throw new ValidationException(ErrorCode.TYPE_CANNOT_HAVE_DATA,
                     "Type '" + existing.type() + "' cannot carry data");
         }
         if (dataJson == null) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.DATA_REQUIRED.name()).increment();
             throw new ValidationException(ErrorCode.DATA_REQUIRED,
                     "Update of id=" + id + " requires data");
         }
 
-        String xmlOrNull = policy.isAlsoPersistedAsXmlOnWrite(existing.type())
-                ? converter.jsonToXml(dataJson)
-                : null;
+        String xmlOrNull = null;
+        if (policy.isAlsoPersistedAsXmlOnWrite(existing.type())) {
+            try {
+                xmlOrNull = converter.jsonToXml(dataJson);
+            } catch (RuntimeException e) {
+                meterRegistry.counter("itemtree.conversion.json_to_xml.failure",
+                        "type", existing.type()).increment();
+                throw e;
+            }
+        }
 
         Instant now = timeMapper.now();
         String stampUser = userContext.effectiveUser();
@@ -367,7 +402,20 @@ public class ItemService {
         String xml  = row != null ? row.xml()  : null;
 
         if (policy.isSentAsXmlToUi(n.type())) {
-            String shippedXml = xml != null ? xml : (json != null ? converter.jsonToXml(json) : null);
+            String shippedXml;
+            if (xml != null) {
+                shippedXml = xml;
+            } else if (json != null) {
+                try {
+                    shippedXml = converter.jsonToXml(json);
+                } catch (RuntimeException e) {
+                    meterRegistry.counter("itemtree.conversion.json_to_xml.failure",
+                            "type", n.type()).increment();
+                    throw e;
+                }
+            } else {
+                shippedXml = null;
+            }
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
                     n.lastUpdate(), n.lastUpdateUser(), null, shippedXml, children);
         }
@@ -377,7 +425,14 @@ public class ItemService {
                     n.lastUpdate(), n.lastUpdateUser(), json, null, children);
         }
         if (xml != null) {
-            String convertedJson = converter.xmlToJson(xml);
+            String convertedJson;
+            try {
+                convertedJson = converter.xmlToJson(xml);
+            } catch (RuntimeException e) {
+                meterRegistry.counter("itemtree.conversion.xml_to_json.failure",
+                        "type", n.type()).increment();
+                throw e;
+            }
             backfillBatch.add(new JsonBackfillRow(n.itemTreeId(), convertedJson));
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
                     n.lastUpdate(), n.lastUpdateUser(), convertedJson, null, children);

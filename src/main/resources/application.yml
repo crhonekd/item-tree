@@ -29,6 +29,13 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+  prometheus:
+    metrics:
+      export:
+        enabled: true   # Spring Boot 3.4+ disabled metrics export by default; opt in explicitly
+  tracing:
+    sampling:
+      probability: 1.0  # Phase A: sample everything; TODO Phase B: reduce for production traffic
 
 # ── Placeholder config sections from design §17 ──────────────────────────────
 # Filled in by later phases:
@@ -54,6 +61,10 @@ itemtree:
     health:
       mark-down-after: PT4H
   oracle: {}
+  security:
+    trusted-cidrs:
+      - 127.0.0.1/32
+      - "::1/128"
   data:
     types-without-data:
       - Folder

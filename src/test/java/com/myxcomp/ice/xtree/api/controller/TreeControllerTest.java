@@ -4,6 +4,7 @@ import com.myxcomp.ice.xtree.api.advice.GlobalExceptionHandler;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
 import com.myxcomp.ice.xtree.api.mapper.ItemNodeMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
+import com.myxcomp.ice.xtree.config.SecurityProperties;
 import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.common.UserContext;
@@ -39,6 +40,7 @@ class TreeControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean TreeService treeService;
     @MockitoBean CacheReadinessGate cacheReadinessGate;
+    @MockitoBean SecurityProperties securityProperties;
 
     private static final Instant T = Instant.parse("2026-05-16T12:00:00Z");
 
