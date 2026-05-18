@@ -4,6 +4,7 @@ import com.myxcomp.ice.xtree.api.advice.GlobalExceptionHandler;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
 import com.myxcomp.ice.xtree.api.mapper.ItemNodeMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
+import com.myxcomp.ice.xtree.config.SecurityProperties;
 import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.service.HomeFolderService;
@@ -31,6 +32,7 @@ class UserControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean HomeFolderService homeFolderService;
     @MockitoBean CacheReadinessGate cacheReadinessGate;
+    @MockitoBean SecurityProperties securityProperties;
 
     @BeforeEach
     void gateReady() {

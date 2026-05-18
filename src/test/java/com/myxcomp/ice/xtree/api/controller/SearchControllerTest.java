@@ -4,6 +4,7 @@ import com.myxcomp.ice.xtree.api.advice.GlobalExceptionHandler;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
 import com.myxcomp.ice.xtree.api.mapper.SearchHitMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
+import com.myxcomp.ice.xtree.config.SecurityProperties;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.service.SearchService;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +39,7 @@ class SearchControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean SearchService searchService;
     @MockitoBean CacheReadinessGate cacheReadinessGate;
+    @MockitoBean SecurityProperties securityProperties;
 
     @BeforeEach
     void gateReady() {

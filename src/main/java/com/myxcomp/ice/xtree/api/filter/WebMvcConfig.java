@@ -3,6 +3,7 @@ package com.myxcomp.ice.xtree.api.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
+import com.myxcomp.ice.xtree.config.SecurityProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,6 +27,16 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registration.setFilter(new CacheReadinessFilter(gate, problemFactory, objectMapper));
         registration.addUrlPatterns("/api/v1/itemtree/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<RefreshEndpointAccessFilter> refreshEndpointAccessFilterRegistration(
+            SecurityProperties securityProperties) {
+        FilterRegistrationBean<RefreshEndpointAccessFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(new RefreshEndpointAccessFilter(securityProperties));
+        registration.addUrlPatterns("/actuator/itemtree-refresh/*");
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 5);
         return registration;
     }
 }
