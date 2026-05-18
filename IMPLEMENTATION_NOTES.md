@@ -414,25 +414,19 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 11 — Resilience ⬅ NEXT — implementable in Phase A via stubs
+## Phase 11 — Resilience ✅ COMPLETE (2026-05-18)
 
-**Goal:** reconnect-driven reconciliation works against the stub exception listener; thresholds verified.
+**Goal achieved:** Broker reconnect-reconciliation pipeline wired end-to-end via `StubConnectionExceptionListener`. `ConnectionStateTracker` registers with `RecoveryListenerHook` on `@PostConstruct`, tracks `disconnectedAt`/`lastConnectedAt`/`lastEventReceivedAt`, and drives `ReconnectReconciler` on non-first reconnects. `MessagingHealthIndicator` flips DOWN past the `PT4H` threshold. All §18 messaging metrics are emitted. `EventConsumerService` updates `lastEventReceivedAt` on every successful deserialise.
 
-- `ConnectionStateTracker implements ConnectionRecoveryListener` — registers itself with the injected `ConnectionExceptionListener` (the stub in Phase A; the real one in Phase B) via `addRecoveryListener(...)` in `@PostConstruct`.
-- Tracks `disconnectedAt`, `lastConnectedAt`, `lastEventReceivedAt`.
-- First-connect special case: no prior disconnect → no reconcile.
-- `ReconnectReconciler` — outage duration → no-op / delta / full reload via `RefreshOrchestrator`.
-- `MessagingHealthIndicator` — gauges current state; flips DOWN after configurable outage (default `PT4H`). (Renamed from `SolaceHealthIndicator` to be agnostic of the underlying impl.)
-- Wire connection-state gauges and counters per §18.
+**Deviations from plan (reviewed and approved):**
+- `@MockBean RefreshOrchestrator` used instead of `@SpyBean` in `MessagingResilienceIT` — `@DirtiesContext` per-test combined with `orchestrator::runDelta` method-reference capture in `ReconnectReconciler` caused the spy proxy to be bypassed. `@MockBean` (a full mock replacing the bean before wiring) intercepts calls correctly.
+- `when(timeMapper.now()).thenReturn(T0.plus(Duration.ofHours(2)), T0)` in `longOutageTriggersFullReload` — the first call returns the outage timestamp (so the duration classifies as long), the second call returns a past instant for `taskScheduler.schedule(..., timeMapper.now())` so the submitted task fires immediately rather than in 90 minutes.
 
-**Tests (Phase A):**
-- `StubConnectionExceptionListener.simulateDisconnect()` followed by `simulateRecovery()` with controllable elapsed time → asserts the matching `RefreshOrchestrator` action.
-- Threshold matrix: 30s blip (no action), 10 min (delta), 2 h (full reload), 6 h (health DOWN).
-- First-connect produces no reconcile.
+**Actual done state:** 487 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
-## Phase 12 — Observability & polish
+## Phase 12 — Observability & polish ⬅ NEXT
 
 **Goal:** every metric from §18 is emitted; health endpoints accurate.
 
