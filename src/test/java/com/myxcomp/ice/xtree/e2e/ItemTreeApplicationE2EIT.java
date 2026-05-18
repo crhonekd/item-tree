@@ -177,4 +177,39 @@ class ItemTreeApplicationE2EIT {
                 .as("delta reconcile counter ticked exactly once")
                 .isEqualTo(1.0);
     }
+
+    @Test
+    void longOutageReconcilesViaFullReload() {
+        com.myxcomp.ice.xtree.cache.TreeCache cacheB =
+                pair.b().getBean(com.myxcomp.ice.xtree.cache.TreeCache.class);
+        com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener stubB =
+                pair.b().getBean(com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener.class);
+        com.myxcomp.ice.xtree.common.TimeMapper clockB =
+                pair.b().getBean(com.myxcomp.ice.xtree.common.TimeMapper.class);
+        io.micrometer.core.instrument.MeterRegistry registryB =
+                pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+
+        stubB.simulateRecovery();   // first connect baseline
+
+        java.time.Instant t0 = E2ETestConfig.DEFAULT_TEST_INSTANT;
+        org.mockito.Mockito.when(clockB.now()).thenReturn(t0);
+        stubB.simulateDisconnect();
+
+        long missedId = insertRowDirectlyIntoH2(2L, "E2E_FullMissed", "Folder");
+        assertThat(cacheB.getById(missedId)).as("B blind before reconcile").isEmpty();
+
+        // Reconnect 2 h later — exceeds longThreshold PT1H → full reload.
+        org.mockito.Mockito.when(clockB.now()).thenReturn(t0.plus(java.time.Duration.ofHours(2)));
+        stubB.simulateRecovery();
+
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10))
+                .untilAsserted(() -> assertThat(cacheB.getById(missedId)).isPresent());
+
+        assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "full").count())
+                .as("full reconcile counter ticked exactly once")
+                .isEqualTo(1.0);
+        assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "delta").count())
+                .as("delta counter NOT touched for long outage")
+                .isZero();
+    }
 }
