@@ -29,6 +29,9 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+  tracing:
+    sampling:
+      probability: 1.0
 
 # ── Placeholder config sections from design §17 ──────────────────────────────
 # Filled in by later phases:

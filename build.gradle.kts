@@ -30,6 +30,7 @@ dependencies {
 
     // ── Observability ────────────────────────────────────────────────────
     implementation("io.micrometer:micrometer-registry-prometheus")
+    implementation("io.micrometer:micrometer-tracing-bridge-brave")
 
     // ── OpenAPI doc endpoint (spec authoring lands in Phase 1) ───────────
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6")
