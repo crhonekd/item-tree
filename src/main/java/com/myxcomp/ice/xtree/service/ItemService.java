@@ -265,6 +265,8 @@ public class ItemService {
             meterRegistry.counter("itemtree.policy.unknown_type", "type", existing.type()).increment();
         }
         if (Types.isFolder(existing.type())) {
+            meterRegistry.counter("itemtree.policy.validation_rejection",
+                    "reason", ErrorCode.FOLDER_CANNOT_HAVE_DATA.name()).increment();
             throw new ValidationException(ErrorCode.FOLDER_CANNOT_HAVE_DATA,
                     "Folder " + id + " cannot carry data");
         }

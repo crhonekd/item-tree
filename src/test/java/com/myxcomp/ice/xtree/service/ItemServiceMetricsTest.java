@@ -10,7 +10,9 @@ import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
 import com.myxcomp.ice.xtree.messaging.EventPublisher;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
+import com.myxcomp.ice.xtree.persistence.PayloadRow;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,13 +25,13 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import com.myxcomp.ice.xtree.persistence.PayloadRow;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -79,7 +81,6 @@ class ItemServiceMetricsTest {
 
         service.deleteItem(999L, new UserContext("u", null));
 
-        DistributionSummary summary = meterRegistry.find("itemtree.delete.cascade.size").summary();
         assertThat(meterRegistry.find("itemtree.delete.cascade.size").summary()).isNull();
     }
 
@@ -94,9 +95,10 @@ class ItemServiceMetricsTest {
                 service.createItem(1L, "child", "Folder", "{\"k\":1}", new UserContext("u", null))
         ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
 
-        assertThat(meterRegistry.find("itemtree.policy.validation_rejection")
-                .tag("reason", "TYPE_CANNOT_HAVE_DATA").counter())
-                .isNotNull();
+        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "TYPE_CANNOT_HAVE_DATA").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     @Test
@@ -110,9 +112,10 @@ class ItemServiceMetricsTest {
                 service.createItem(1L, "child", "Report", null, new UserContext("u", null))
         ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
 
-        assertThat(meterRegistry.find("itemtree.policy.validation_rejection")
-                .tag("reason", "DATA_REQUIRED").counter())
-                .isNotNull();
+        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "DATA_REQUIRED").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     @Test
@@ -127,9 +130,10 @@ class ItemServiceMetricsTest {
 
         service.createItem(1L, "child", "MyExoticType", "{\"k\":1}", new UserContext("u", null));
 
-        assertThat(meterRegistry.find("itemtree.policy.unknown_type")
-                .tag("type", "MyExoticType").counter())
-                .isNotNull();
+        Counter counter = meterRegistry.find("itemtree.policy.unknown_type")
+                .tag("type", "MyExoticType").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     @Test
@@ -146,9 +150,10 @@ class ItemServiceMetricsTest {
                 service.createItem(1L, "r", "Report", "{\"k\":1}", new UserContext("u", null))
         ).isInstanceOf(IllegalArgumentException.class);
 
-        assertThat(meterRegistry.find("itemtree.conversion.json_to_xml.failure")
-                .tag("type", "Report").counter())
-                .isNotNull();
+        Counter counter = meterRegistry.find("itemtree.conversion.json_to_xml.failure")
+                .tag("type", "Report").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     @Test
@@ -166,8 +171,100 @@ class ItemServiceMetricsTest {
                 service.getItemsWithData(List.of(42L))
         ).isInstanceOf(IllegalArgumentException.class);
 
-        assertThat(meterRegistry.find("itemtree.conversion.xml_to_json.failure")
-                .tag("type", "Report").counter())
-                .isNotNull();
+        Counter counter = meterRegistry.find("itemtree.conversion.xml_to_json.failure")
+                .tag("type", "Report").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    // ─── A2: updateItemData instrumentation tests ─────────────────────────────
+
+    @Test
+    void updateItemData_onFolderNode_incrementsFolderCannotHaveDataCounter() {
+        CachedNode folder = new CachedNode(5L, 0L, "folder", Types.FOLDER, Instant.EPOCH, "u");
+        when(cache.getById(5L)).thenReturn(Optional.of(folder));
+        when(policy.isKnown(Types.FOLDER)).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                service.updateItemData(5L, "{}", new UserContext("u", null))
+        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
+
+        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "FOLDER_CANNOT_HAVE_DATA").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void updateItemData_onTypeWithoutData_incrementsTypeCannotHaveDataCounter() {
+        CachedNode node = new CachedNode(6L, 1L, "item", "NoDataType", Instant.EPOCH, "u");
+        when(cache.getById(6L)).thenReturn(Optional.of(node));
+        when(policy.isKnown("NoDataType")).thenReturn(true);
+        when(policy.hasData("NoDataType")).thenReturn(false);
+
+        assertThatThrownBy(() ->
+                service.updateItemData(6L, "{}", new UserContext("u", null))
+        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
+
+        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "TYPE_CANNOT_HAVE_DATA").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void updateItemData_missingData_incrementsDataRequiredCounter() {
+        CachedNode node = new CachedNode(7L, 1L, "item", "Report", Instant.EPOCH, "u");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.isKnown("Report")).thenReturn(true);
+        when(policy.hasData("Report")).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                service.updateItemData(7L, null, new UserContext("u", null))
+        ).isInstanceOf(com.myxcomp.ice.xtree.service.exception.ValidationException.class);
+
+        Counter counter = meterRegistry.find("itemtree.policy.validation_rejection")
+                .tag("reason", "DATA_REQUIRED").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void updateItemData_jsonToXmlFailure_incrementsConversionCounter() {
+        CachedNode node = new CachedNode(8L, 1L, "item", "Report", Instant.EPOCH, "u");
+        when(cache.getById(8L)).thenReturn(Optional.of(node));
+        when(policy.isKnown("Report")).thenReturn(true);
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("Report")).thenReturn(true);
+        when(converter.jsonToXml(anyString()))
+                .thenThrow(new IllegalArgumentException("bad json"));
+
+        assertThatThrownBy(() ->
+                service.updateItemData(8L, "{}", new UserContext("u", null))
+        ).isInstanceOf(IllegalArgumentException.class);
+
+        Counter counter = meterRegistry.find("itemtree.conversion.json_to_xml.failure")
+                .tag("type", "Report").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void updateItemData_unknownType_incrementsUnknownTypeCounter() {
+        CachedNode node = new CachedNode(9L, 1L, "item", "Exotic", Instant.EPOCH, "u");
+        when(cache.getById(9L)).thenReturn(Optional.of(node));
+        when(policy.isKnown("Exotic")).thenReturn(false);
+        when(policy.hasData("Exotic")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("Exotic")).thenReturn(false);
+        doNothing().when(repository).updateJson(eq(9L), anyString(), isNull(), any(Instant.class), anyString());
+        doNothing().when(cache).applyMetadataUpdate(eq(9L), any(Instant.class), anyString());
+        when(cache.getById(9L)).thenReturn(Optional.of(node));
+
+        service.updateItemData(9L, "{}", new UserContext("u", null));
+
+        Counter counter = meterRegistry.find("itemtree.policy.unknown_type")
+                .tag("type", "Exotic").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 }
