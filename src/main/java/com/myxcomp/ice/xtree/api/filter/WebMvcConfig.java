@@ -32,9 +32,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Bean
     public FilterRegistrationBean<RefreshEndpointAccessFilter> refreshEndpointAccessFilterRegistration(
-            SecurityProperties securityProperties) {
+            SecurityProperties securityProperties, ProblemFactory problemFactory,
+            ObjectMapper objectMapper) {
         FilterRegistrationBean<RefreshEndpointAccessFilter> registration = new FilterRegistrationBean<>();
-        registration.setFilter(new RefreshEndpointAccessFilter(securityProperties));
+        registration.setFilter(new RefreshEndpointAccessFilter(securityProperties, problemFactory, objectMapper));
         registration.addUrlPatterns("/actuator/itemtree-refresh/*");
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 5);
         return registration;
