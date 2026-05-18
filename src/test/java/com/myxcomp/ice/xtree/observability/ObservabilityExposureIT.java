@@ -171,19 +171,23 @@ class ObservabilityExposureIT {
                 List.class);
         assertThat(getResp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        // 4. Delete the folder — cascades the report → fires itemtree.delete.cascade.size
-        //    Also remove them from the cleanup list (already deleted).
-        deleteItem(folderId);
-        createdIds.remove(Long.valueOf(folderId));
-        createdIds.remove(Long.valueOf(reportId));
-
-        // 5. POST /actuator/itemtree-refresh/delta — fires refresh metrics
+        // 4. POST /actuator/itemtree-refresh/delta BEFORE deleting — the two newly-created
+        //    rows are still in the DB so findStructuralChangedSince() returns a non-empty list,
+        //    causing recordDeltaCounters() to increment itemtree.cache.refresh.delta.rows.
+        //    If the delta runs after the hard-delete, zero rows are found and the counter is
+        //    never incremented (and thus never appears on /actuator/prometheus).
         ResponseEntity<String> refreshResp = rest.exchange(
                 "/actuator/itemtree-refresh/delta",
                 HttpMethod.POST,
                 new HttpEntity<>(iceHeaders()),
                 String.class);
         assertThat(refreshResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // 5. Delete the folder — cascades the report → fires itemtree.delete.cascade.size
+        //    Also remove them from the cleanup list (already deleted).
+        deleteItem(folderId);
+        createdIds.remove(Long.valueOf(folderId));
+        createdIds.remove(Long.valueOf(reportId));
 
         // 6. Attempt to create a Folder WITH data → TYPE_CANNOT_HAVE_DATA validation rejection
         //    This is rejected (400) so no item is persisted; nothing to clean up.
@@ -214,6 +218,17 @@ class ObservabilityExposureIT {
         assertThat(body).contains("itemtree_solace_connected");
         assertThat(body).contains("itemtree_solace_outage_seconds");
         assertThat(body).contains("itemtree_solace_last_event_age_seconds");
+
+        // §18 Event pipeline counters (fired by create/delete workload above)
+        assertThat(body).contains("itemtree_event_published_total");
+        // itemtree_event_consumed_total is intentionally NOT asserted here.
+        // EventConsumerService suppresses self-echoes: when publisher and consumer share the
+        // same instanceId (single-instance dev/test setup), every inbound event is dropped
+        // before the "consumed" counter fires.  Only events from a DIFFERENT instance (i.e.
+        // a second running node) would increment this counter.  Coverage is provided by
+        // EventConsumerServiceTest unit tests.
+        assertThat(body).contains("itemtree_event_self_dropped_total");
+        assertThat(body).contains("itemtree_cache_refresh_delta_rows_total");
 
         // §18 Business metrics
         assertThat(body).contains("itemtree_delete_cascade_size");
