@@ -38,7 +38,7 @@ class MessagingHealthIndicatorTest {
                 "BC/ICE/ITEMTREE",
                 new SolaceProperties.Reconnect(Duration.ofMinutes(1), Duration.ofHours(1)),
                 new SolaceProperties.Health(Duration.ofHours(4)));
-        indicator = new MessagingHealthIndicator(tracker, timeMapper, props);
+        indicator = new MessagingHealthIndicator(tracker, props);
     }
 
     @Test
