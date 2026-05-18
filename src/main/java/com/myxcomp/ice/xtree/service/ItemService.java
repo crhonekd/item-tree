@@ -24,6 +24,7 @@ import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -58,6 +59,7 @@ public class ItemService {
     private final InstanceIdProvider instanceIdProvider;
     private final SequenceGenerator sequenceGenerator;
     private final TaskExecutor backfillExecutor;
+    private final MeterRegistry meterRegistry;
 
     public ItemService(TreeCache cache,
                        ItemTreeRepository repository,
@@ -67,7 +69,8 @@ public class ItemService {
                        TimeMapper timeMapper,
                        InstanceIdProvider instanceIdProvider,
                        SequenceGenerator sequenceGenerator,
-                       @Qualifier("backfillExecutor") TaskExecutor backfillExecutor) {
+                       @Qualifier("backfillExecutor") TaskExecutor backfillExecutor,
+                       MeterRegistry meterRegistry) {
         this.cache = cache;
         this.repository = repository;
         this.policy = policy;
@@ -77,6 +80,7 @@ public class ItemService {
         this.instanceIdProvider = instanceIdProvider;
         this.sequenceGenerator = sequenceGenerator;
         this.backfillExecutor = backfillExecutor;
+        this.meterRegistry = meterRegistry;
     }
 
     /**
@@ -143,6 +147,7 @@ public class ItemService {
             log.info("deleteItem: id={} not present in DB; no-op", id);
             return;
         }
+        meterRegistry.summary("itemtree.delete.cascade.size").record(deletedIds.size());
         cache.applyDelete(new HashSet<>(deletedIds));
         Instant now = timeMapper.now();
         try {

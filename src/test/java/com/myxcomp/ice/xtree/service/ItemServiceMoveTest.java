@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.core.task.SyncTaskExecutor;
 
 import java.time.Instant;
@@ -57,7 +58,8 @@ class ItemServiceMoveTest {
     @BeforeEach
     void setUp() {
         service = new ItemService(cache, repository, policy, converter, publisher,
-                timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor());
+                timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
+                new SimpleMeterRegistry());
     }
 
     private CachedNode folder(long id, long parentId, String name) {
