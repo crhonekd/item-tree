@@ -212,4 +212,15 @@ class ItemTreeApplicationE2EIT {
                 .as("delta counter NOT touched for long outage")
                 .isZero();
     }
+
+    @Test
+    void bothCachesBootstrappedToIdenticalSize() {
+        TreeCache cacheA = pair.a().getBean(TreeCache.class);
+        TreeCache cacheB = pair.b().getBean(TreeCache.class);
+
+        int sizeA = cacheA.size();
+        int sizeB = cacheB.size();
+        assertThat(sizeA).isPositive();
+        assertThat(sizeB).isEqualTo(sizeA);
+    }
 }
