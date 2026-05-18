@@ -7,6 +7,8 @@ import com.myxcomp.ice.xtree.service.ItemService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Optional;
 
@@ -68,5 +70,56 @@ class ItemTreeApplicationE2EIT {
                 .isEqualTo(bConsumedBefore + 1.0);
         assertThat(registryB.counter("itemtree.event.self_dropped").count())
                 .isZero();
+    }
+
+    @ParameterizedTest(name = "{0} propagates A -> B")
+    @ValueSource(strings = {"UPDATE", "MOVE", "RENAME", "DELETE"})
+    void mutationPropagatesAcrossInstances(String operation) {
+        ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        TreeCache cacheA = pair.a().getBean(TreeCache.class);
+        TreeCache cacheB = pair.b().getBean(TreeCache.class);
+        UserContext alice = new UserContext("alice", null);
+
+        // Seed a target Folder node under Users (id=2) via ItemService so both caches see it.
+        CachedNode target = itemServiceA.createItem(
+                2L, "E2E_" + operation + "_target", "Folder", null, alice);
+        long id = target.itemTreeId();
+        assertThat(cacheB.getById(id)).as("seed visible on B").isPresent();
+
+        switch (operation) {
+            case "UPDATE" -> {
+                // updateItemData requires a data-bearing type — delete the Folder and create a Report.
+                itemServiceA.deleteItem(id, alice);
+                CachedNode report = itemServiceA.createItem(
+                        3L, "E2E_UPDATE_report", "Report",
+                        "{\"name\":\"before\",\"n\":1}", alice);
+                long reportId = report.itemTreeId();
+                assertThat(cacheB.getById(reportId)).isPresent();
+                itemServiceA.updateItemData(reportId, "{\"name\":\"after\",\"n\":2}", alice);
+                // UPDATE payload does not carry JSON data — verify event arrived on B via counter.
+                io.micrometer.core.instrument.MeterRegistry registryB =
+                        pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+                assertThat(registryB.counter("itemtree.event.consumed", "op", "UPDATE").count())
+                        .as("UPDATE event consumed by B")
+                        .isGreaterThanOrEqualTo(1.0);
+            }
+            case "MOVE" -> {
+                itemServiceA.moveItem(id, 3L, alice);   // move under Reports (id=3)
+                assertThat(cacheA.getById(id).orElseThrow().parentId()).isEqualTo(3L);
+                assertThat(cacheB.getById(id).orElseThrow().parentId())
+                        .as("B sees the new parent").isEqualTo(3L);
+            }
+            case "RENAME" -> {
+                itemServiceA.renameItem(id, "E2E_RENAME_after", alice);
+                assertThat(cacheB.getById(id).orElseThrow().name())
+                        .as("B sees the new name").isEqualTo("E2E_RENAME_after");
+            }
+            case "DELETE" -> {
+                itemServiceA.deleteItem(id, alice);
+                assertThat(cacheA.getById(id)).as("A removed").isEmpty();
+                assertThat(cacheB.getById(id)).as("B removed").isEmpty();
+            }
+            default -> throw new IllegalArgumentException("unknown op " + operation);
+        }
     }
 }
