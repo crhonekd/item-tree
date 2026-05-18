@@ -1,6 +1,5 @@
 package com.myxcomp.ice.xtree.messaging;
 
-import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.config.SolaceProperties;
 import com.myxcomp.ice.xtree.refresh.RefreshOrchestrator;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -19,19 +18,16 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 class ReconnectReconcilerTest {
 
-    private static final Instant NOW = Instant.parse("2026-05-18T10:00:00Z");
-
     private RefreshOrchestrator orchestrator;
     private TaskScheduler taskScheduler;
-    private TimeMapper timeMapper;
     private SimpleMeterRegistry meterRegistry;
     private ReconnectReconciler reconciler;
 
@@ -39,14 +35,12 @@ class ReconnectReconcilerTest {
     void setUp() {
         orchestrator = mock(RefreshOrchestrator.class);
         taskScheduler = mock(TaskScheduler.class);
-        timeMapper = mock(TimeMapper.class);
         meterRegistry = new SimpleMeterRegistry();
-        when(timeMapper.now()).thenReturn(NOW);
         SolaceProperties props = new SolaceProperties(
                 "BC/ICE/ITEMTREE",
                 new SolaceProperties.Reconnect(Duration.ofMinutes(1), Duration.ofHours(1)),
                 new SolaceProperties.Health(Duration.ofHours(4)));
-        reconciler = new ReconnectReconciler(orchestrator, taskScheduler, timeMapper, meterRegistry, props);
+        reconciler = new ReconnectReconciler(orchestrator, taskScheduler, meterRegistry, props);
     }
 
     @ParameterizedTest(name = "{0} → no-op")
@@ -71,7 +65,7 @@ class ReconnectReconcilerTest {
         reconciler.reconcile(outage);
 
         ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
-        verify(taskScheduler).schedule(taskCaptor.capture(), any(Instant.class));
+        verify(taskScheduler).schedule(taskCaptor.capture(), eq(Instant.EPOCH));
         verify(orchestrator, never()).runDelta();
 
         taskCaptor.getValue().run();
@@ -95,7 +89,7 @@ class ReconnectReconcilerTest {
         reconciler.reconcile(outage);
 
         ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
-        verify(taskScheduler).schedule(taskCaptor.capture(), any(Instant.class));
+        verify(taskScheduler).schedule(taskCaptor.capture(), eq(Instant.EPOCH));
 
         taskCaptor.getValue().run();
         verify(orchestrator).runFullReload();

@@ -1,6 +1,5 @@
 package com.myxcomp.ice.xtree.messaging;
 
-import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.config.SolaceProperties;
 import com.myxcomp.ice.xtree.refresh.RefreshOrchestrator;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -10,6 +9,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 
 /**
@@ -21,6 +21,9 @@ import java.util.Objects;
  *   outage ≥ long-threshold           → full reload
  * </pre>
  *
+ * <p>Tasks are submitted for immediate execution by passing {@code Instant.EPOCH} as the
+ * scheduler trigger — a past instant fires immediately on the next available thread.
+ *
  * <p>The counter {@code itemtree.solace.reconnect_reconcile{type}} increments at submission time.
  * Submitted-task outcomes are counted by {@link RefreshOrchestrator}'s own failure counters.
  */
@@ -31,18 +34,15 @@ public class ReconnectReconciler {
 
     private final RefreshOrchestrator orchestrator;
     private final TaskScheduler taskScheduler;
-    private final TimeMapper timeMapper;
     private final MeterRegistry meterRegistry;
     private final SolaceProperties props;
 
     public ReconnectReconciler(RefreshOrchestrator orchestrator,
                                TaskScheduler taskScheduler,
-                               TimeMapper timeMapper,
                                MeterRegistry meterRegistry,
                                SolaceProperties props) {
         this.orchestrator = Objects.requireNonNull(orchestrator, "orchestrator");
         this.taskScheduler = Objects.requireNonNull(taskScheduler, "taskScheduler");
-        this.timeMapper = Objects.requireNonNull(timeMapper, "timeMapper");
         this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
         this.props = Objects.requireNonNull(props, "props");
     }
@@ -62,13 +62,13 @@ public class ReconnectReconciler {
             log.info("Reconnect outage={}s below long-threshold={}s — queueing delta",
                     outage.toSeconds(), longT.toSeconds());
             meterRegistry.counter("itemtree.solace.reconnect_reconcile", "type", "delta").increment();
-            taskScheduler.schedule(orchestrator::runDelta, timeMapper.now());
+            taskScheduler.schedule(orchestrator::runDelta, Instant.EPOCH);
             return;
         }
 
         log.info("Reconnect outage={}s at-or-above long-threshold={}s — queueing full reload",
                 outage.toSeconds(), longT.toSeconds());
         meterRegistry.counter("itemtree.solace.reconnect_reconcile", "type", "full").increment();
-        taskScheduler.schedule(orchestrator::runFullReload, timeMapper.now());
+        taskScheduler.schedule(orchestrator::runFullReload, Instant.EPOCH);
     }
 }

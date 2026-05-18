@@ -25,6 +25,7 @@ class SolacePropertiesTest {
                         "itemtree.solace.reconnect.long-threshold=PT1H",
                         "itemtree.solace.health.mark-down-after=PT4H")
                 .run(ctx -> {
+                    assertThat(ctx).hasNotFailed();
                     SolaceProperties props = ctx.getBean(SolaceProperties.class);
                     assertThat(props.topic()).isEqualTo("BC/ICE/ITEMTREE");
                     assertThat(props.reconnect().shortThreshold()).isEqualTo(Duration.ofMinutes(1));

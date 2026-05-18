@@ -70,6 +70,7 @@ public class ConnectionStateTracker implements ConnectionRecoveryListener {
             disconnectedAt = timeMapper.now();
         }
         connected = false;
+        // Counts every library callback, including duplicates while already disconnected.
         connectionLostCounter.increment();
         log.warn("Connection lost: service={} disconnectedAt={}", serviceName, disconnectedAt);
     }

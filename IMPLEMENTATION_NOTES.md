@@ -419,10 +419,19 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 **Goal achieved:** Broker reconnect-reconciliation pipeline wired end-to-end via `StubConnectionExceptionListener`. `ConnectionStateTracker` registers with `RecoveryListenerHook` on `@PostConstruct`, tracks `disconnectedAt`/`lastConnectedAt`/`lastEventReceivedAt`, and drives `ReconnectReconciler` on non-first reconnects. `MessagingHealthIndicator` flips DOWN past the `PT4H` threshold. All §18 messaging metrics are emitted. `EventConsumerService` updates `lastEventReceivedAt` on every successful deserialise.
 
 **Deviations from plan (reviewed and approved):**
-- `@MockBean RefreshOrchestrator` used instead of `@SpyBean` in `MessagingResilienceIT` — `@DirtiesContext` per-test combined with `orchestrator::runDelta` method-reference capture in `ReconnectReconciler` caused the spy proxy to be bypassed. `@MockBean` (a full mock replacing the bean before wiring) intercepts calls correctly.
-- `when(timeMapper.now()).thenReturn(T0.plus(Duration.ofHours(2)), T0)` in `longOutageTriggersFullReload` — the first call returns the outage timestamp (so the duration classifies as long), the second call returns a past instant for `taskScheduler.schedule(..., timeMapper.now())` so the submitted task fires immediately rather than in 90 minutes.
+- `@MockBean RefreshOrchestrator` used instead of `@SpyBean` in `MessagingResilienceIT` → later migrated to `@MockitoBean` (see post-audit fixes below).
+- Original `when(timeMapper.now()).thenReturn(T0.plus(Duration.ofHours(2)), T0)` dual-mock in `longOutageTriggersFullReload` — eliminated by the post-audit fix below.
 
-**Actual done state:** 487 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+**Post-audit quality fixes (2026-05-18):**
+- `ReconnectReconciler` no longer injects `TimeMapper`; `taskScheduler.schedule(...)` now uses `Instant.EPOCH` (fires immediately) rather than `timeMapper.now()`. The scheduler trigger is internal plumbing, not a domain timestamp; the TimeMapper invariant applies only to domain timestamps.
+- Brittle dual-answer mock in `MessagingResilienceIT.longOutageTriggersFullReload` replaced with a single `thenReturn` value (consequence of above fix).
+- `@MockBean` → `@MockitoBean` in `MessagingResilienceIT` (Spring Boot 3.4 deprecation).
+- `ReconnectReconcilerTest` scheduler-assertion strengthened from `any(Instant.class)` to `eq(Instant.EPOCH)`.
+- `MessagingHealthIndicator` now delegates outage/last-event-age computation to `ConnectionStateTracker.outageSeconds()` / `lastEventAgeSeconds()`; `TimeMapper` removed from the indicator.
+- `messaging/package-info.java` extended to document all four Phase 11 production classes.
+- Cosmetic: redundant same-package import removed from `EventConsumerServiceTest`; `assertThat(ctx).hasNotFailed()` assertion committed in `SolacePropertiesTest`; inline comment added above `connectionLostCounter.increment()` in `onConnectionLost` explaining that the counter counts all library callbacks including duplicates.
+
+**Actual done state:** 487 tests green; `./gradlew test --rerun-tasks` → BUILD SUCCESSFUL.
 
 ---
 
