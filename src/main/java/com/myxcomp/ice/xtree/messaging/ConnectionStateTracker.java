@@ -30,6 +30,7 @@ public class ConnectionStateTracker implements ConnectionRecoveryListener {
     private final RecoveryListenerHook hook;
     private final TimeMapper timeMapper;
     private final MeterRegistry meterRegistry;
+    private final ReconnectReconciler reconciler;
 
     private volatile Instant disconnectedAt;
     private volatile Instant lastConnectedAt;
@@ -41,10 +42,12 @@ public class ConnectionStateTracker implements ConnectionRecoveryListener {
 
     public ConnectionStateTracker(RecoveryListenerHook hook,
                                   TimeMapper timeMapper,
-                                  MeterRegistry meterRegistry) {
+                                  MeterRegistry meterRegistry,
+                                  ReconnectReconciler reconciler) {
         this.hook = Objects.requireNonNull(hook, "hook");
         this.timeMapper = Objects.requireNonNull(timeMapper, "timeMapper");
         this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
+        this.reconciler = Objects.requireNonNull(reconciler, "reconciler");
     }
 
     @PostConstruct
@@ -73,12 +76,18 @@ public class ConnectionStateTracker implements ConnectionRecoveryListener {
 
     @Override
     public void onConnectionRecovered(String serviceName) {
+        Instant priorDisconnect = disconnectedAt;
         Instant now = timeMapper.now();
         lastConnectedAt = now;
         disconnectedAt = null;
         connected = true;
         connectionRecoveredCounter.increment();
         log.info("Connection recovered: service={} at={}", serviceName, now);
+
+        if (priorDisconnect != null) {
+            Duration outage = Duration.between(priorDisconnect, now);
+            reconciler.reconcile(outage);
+        }
     }
 
     public void recordEventReceived() {

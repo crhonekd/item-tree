@@ -10,7 +10,10 @@ import java.time.Duration;
 import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,7 +32,8 @@ class ConnectionStateTrackerTest {
         meterRegistry = new SimpleMeterRegistry();
         hook = mock(RecoveryListenerHook.class);
         when(timeMapper.now()).thenReturn(T0);
-        tracker = new ConnectionStateTracker(hook, timeMapper, meterRegistry);
+        tracker = new ConnectionStateTracker(hook, timeMapper, meterRegistry,
+                mock(ReconnectReconciler.class));
         tracker.registerWithHook();
     }
 
@@ -119,6 +123,48 @@ class ConnectionStateTrackerTest {
             assertThat(tracker.isConnected()).isTrue();
             assertThat(meterRegistry.counter("itemtree.solace.connection_recovered_total").count())
                     .isEqualTo(2.0);
+        }
+    }
+
+    @Nested
+    class ReconcileWiring {
+
+        private ReconnectReconciler reconciler;
+
+        @BeforeEach
+        void wireReconciler() {
+            reconciler = mock(ReconnectReconciler.class);
+            tracker = new ConnectionStateTracker(hook, timeMapper, meterRegistry, reconciler);
+            tracker.registerWithHook();
+        }
+
+        @Test
+        void firstConnectDoesNotReconcile() {
+            tracker.onConnectionRecovered("itemtree");
+
+            verify(reconciler, never()).reconcile(any());
+        }
+
+        @Test
+        void recoveryAfterLossPassesOutageDurationToReconciler() {
+            tracker.onConnectionLost("itemtree");
+            when(timeMapper.now()).thenReturn(T0.plusSeconds(45));
+
+            tracker.onConnectionRecovered("itemtree");
+
+            verify(reconciler).reconcile(Duration.ofSeconds(45));
+        }
+
+        @Test
+        void spuriousSecondRecoveryDoesNotCallReconcileAgain() {
+            tracker.onConnectionLost("itemtree");
+            when(timeMapper.now()).thenReturn(T0.plusSeconds(45));
+            tracker.onConnectionRecovered("itemtree");
+            reset(reconciler);
+
+            tracker.onConnectionRecovered("itemtree");
+
+            verify(reconciler, never()).reconcile(any());
         }
     }
 
