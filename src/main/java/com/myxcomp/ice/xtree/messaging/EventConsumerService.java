@@ -29,6 +29,7 @@ public class EventConsumerService {
     private final EventDispatcher dispatcher;
     private final InstanceIdProvider instanceIdProvider;
     private final MeterRegistry meterRegistry;
+    private final ConnectionStateTracker tracker;
 
     // Keyed by peer instance ID (UUID). Bounded in practice by the number of deployed instances
     // (≤6 per deployment); stale entries from stopped instances persist but are harmless.
@@ -37,11 +38,13 @@ public class EventConsumerService {
     public EventConsumerService(ObjectMapper objectMapper,
                                 EventDispatcher dispatcher,
                                 InstanceIdProvider instanceIdProvider,
-                                MeterRegistry meterRegistry) {
-        this.objectMapper = objectMapper;
-        this.dispatcher = dispatcher;
-        this.instanceIdProvider = instanceIdProvider;
-        this.meterRegistry = meterRegistry;
+                                MeterRegistry meterRegistry,
+                                ConnectionStateTracker tracker) {
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+        this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
+        this.instanceIdProvider = Objects.requireNonNull(instanceIdProvider, "instanceIdProvider");
+        this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
+        this.tracker = Objects.requireNonNull(tracker, "tracker");
     }
 
     public void processPayload(String payload) {
@@ -56,6 +59,8 @@ public class EventConsumerService {
                     payload.substring(0, Math.min(80, payload.length())), e.toString());
             return;
         }
+
+        tracker.recordEventReceived();
 
         if (instanceIdProvider.getInstanceId().equals(event.getInstanceId())) {
             meterRegistry.counter("itemtree.event.self_dropped").increment();

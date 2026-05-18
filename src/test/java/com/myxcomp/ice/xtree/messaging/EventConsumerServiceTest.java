@@ -24,11 +24,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.myxcomp.ice.xtree.messaging.ConnectionStateTracker;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -43,6 +47,7 @@ class EventConsumerServiceTest {
     private MeterRegistry registry;
     private EventDispatcher dispatcher;
     private InstanceIdProvider idProvider;
+    private ConnectionStateTracker tracker;
     private EventConsumerService consumer;
 
     @BeforeEach
@@ -53,8 +58,9 @@ class EventConsumerServiceTest {
         registry = new SimpleMeterRegistry();
         dispatcher = mock(EventDispatcher.class);
         idProvider = mock(InstanceIdProvider.class);
+        tracker = mock(ConnectionStateTracker.class);
         when(idProvider.getInstanceId()).thenReturn(LOCAL);
-        consumer = new EventConsumerService(mapper, dispatcher, idProvider, registry);
+        consumer = new EventConsumerService(mapper, dispatcher, idProvider, registry, tracker);
     }
 
     private String json(TreeMutationEvent e) throws Exception {
@@ -90,6 +96,27 @@ class EventConsumerServiceTest {
         verifyNoInteractions(dispatcher);
         assertThat(registry.counter("itemtree.event.self_dropped").count()).isOne();
         assertThat(registry.counter("itemtree.event.consumed", "op", "UPDATE").count()).isZero();
+    }
+
+    @Test
+    void record_event_received_called_after_deserialize_even_for_self_echo() throws Exception {
+        TreeMutationEvent self = TreeMutationEvent.builder()
+                .eventId("e-self").instanceId(LOCAL).sequence(1L).occurredAt(T)
+                .iceUser("u").operationType(OperationType.UPDATE)
+                .payload(new UpdatePayload(100L, T, "u")).build();
+        consumer.processPayload(json(self));
+
+        verify(tracker, times(1)).recordEventReceived();
+        verifyNoInteractions(dispatcher);
+        assertThat(registry.counter("itemtree.event.self_dropped").count()).isOne();
+    }
+
+    @Test
+    void record_event_received_not_called_on_deserialize_failure() {
+        consumer.processPayload("{ not valid json");
+
+        verify(tracker, never()).recordEventReceived();
+        assertThat(registry.counter("itemtree.event.consume.deserialize.failure").count()).isOne();
     }
 
     @Test
