@@ -47,4 +47,26 @@ class ItemTreeApplicationE2EIT {
         assertThat(onB.get().name()).isEqualTo("E2E_PeerCreate");
         assertThat(onB.get().parentId()).isEqualTo(2L);
     }
+
+    @Test
+    void selfEchoSuppressedOnOriginator() {
+        ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        io.micrometer.core.instrument.MeterRegistry registryA =
+                pair.a().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+        io.micrometer.core.instrument.MeterRegistry registryB =
+                pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+
+        double aDroppedBefore  = registryA.counter("itemtree.event.self_dropped").count();
+        double bConsumedBefore = registryB.counter("itemtree.event.consumed", "op", "CREATE").count();
+
+        itemServiceA.createItem(2L, "E2E_SelfEcho", "Folder", null,
+                new UserContext("alice", null));
+
+        assertThat(registryA.counter("itemtree.event.self_dropped").count())
+                .isEqualTo(aDroppedBefore + 1.0);
+        assertThat(registryB.counter("itemtree.event.consumed", "op", "CREATE").count())
+                .isEqualTo(bConsumedBefore + 1.0);
+        assertThat(registryB.counter("itemtree.event.self_dropped").count())
+                .isZero();
+    }
 }
