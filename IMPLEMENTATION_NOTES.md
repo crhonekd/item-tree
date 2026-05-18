@@ -447,7 +447,11 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 **Actual done state:** 527 tests green; `./gradlew clean test` → BUILD SUCCESSFUL.
 
-**Post-completion quality fixes:** None.
+**Post-completion quality fixes (applied after audit, same phase):**
+- `Objects.requireNonNull(meterRegistry, "meterRegistry")` guard added to `ItemService` constructor; `Objects.requireNonNull` guards added to all four fields of `TypePolicyStartupAuditor` constructor (previously all four were unguarded).
+- `CacheMetricsBinder`: lambda `c -> c.size()` replaced with `TreeCache::size` method reference (style consistency).
+- `ObservabilityExposureIT`: explanatory comment added documenting why `itemtree.conversion.*_failure` counters are excluded from the smoke test (error-path-only; covered by `ItemServiceMetricsTest` unit tests).
+- `ItemServiceMetricsTest.deleteOnUnknownIdDoesNotRecordCascadeSize`: replaced ambiguous `assertThat(summary == null || ...).isTrue()` with `assertThat(...summary()).isNull()` (semantic assertion).
 
 ---
 
