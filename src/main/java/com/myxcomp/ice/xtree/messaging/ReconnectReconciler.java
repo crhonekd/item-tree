@@ -21,6 +21,9 @@ import java.util.Objects;
  *   outage ≥ long-threshold           → full reload
  * </pre>
  *
+ * <p>Tasks are submitted for immediate execution by passing {@code Instant.EPOCH} as the
+ * scheduler trigger — a past instant fires immediately on the next available thread.
+ *
  * <p>The counter {@code itemtree.solace.reconnect_reconcile{type}} increments at submission time.
  * Submitted-task outcomes are counted by {@link RefreshOrchestrator}'s own failure counters.
  */

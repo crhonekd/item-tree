@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -64,7 +65,7 @@ class ReconnectReconcilerTest {
         reconciler.reconcile(outage);
 
         ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
-        verify(taskScheduler).schedule(taskCaptor.capture(), any(Instant.class));
+        verify(taskScheduler).schedule(taskCaptor.capture(), eq(Instant.EPOCH));
         verify(orchestrator, never()).runDelta();
 
         taskCaptor.getValue().run();
@@ -88,7 +89,7 @@ class ReconnectReconcilerTest {
         reconciler.reconcile(outage);
 
         ArgumentCaptor<Runnable> taskCaptor = ArgumentCaptor.forClass(Runnable.class);
-        verify(taskScheduler).schedule(taskCaptor.capture(), any(Instant.class));
+        verify(taskScheduler).schedule(taskCaptor.capture(), eq(Instant.EPOCH));
 
         taskCaptor.getValue().run();
         verify(orchestrator).runFullReload();
