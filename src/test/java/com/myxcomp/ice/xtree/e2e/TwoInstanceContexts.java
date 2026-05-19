@@ -1,6 +1,8 @@
 package com.myxcomp.ice.xtree.e2e;
 
 import com.myxcomp.ice.xtree.ItemTreeApplication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -17,6 +19,8 @@ import org.springframework.context.ConfigurableApplicationContext;
  * each test method so the bus has no stale subscriptions from a prior test.
  */
 public final class TwoInstanceContexts implements AutoCloseable {
+
+    private static final Logger log = LoggerFactory.getLogger(TwoInstanceContexts.class);
 
     private final ConfigurableApplicationContext a;
     private final ConfigurableApplicationContext b;
@@ -48,7 +52,7 @@ public final class TwoInstanceContexts implements AutoCloseable {
 
     @Override
     public void close() {
-        try { a.close(); } catch (RuntimeException ignored) { /* best effort */ }
-        try { b.close(); } catch (RuntimeException ignored) { /* best effort */ }
+        try { a.close(); } catch (RuntimeException e) { log.debug("context A shutdown failed: {}", e.toString()); }
+        try { b.close(); } catch (RuntimeException e) { log.debug("context B shutdown failed: {}", e.toString()); }
     }
 }

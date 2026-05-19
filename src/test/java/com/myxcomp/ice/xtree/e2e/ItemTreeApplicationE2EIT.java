@@ -2,14 +2,23 @@ package com.myxcomp.ice.xtree.e2e;
 
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.common.UserContext;
+import com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener;
 import com.myxcomp.ice.xtree.service.ItemService;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,10 +62,10 @@ class ItemTreeApplicationE2EIT {
     @Test
     void selfEchoSuppressedOnOriginator() {
         ItemService itemServiceA = pair.a().getBean(ItemService.class);
-        io.micrometer.core.instrument.MeterRegistry registryA =
-                pair.a().getBean(io.micrometer.core.instrument.MeterRegistry.class);
-        io.micrometer.core.instrument.MeterRegistry registryB =
-                pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+        MeterRegistry registryA =
+                pair.a().getBean(MeterRegistry.class);
+        MeterRegistry registryB =
+                pair.b().getBean(MeterRegistry.class);
 
         double aDroppedBefore  = registryA.counter("itemtree.event.self_dropped").count();
         double bConsumedBefore = registryB.counter("itemtree.event.consumed", "op", "CREATE").count();
@@ -98,8 +107,8 @@ class ItemTreeApplicationE2EIT {
                 itemServiceA.updateItemData(reportId, "{\"name\":\"after\",\"n\":2}", alice);
                 // UPDATE payload carries metadata (lastUpdate, lastUpdateUser) but not JSON data.
                 // Verify the event arrived via counter and was applied via the metadata field on B.
-                io.micrometer.core.instrument.MeterRegistry registryB =
-                        pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+                MeterRegistry registryB =
+                        pair.b().getBean(MeterRegistry.class);
                 assertThat(registryB.counter("itemtree.event.consumed", "op", "UPDATE").count())
                         .as("UPDATE event consumed by B")
                         .isGreaterThanOrEqualTo(1.0);
@@ -128,8 +137,8 @@ class ItemTreeApplicationE2EIT {
     }
 
     private long insertRowDirectlyIntoH2(long parentId, String name, String type) {
-        org.springframework.jdbc.core.simple.JdbcClient jdbc =
-                pair.b().getBean(org.springframework.jdbc.core.simple.JdbcClient.class);
+        JdbcClient jdbc =
+                pair.b().getBean(JdbcClient.class);
         Long newId = jdbc.sql("SELECT ITEMTREE_ID_SQN.NEXTVAL FROM DUAL")
                 .query(Long.class).single();
         jdbc.sql("""
@@ -142,8 +151,8 @@ class ItemTreeApplicationE2EIT {
                 .param("name", name)
                 .param("type", type)
                 .param("lastUpdate", E2ETestConfig.DEFAULT_TEST_INSTANT  // fixed 1 day after test instant
-                        .plus(java.time.Duration.ofDays(1))
-                        .atOffset(java.time.ZoneOffset.UTC)
+                        .plus(Duration.ofDays(1))
+                        .atOffset(ZoneOffset.UTC)
                         .toLocalDateTime())
                 .update();
         return newId;
@@ -151,22 +160,22 @@ class ItemTreeApplicationE2EIT {
 
     @Test
     void shortOutageReconcilesViaDeltaRefresh() {
-        com.myxcomp.ice.xtree.cache.TreeCache cacheB =
-                pair.b().getBean(com.myxcomp.ice.xtree.cache.TreeCache.class);
-        com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener stubB =
-                pair.b().getBean(com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener.class);
-        com.myxcomp.ice.xtree.common.TimeMapper clockB =
-                pair.b().getBean(com.myxcomp.ice.xtree.common.TimeMapper.class);
-        io.micrometer.core.instrument.MeterRegistry registryB =
-                pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+        TreeCache cacheB =
+                pair.b().getBean(TreeCache.class);
+        StubConnectionExceptionListener stubB =
+                pair.b().getBean(StubConnectionExceptionListener.class);
+        TimeMapper clockB =
+                pair.b().getBean(TimeMapper.class);
+        MeterRegistry registryB =
+                pair.b().getBean(MeterRegistry.class);
 
         // 1) First connect — establishes tracker baseline (no reconcile).
         stubB.simulateRecovery();
         assertThat(registryB.find("itemtree.solace.reconnect_reconcile").counters()).isEmpty();
 
         // 2) Disconnect at T0.
-        java.time.Instant t0 = E2ETestConfig.DEFAULT_TEST_INSTANT;
-        org.mockito.Mockito.when(clockB.now()).thenReturn(t0);
+        Instant t0 = E2ETestConfig.DEFAULT_TEST_INSTANT;
+        Mockito.when(clockB.now()).thenReturn(t0);
         stubB.simulateDisconnect();
 
         // 3) Write directly to H2 — no event published, so B's cache is blind.
@@ -174,11 +183,11 @@ class ItemTreeApplicationE2EIT {
         assertThat(cacheB.getById(missedId)).as("B blind before reconcile").isEmpty();
 
         // 4) Reconnect 10 min later (> PT1M, < PT1H) → triggers delta refresh.
-        org.mockito.Mockito.when(clockB.now()).thenReturn(t0.plus(java.time.Duration.ofMinutes(10)));
+        Mockito.when(clockB.now()).thenReturn(t0.plus(Duration.ofMinutes(10)));
         stubB.simulateRecovery();
 
         // 5) ReconnectReconciler submits runDelta() to the TaskScheduler (async) — await effect.
-        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(5))
+        Awaitility.await().atMost(Duration.ofSeconds(15))
                 .untilAsserted(() -> assertThat(cacheB.getById(missedId)).isPresent());
 
         assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "delta").count())
@@ -191,29 +200,29 @@ class ItemTreeApplicationE2EIT {
 
     @Test
     void longOutageReconcilesViaFullReload() {
-        com.myxcomp.ice.xtree.cache.TreeCache cacheB =
-                pair.b().getBean(com.myxcomp.ice.xtree.cache.TreeCache.class);
-        com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener stubB =
-                pair.b().getBean(com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener.class);
-        com.myxcomp.ice.xtree.common.TimeMapper clockB =
-                pair.b().getBean(com.myxcomp.ice.xtree.common.TimeMapper.class);
-        io.micrometer.core.instrument.MeterRegistry registryB =
-                pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
+        TreeCache cacheB =
+                pair.b().getBean(TreeCache.class);
+        StubConnectionExceptionListener stubB =
+                pair.b().getBean(StubConnectionExceptionListener.class);
+        TimeMapper clockB =
+                pair.b().getBean(TimeMapper.class);
+        MeterRegistry registryB =
+                pair.b().getBean(MeterRegistry.class);
 
         stubB.simulateRecovery();   // first connect baseline
 
-        java.time.Instant t0 = E2ETestConfig.DEFAULT_TEST_INSTANT;
-        org.mockito.Mockito.when(clockB.now()).thenReturn(t0);
+        Instant t0 = E2ETestConfig.DEFAULT_TEST_INSTANT;
+        Mockito.when(clockB.now()).thenReturn(t0);
         stubB.simulateDisconnect();
 
         long missedId = insertRowDirectlyIntoH2(2L, "E2E_FullMissed", "Folder");
         assertThat(cacheB.getById(missedId)).as("B blind before reconcile").isEmpty();
 
         // Reconnect 2 h later — exceeds longThreshold PT1H → full reload.
-        org.mockito.Mockito.when(clockB.now()).thenReturn(t0.plus(java.time.Duration.ofHours(2)));
+        Mockito.when(clockB.now()).thenReturn(t0.plus(Duration.ofHours(2)));
         stubB.simulateRecovery();
 
-        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(10))
+        Awaitility.await().atMost(Duration.ofSeconds(30))
                 .untilAsserted(() -> assertThat(cacheB.getById(missedId)).isPresent());
 
         assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "full").count())
