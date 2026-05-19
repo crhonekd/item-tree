@@ -456,15 +456,24 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 13 — End-to-end (Phase A) ⬅ NEXT
+## Phase 13 — End-to-end (Phase A) ✅ COMPLETE (2026-05-18)
 
-**Goal:** two-instance integration test proves convergence via the in-memory bus.
+**Goal achieved:** Two `ApplicationContext`s booted in one JVM converge on cache state via the shared `InMemoryEventBus` and shared H2. All five mutation operations (CREATE, UPDATE, MOVE, RENAME, DELETE) propagate A → B with the originator's self-echo dropped. Short (10 min) outages route through `runDelta`; long (2 h) outages route through `runFullReload`; both repair the cache when a third-party H2 mutation bypasses the broker. Both caches bootstrap to identical sizes from the shared seed data.
 
-- `e2e/ItemTreeApplicationE2E` — `@SpringBootTest` with H2 (Oracle compat mode) and the stub messaging stack.
-- Spin up two `ApplicationContext`s in the same JVM with distinct `instanceId`s, sharing the same H2 instance and the same `InMemoryEventBus`.
-- Issue a mutation on instance A; assert the event is delivered to instance B and B's cache reflects the change.
-- Verify self-echo suppression on A.
-- Simulate a disconnect of one instance (via `StubConnectionExceptionListener.simulateDisconnect()`); after >1 hour of synthetic clock time, simulate recovery; assert reconcile triggers full reload on reconnect.
+**Deviations from plan (reviewed and approved):**
+- `E2ETestConfig.mockTimeMapper()` required additional `thenCallRealMethod()` stubs for `toLocalDateTime(Instant)` and `toInstant(LocalDateTime)`. `JdbcItemTreeRepository.findStructuralChangedSince` routes the `since` Instant through these `TimeMapper` methods before binding it as a SQL parameter; without real implementations the mock returned `null`, causing the delta query to find zero rows and the resilience test to timeout.
+
+**Actual done state:** 549 tests green; `./gradlew clean test` → BUILD SUCCESSFUL. New files under `src/test/java/com/myxcomp/ice/xtree/e2e/`: `SharedBusHolder`, `SharedBusHolderTest`, `E2ETestConfig`, `E2ETestConfigTest`, `TwoInstanceContexts`, `TwoInstanceContextsTest`, `ItemTreeApplicationE2EIT`, `package-info.java`.
+
+**Post-audit quality fixes (2026-05-19):**
+- UPDATE branch of `mutationPropagatesAcrossInstances`: added `lastUpdateUser` cache-state assertion on peer B (proving `applyMetadataUpdate` was applied, not just that the event counter ticked).
+- `insertRowDirectlyIntoH2`: replaced H2's `CURRENT_TIMESTAMP` with a fixed timestamp derived from `E2ETestConfig.DEFAULT_TEST_INSTANT + 1 day`, removing wall-clock dependency.
+- Added `cascadeDeletePropagatesSubtreeRemovalToB` test: creates a 3-level Folder tree, cascade-deletes the root, asserts all three IDs absent from both caches A and B.
+- `shortOutageReconcilesViaDeltaRefresh`: added symmetric `reconnect_reconcile{type=full}` == 0 assertion (mirrors the delta==0 check in the long-outage test).
+- `bothCachesBootstrappedToIdenticalSize`: strengthened from size-equality to also assert specific seed IDs {1=root, 2=Users, 12=deepuser, 25=leafItem} present in both caches.
+- Awaitility timeouts bumped: delta test 5s→15s, full-reload test 10s→30s (CI headroom).
+- `TwoInstanceContexts.close()`: added SLF4J `log.debug` on shutdown exceptions (idiomatic throwable logging).
+- `ItemTreeApplicationE2EIT`: all inline fully-qualified type names promoted to import statements.
 
 ---
 
