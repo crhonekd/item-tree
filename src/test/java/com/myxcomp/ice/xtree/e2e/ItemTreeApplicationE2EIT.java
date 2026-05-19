@@ -96,7 +96,8 @@ class ItemTreeApplicationE2EIT {
                 long reportId = report.itemTreeId();
                 assertThat(cacheB.getById(reportId)).isPresent();
                 itemServiceA.updateItemData(reportId, "{\"name\":\"after\",\"n\":2}", alice);
-                // UPDATE payload does not carry JSON data — verify event arrived on B via counter.
+                // UPDATE payload carries metadata (lastUpdate, lastUpdateUser) but not JSON data.
+                // Verify the event arrived via counter and was applied via the metadata field on B.
                 io.micrometer.core.instrument.MeterRegistry registryB =
                         pair.b().getBean(io.micrometer.core.instrument.MeterRegistry.class);
                 assertThat(registryB.counter("itemtree.event.consumed", "op", "UPDATE").count())
@@ -140,7 +141,10 @@ class ItemTreeApplicationE2EIT {
                 .param("pid", parentId)
                 .param("name", name)
                 .param("type", type)
-                .param("lastUpdate", java.time.LocalDateTime.of(2026, 5, 19, 11, 0, 0))
+                .param("lastUpdate", E2ETestConfig.DEFAULT_TEST_INSTANT  // fixed 1 day after test instant
+                        .plus(java.time.Duration.ofDays(1))
+                        .atOffset(java.time.ZoneOffset.UTC)
+                        .toLocalDateTime())
                 .update();
         return newId;
     }
