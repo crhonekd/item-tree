@@ -245,6 +245,11 @@ class ItemTreeApplicationE2EIT {
         assertThat(cacheB.getById(childId)).as("child visible on B").isPresent();
         assertThat(cacheB.getById(grandchildId)).as("grandchild visible on B").isPresent();
 
+        // All three nodes must also be visible on A before the delete.
+        assertThat(cacheA.getById(parentId)).as("parent visible on A before delete").isPresent();
+        assertThat(cacheA.getById(childId)).as("child visible on A before delete").isPresent();
+        assertThat(cacheA.getById(grandchildId)).as("grandchild visible on A before delete").isPresent();
+
         // Delete the root of the subtree — cascades to child and grandchild.
         // InMemoryEventBus dispatches synchronously, so B's cache is updated before this returns.
         itemServiceA.deleteItem(parentId, alice);
@@ -271,7 +276,7 @@ class ItemTreeApplicationE2EIT {
         assertThat(sizeB).isEqualTo(sizeA);
 
         // Verify specific seed nodes are present in both caches
-        for (long seedId : new long[]{1L, 2L, 12L, 25L}) {
+        for (long seedId : new long[]{1L, 2L, 12L, 25L}) { // root, Users, deepuser, leafItem
             assertThat(cacheA.getById(seedId))
                     .as("cacheA missing seed id=" + seedId).isPresent();
             assertThat(cacheB.getById(seedId))
