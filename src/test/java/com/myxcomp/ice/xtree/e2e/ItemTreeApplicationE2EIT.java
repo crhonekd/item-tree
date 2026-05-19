@@ -184,6 +184,9 @@ class ItemTreeApplicationE2EIT {
         assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "delta").count())
                 .as("delta reconcile counter ticked exactly once")
                 .isEqualTo(1.0);
+        assertThat(registryB.counter("itemtree.solace.reconnect_reconcile", "type", "full").count())
+                .as("full-reload counter NOT touched for short outage")
+                .isZero();
     }
 
     @Test
@@ -222,6 +225,42 @@ class ItemTreeApplicationE2EIT {
     }
 
     @Test
+    void cascadeDeletePropagatesSubtreeRemovalToB() {
+        ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        TreeCache cacheA = pair.a().getBean(TreeCache.class);
+        TreeCache cacheB = pair.b().getBean(TreeCache.class);
+        UserContext alice = new UserContext("alice", null);
+
+        // Build a three-level subtree under Users (id=2): parent → child → grandchild.
+        CachedNode parent = itemServiceA.createItem(2L, "E2E_CascadeParent", "Folder", null, alice);
+        CachedNode child = itemServiceA.createItem(parent.itemTreeId(), "E2E_CascadeChild", "Folder", null, alice);
+        CachedNode grandchild = itemServiceA.createItem(child.itemTreeId(), "E2E_CascadeGrandchild", "Folder", null, alice);
+
+        long parentId = parent.itemTreeId();
+        long childId = child.itemTreeId();
+        long grandchildId = grandchild.itemTreeId();
+
+        // All three nodes must be visible on B before the delete.
+        assertThat(cacheB.getById(parentId)).as("parent visible on B").isPresent();
+        assertThat(cacheB.getById(childId)).as("child visible on B").isPresent();
+        assertThat(cacheB.getById(grandchildId)).as("grandchild visible on B").isPresent();
+
+        // Delete the root of the subtree — cascades to child and grandchild.
+        // InMemoryEventBus dispatches synchronously, so B's cache is updated before this returns.
+        itemServiceA.deleteItem(parentId, alice);
+
+        // All three IDs must be absent from A's cache.
+        assertThat(cacheA.getById(parentId)).as("A: parent removed").isEmpty();
+        assertThat(cacheA.getById(childId)).as("A: child removed").isEmpty();
+        assertThat(cacheA.getById(grandchildId)).as("A: grandchild removed").isEmpty();
+
+        // All three IDs must be absent from B's cache.
+        assertThat(cacheB.getById(parentId)).as("B: parent removed").isEmpty();
+        assertThat(cacheB.getById(childId)).as("B: child removed").isEmpty();
+        assertThat(cacheB.getById(grandchildId)).as("B: grandchild removed").isEmpty();
+    }
+
+    @Test
     void bothCachesBootstrappedToIdenticalSize() {
         TreeCache cacheA = pair.a().getBean(TreeCache.class);
         TreeCache cacheB = pair.b().getBean(TreeCache.class);
@@ -230,5 +269,13 @@ class ItemTreeApplicationE2EIT {
         int sizeB = cacheB.size();
         assertThat(sizeA).isPositive();
         assertThat(sizeB).isEqualTo(sizeA);
+
+        // Verify specific seed nodes are present in both caches
+        for (long seedId : new long[]{1L, 2L, 12L, 25L}) {
+            assertThat(cacheA.getById(seedId))
+                    .as("cacheA missing seed id=" + seedId).isPresent();
+            assertThat(cacheB.getById(seedId))
+                    .as("cacheB missing seed id=" + seedId).isPresent();
+        }
     }
 }
