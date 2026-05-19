@@ -102,6 +102,9 @@ class ItemTreeApplicationE2EIT {
                 assertThat(registryB.counter("itemtree.event.consumed", "op", "UPDATE").count())
                         .as("UPDATE event consumed by B")
                         .isGreaterThanOrEqualTo(1.0);
+                assertThat(cacheB.getById(reportId).orElseThrow().lastUpdateUser())
+                        .as("B sees the updated lastUpdateUser")
+                        .isEqualTo("alice");
             }
             case "MOVE" -> {
                 itemServiceA.moveItem(id, 3L, alice);   // move under Reports (id=3)
@@ -131,12 +134,13 @@ class ItemTreeApplicationE2EIT {
         jdbc.sql("""
                 INSERT INTO ITEMTREE
                 (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON)
-                VALUES (:id, :pid, :name, :type, NULL, 'direct', CURRENT_TIMESTAMP, NULL)
+                VALUES (:id, :pid, :name, :type, NULL, 'direct', :lastUpdate, NULL)
                 """)
                 .param("id", newId)
                 .param("pid", parentId)
                 .param("name", name)
                 .param("type", type)
+                .param("lastUpdate", java.time.LocalDateTime.of(2026, 5, 19, 11, 0, 0))
                 .update();
         return newId;
     }
