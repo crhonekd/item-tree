@@ -52,7 +52,7 @@ public final class TwoInstanceContexts implements AutoCloseable {
 
     @Override
     public void close() {
-        try { a.close(); } catch (RuntimeException e) { log.debug("context A shutdown failed: {}", e.toString()); }
-        try { b.close(); } catch (RuntimeException e) { log.debug("context B shutdown failed: {}", e.toString()); }
+        try { a.close(); } catch (RuntimeException e) { log.debug("context A shutdown failed", e); }
+        try { b.close(); } catch (RuntimeException e) { log.debug("context B shutdown failed", e); }
     }
 }
