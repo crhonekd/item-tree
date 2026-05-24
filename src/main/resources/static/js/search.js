@@ -3,12 +3,6 @@ import { api, ProblemError } from './api.js';
 import { toastError } from './toast.js';
 import { renderTree, ingestSubtreeResult } from './tree.js';
 
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  })[c]);
-}
-
 export async function runSearch() {
   const input = document.getElementById('search-input').value.trim();
   const mode = document.querySelector('input[name="search-mode"]:checked').value;

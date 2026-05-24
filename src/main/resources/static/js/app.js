@@ -64,7 +64,8 @@ async function doLogin() {
     ingestSubtreeResult(home.itemTreeId, subtree);
 
     renderTree();
-    $('detail-root').innerHTML = `(logged in as <b>${state.iceUser}</b>; click a node)`;
+    $('detail-root').innerHTML = '(logged in as <b></b>; click a node)';
+    $('detail-root').querySelector('b').textContent = state.iceUser;
   } catch (e) {
     if (e instanceof ProblemError) toastError(e.problem); else toastError(String(e));
     $('detail-root').innerHTML = '(login failed — see toast)';
