@@ -1,0 +1,86 @@
+import { state, removeNode, reparentNode, ingestNodes } from './state.js';
+import { api, ProblemError } from './api.js';
+import { toastError, toastSuccess } from './toast.js';
+import { renderTree, refreshSubtree } from './tree.js';
+import { openCreateModal, openRenameModal, openDeleteConfirm, openEditDataModal } from './modal.js';
+
+const FOLDER = 'Folder';
+const ROOT_ID = 1;
+
+let openMenuEl = null;
+
+function closeMenu() {
+  if (openMenuEl) { openMenuEl.remove(); openMenuEl = null; }
+}
+
+document.addEventListener('click', closeMenu);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (openMenuEl) { closeMenu(); return; }
+    if (state.clipboard) { state.clipboard = null; renderTree(); }
+  }
+});
+
+export function openContextMenu(id, clientX, clientY) {
+  closeMenu();
+  const node = state.tree.nodesById.get(id);
+  if (!node || id === ROOT_ID) return;
+  const isFolder = node.type === FOLDER;
+  const hasData = !isFolder && !node.type.startsWith('Shortcut');
+
+  const items = [];
+  if (isFolder) {
+    items.push({ label: 'Refresh subtree', action: () => refreshSubtree(id) });
+    items.push({ label: 'Create child', action: () => openCreateModal(id) });
+  }
+  if (hasData) {
+    items.push({ label: 'Edit data', action: () => openEditDataModal(id, null) });
+  }
+  items.push({ label: 'Rename', action: () => openRenameModal(id, node.name) });
+  items.push({ label: 'Delete', action: () => openDeleteConfirm(id, node) });
+  items.push({ label: 'Cut', action: () => { state.clipboard = { op: 'cut', sourceId: id, sourceName: node.name }; renderTree(); } });
+  items.push({ label: 'Copy', action: () => { state.clipboard = { op: 'copy', sourceId: id, sourceName: node.name }; renderTree(); } });
+  if (isFolder && state.clipboard) {
+    items.push({ label: `Paste here (${state.clipboard.op} ${state.clipboard.sourceName})`,
+                 action: () => pasteInto(id) });
+  }
+
+  const ul = document.createElement('ul');
+  ul.className = 'context-menu';
+  ul.style.left = `${clientX}px`;
+  ul.style.top = `${clientY}px`;
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.textContent = item.label;
+    li.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(); item.action(); });
+    ul.appendChild(li);
+  }
+  document.body.appendChild(ul);
+  openMenuEl = ul;
+}
+
+async function pasteInto(targetId) {
+  const cb = state.clipboard;
+  if (!cb) return;
+  try {
+    if (cb.op === 'cut') {
+      const moved = await api.moveItem(cb.sourceId, targetId);
+      reparentNode(cb.sourceId, targetId);
+      ingestNodes([moved]);
+      state.clipboard = null;
+      toastSuccess(`Moved ${cb.sourceName} (id ${cb.sourceId})`);
+    } else {
+      const newNodes = await api.copyItem(cb.sourceId, targetId);
+      ingestNodes(newNodes);
+      toastSuccess(`Copied — ${newNodes.length} new node(s)`);
+    }
+    renderTree();
+  } catch (e) {
+    if (e instanceof ProblemError) {
+      toastError(e.problem);
+      if (e.problem.errorCode === 'ITEM_NOT_FOUND') removeNode(cb.sourceId);
+    } else {
+      toastError(String(e));
+    }
+  }
+}
