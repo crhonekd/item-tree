@@ -158,6 +158,44 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /api/v1/itemtree/items/{id}/copy:
+    post:
+      tags: [items]
+      operationId: copyItem
+      summary: Copy item (or subtree) into a folder owned by the caller
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyItemRequest'
+      responses:
+        '201':
+          description: New subtree (BFS-ordered, root first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemNode'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
   /api/v1/itemtree/items/{id}/data:
     put:
       tags: [items]
@@ -443,6 +481,18 @@ components:
           type: integer
           format: int64
 
+    CopyItemRequest:
+      type: object
+      required: [destinationFolderId]
+      properties:
+        destinationFolderId:
+          type: integer
+          format: int64
+          description: |
+            Folder that will own the new copy. Must be the caller's home folder
+            or a descendant of it. Caller identity = impersonatedUser if present,
+            else iceUser.
+
     RenameRequest:
       type: object
       required: [newName]
@@ -491,6 +541,12 @@ components:
             $ref: '#/components/schemas/Problem'
     NotFound:
       description: Not found
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PayloadTooLarge:
+      description: Copy subtree exceeds the configured cap
       content:
         application/problem+json:
           schema:
