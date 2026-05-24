@@ -441,6 +441,31 @@ public class DefaultTreeCache implements TreeCache {
     }
 
     @Override
+    public void applyCopy(List<CachedNode> newNodes) {
+        Objects.requireNonNull(newNodes, "newNodes");
+        if (newNodes.isEmpty()) return;
+        for (CachedNode n : newNodes) {
+            Objects.requireNonNull(n, "newNodes element");
+        }
+        lock.writeLock().lock();
+        try {
+            for (CachedNode n : newNodes) {
+                byId.put(n.itemTreeId(), n);
+                childrenByParent
+                        .computeIfAbsent(n.parentId(), k -> ConcurrentHashMap.newKeySet())
+                        .add(n.itemTreeId());
+                if (Types.isFolder(n.type())) {
+                    foldersByName
+                            .computeIfAbsent(n.name(), k -> ConcurrentHashMap.newKeySet())
+                            .add(n.itemTreeId());
+                }
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    @Override
     public TreeSnapshot snapshot() {
         lock.readLock().lock();
         try {

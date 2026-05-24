@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -13,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -593,6 +595,91 @@ class DefaultTreeCacheTest {
     }
 
     @Nested
+    class ApplyCopy {
+
+        private final Instant T = Instant.parse("2026-05-24T10:00:00Z");
+
+        @Test
+        void appliesAllNodesInOrder() {
+            cache.applyCreate(folder(10L, 0L, "dest"));
+            List<CachedNode> batch = List.of(
+                    folder(100L, 10L, "root-copy"),
+                    folder(101L, 100L, "child1"),
+                    node(102L, 101L, "leaf", "Report")
+            );
+            cache.applyCopy(batch);
+
+            assertThat(cache.getById(100L)).isPresent();
+            assertThat(cache.getById(101L)).isPresent();
+            assertThat(cache.getById(102L)).isPresent();
+            assertThat(cache.getChildren(10L))
+                    .extracting(CachedNode::itemTreeId)
+                    .contains(100L);
+            assertThat(cache.getChildren(100L))
+                    .extracting(CachedNode::itemTreeId)
+                    .contains(101L);
+            assertThat(cache.getChildren(101L))
+                    .extracting(CachedNode::itemTreeId)
+                    .contains(102L);
+        }
+
+        @Test
+        void emptyListIsNoOp() {
+            int before = cache.size();
+            cache.applyCopy(List.of());
+            assertThat(cache.size()).isEqualTo(before);
+        }
+
+        @Test
+        void idempotentReapplyOverwritesWithSameValues() {
+            cache.applyCreate(folder(10L, 0L, "dest"));
+            List<CachedNode> batch = List.of(folder(200L, 10L, "x"));
+            cache.applyCopy(batch);
+            cache.applyCopy(batch);
+            assertThat(cache.getById(200L)).get().extracting(CachedNode::name).isEqualTo("x");
+        }
+
+        @Test
+        void toleratesOrphanParent() {
+            // root copy points at a parent that doesn't exist in the cache
+            cache.applyCopy(List.of(folder(300L, 99_999L, "orphan-root")));
+            assertThat(cache.getById(300L)).isPresent();
+        }
+
+        @Test
+        void foldersAreIndexedByName() {
+            cache.applyCreate(folder(10L, 0L, "dest"));
+            cache.applyCopy(List.of(folder(400L, 10L, "report-folder")));
+            assertThat(cache.findHomeFolder("report-folder"))
+                    .get()
+                    .extracting(CachedNode::itemTreeId)
+                    .isEqualTo(400L);
+        }
+
+        @Test
+        void rejectsNullList() {
+            assertThatNullPointerException().isThrownBy(() -> cache.applyCopy(null));
+        }
+
+        @Test
+        void rejectsNullElement() {
+            cache.applyCreate(folder(10L, 0L, "dest"));
+            List<CachedNode> batch = new ArrayList<>();
+            batch.add(folder(500L, 10L, "ok"));
+            batch.add(null);
+            assertThatNullPointerException().isThrownBy(() -> cache.applyCopy(batch));
+        }
+
+        private CachedNode folder(long id, long parentId, String name) {
+            return new CachedNode(id, parentId, name, "Folder", T, "alice");
+        }
+
+        private CachedNode node(long id, long parentId, String name, String type) {
+            return new CachedNode(id, parentId, name, type, T, "alice");
+        }
+    }
+
+    @Nested
     class Concurrency {
 
         private DefaultTreeCache buildCacheWith(int nodeCount) {
@@ -638,21 +725,22 @@ class DefaultTreeCacheTest {
                 }
             };
 
-            // Writer 1: rotates through all five mutation operations
+            // Writer 1: rotates through all six mutation operations
+            AtomicLong idGen = new AtomicLong(1_000_000L);
             Runnable mutationWriter = () -> {
                 try {
                     startLatch.await();
                     long deadline = System.currentTimeMillis() + 2_000;
-                    long id = 1_000_000L;
                     int op = 0;
                     while (System.currentTimeMillis() < deadline) {
-                        long newId = id++;
-                        switch (op % 5) {
+                        long newId = idGen.getAndIncrement();
+                        switch (op % 6) {
                             case 0 -> stressCache.applyCreate(new CachedNode(newId, 1L, "stress" + newId, "Report", T, "sys"));
                             case 1 -> stressCache.applyMetadataUpdate(newId - 1, T, "writer");
                             case 2 -> stressCache.applyRename(newId - 1, "renamed" + newId, T, "writer");
                             case 3 -> stressCache.applyMove(newId - 1, 1L, T, "writer");
                             case 4 -> stressCache.applyDelete(Set.of(newId - 1));
+                            case 5 -> stressCache.applyCopy(List.of(new CachedNode(newId, 1L, "copy-" + newId, "Report", T, "stress")));
                         }
                         op++;
                     }

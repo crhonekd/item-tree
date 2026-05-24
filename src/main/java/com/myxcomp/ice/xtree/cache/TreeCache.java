@@ -37,6 +37,17 @@ public interface TreeCache {
     void replaceAll(TreeSnapshot newSnapshot);
 
     /**
+     * Applies a BFS-ordered batch of newly created nodes — a copied subtree — under
+     * a single write lock. Idempotent and tolerant per the {@link #applyCreate}
+     * contract (design §4): id-already-present is upserted; missing parent
+     * references are still recorded (apply* tolerance). Atomic from any concurrent
+     * reader's view.
+     *
+     * @param newNodes BFS-ordered list, never null, may be empty; elements never null
+     */
+    void applyCopy(List<CachedNode> newNodes);
+
+    /**
      * Returns an immutable copy of the current cache state, captured under the read lock.
      * Used by the full-reload drift diff (design §7) and by tests that need a frozen view.
      */
