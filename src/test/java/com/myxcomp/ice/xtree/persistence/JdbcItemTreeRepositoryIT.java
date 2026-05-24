@@ -509,6 +509,7 @@ class JdbcItemTreeRepositoryIT {
             List<ItemTreeFullRow> rows = repository.findRowsForCopy(2L, 1000);
 
             assertThat(rows).isNotEmpty();
+            assertThat(rows.get(0).itemTreeId()).isEqualTo(2L);
             Set<Long> seen = new HashSet<>();
             seen.add(rows.get(0).itemTreeId());
             for (int i = 1; i < rows.size(); i++) {

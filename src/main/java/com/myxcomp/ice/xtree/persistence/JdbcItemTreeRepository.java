@@ -45,17 +45,20 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     private final JdbcTemplate jdbcTemplate;
     private final StructuralRowMapper structuralRowMapper;
     private final PayloadRowMapper payloadRowMapper;
+    private final ItemTreeFullRowMapper itemTreeFullRowMapper;
     private final TimeMapper timeMapper;
 
     public JdbcItemTreeRepository(JdbcClient jdbcClient,
                                    JdbcTemplate jdbcTemplate,
                                    StructuralRowMapper structuralRowMapper,
                                    PayloadRowMapper payloadRowMapper,
+                                   ItemTreeFullRowMapper itemTreeFullRowMapper,
                                    TimeMapper timeMapper) {
         this.jdbcClient = jdbcClient;
         this.jdbcTemplate = jdbcTemplate;
         this.structuralRowMapper = structuralRowMapper;
         this.payloadRowMapper = payloadRowMapper;
+        this.itemTreeFullRowMapper = itemTreeFullRowMapper;
         this.timeMapper = timeMapper;
     }
 
@@ -264,7 +267,6 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
         if (limit <= 0) {
             return List.of();
         }
-        ItemTreeFullRowMapper mapper = new ItemTreeFullRowMapper(timeMapper);
 
         List<Long> frontier = new ArrayList<>();
         frontier.add(rootId);
@@ -278,7 +280,7 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
             for (List<Long> chunkIds : chunks) {
                 List<ItemTreeFullRow> rows = jdbcClient.sql(SQL_FIND_ROWS_FOR_COPY_BY_IDS)
                         .param("ids", chunkIds)
-                        .query(mapper)
+                        .query(itemTreeFullRowMapper)
                         .list();
                 for (ItemTreeFullRow row : rows) byId.put(row.itemTreeId(), row);
 

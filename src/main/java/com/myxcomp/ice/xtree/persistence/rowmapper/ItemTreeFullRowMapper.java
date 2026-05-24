@@ -3,11 +3,13 @@ package com.myxcomp.ice.xtree.persistence.rowmapper;
 import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.persistence.ItemTreeFullRow;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Component;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 
+@Component
 public class ItemTreeFullRowMapper implements RowMapper<ItemTreeFullRow> {
 
     private final TimeMapper timeMapper;
