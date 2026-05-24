@@ -4,12 +4,14 @@ import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
+import com.myxcomp.ice.xtree.messaging.event.payload.CopyPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -94,6 +96,31 @@ class EventDispatcherTest {
     void wrong_payload_type_for_operation_throws_ClassCastException() {
         UpdatePayload wrong = new UpdatePayload(100L, T, "alice");
         assertThatThrownBy(() -> dispatcher.dispatch(envelope(OperationType.CREATE, wrong)))
+                .isInstanceOf(ClassCastException.class);
+    }
+
+    @Test
+    void copyDispatchesToApplyCopy() {
+        Instant t = Instant.parse("2026-05-24T10:00:00Z");
+        CopyPayload payload = new CopyPayload(List.of(
+                new CopyPayload.CopiedNode(100L, 10L, "x", "Folder", t, "alice"),
+                new CopyPayload.CopiedNode(101L, 100L, "y", "Report", t, "alice")
+        ));
+        dispatcher.dispatch(envelope(OperationType.COPY, payload));
+
+        ArgumentCaptor<List<CachedNode>> captor = ArgumentCaptor.forClass(List.class);
+        verify(cache).applyCopy(captor.capture());
+        assertThat(captor.getValue())
+                .extracting(CachedNode::itemTreeId)
+                .containsExactly(100L, 101L);
+    }
+
+    @Test
+    void copyWithWrongPayloadTypeThrowsClassCast() {
+        Instant t = Instant.parse("2026-05-24T10:00:00Z");
+        // Use one of the existing payload types (e.g. CreatePayload) with OperationType.COPY
+        CreatePayload wrongPayload = new CreatePayload(1L, 0L, "x", "Folder", t, "alice");
+        assertThatThrownBy(() -> dispatcher.dispatch(envelope(OperationType.COPY, wrongPayload)))
                 .isInstanceOf(ClassCastException.class);
     }
 }

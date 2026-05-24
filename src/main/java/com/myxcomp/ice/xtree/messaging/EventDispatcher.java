@@ -4,6 +4,7 @@ import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
+import com.myxcomp.ice.xtree.messaging.event.payload.CopyPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
@@ -12,6 +13,7 @@ import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -54,6 +56,15 @@ public class EventDispatcher {
             case DELETE -> {
                 DeletePayload p = (DeletePayload) event.getPayload();
                 cache.applyDelete(new HashSet<>(p.deletedIds()));
+            }
+            case COPY -> {
+                CopyPayload p = (CopyPayload) event.getPayload();
+                List<CachedNode> nodes = p.newNodes().stream()
+                        .map(n -> new CachedNode(
+                                n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                                n.lastUpdate(), n.lastUpdateUser()))
+                        .toList();
+                cache.applyCopy(nodes);
             }
         }
     }
