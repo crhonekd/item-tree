@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ITEMTREE Test UI</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="brand">ITEMTREE Test UI</div>
+    <div class="header-controls">
+      <label>X-Ice-User:
+        <input id="ice-user" type="text" maxlength="20" placeholder="testuser1">
+      </label>
+      <label>X-Impersonated:
+        <input id="impersonated-user" type="text" maxlength="20" placeholder="(optional)">
+      </label>
+      <button id="probe-btn" type="button">Probe home</button>
+      <button id="login-btn" type="button">Login</button>
+      <label>Backend:
+        <input id="backend-url" type="text" size="22" placeholder="(blank = same origin)">
+      </label>
+      <span id="probe-result" class="probe-result"></span>
+    </div>
+  </header>
+
+  <section class="search-bar">
+    <label>Search:
+      <input id="search-input" type="text" placeholder="name or id…">
+    </label>
+    <label><input type="radio" name="search-mode" value="name" checked> name</label>
+    <label><input type="radio" name="search-mode" value="id"> id</label>
+    <label>limit:
+      <input id="search-limit" type="number" min="1" value="50" style="width:5em">
+    </label>
+    <button id="search-btn" type="button">Search</button>
+    <ul id="search-results" class="search-results"></ul>
+  </section>
+
+  <main class="main-grid">
+    <aside class="tree-pane">
+      <h2>Tree</h2>
+      <ul id="tree-root" class="tree-root"></ul>
+      <div class="refresh-strip">
+        <button id="refresh-delta-btn" type="button">Refresh delta</button>
+        <button id="refresh-full-btn" type="button">Refresh full</button>
+        <div id="refresh-status" class="refresh-status"></div>
+      </div>
+    </aside>
+    <section class="detail-pane">
+      <h2>Detail</h2>
+      <div id="detail-root">(nothing selected)</div>
+    </section>
+  </main>
+
+  <div id="modal-root"></div>
+  <div id="toast-container" class="toast-container"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
