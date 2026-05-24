@@ -345,5 +345,23 @@ class ItemServiceCopyTest {
             verify(repository).insertBatch(any());
             verify(cache).applyCopy(any());
         }
+
+        @Test
+        void itemFoundInCacheButAbsentFromDb() {
+            CachedNode source = new CachedNode(50L, 99L, "X", "Report", T, "bob");
+            CachedNode dest = new CachedNode(10L, 1L, "alice", "Folder", T, "alice");
+            when(cache.getById(50L)).thenReturn(Optional.of(source));
+            when(cache.getById(10L)).thenReturn(Optional.of(dest));
+            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(cache.isAncestor(50L, 10L)).thenReturn(false);
+            when(cache.getSubtreeFlat(50L)).thenReturn(List.of(source));
+            when(repository.findRowsForCopy(eq(50L), anyInt())).thenReturn(List.of());
+
+            assertThatThrownBy(() -> service.copyItem(50L, 10L, ctx))
+                    .isInstanceOf(NotFoundException.class)
+                    .satisfies(e -> assertThat(((NotFoundException) e).errorCode())
+                            .isEqualTo(ErrorCode.ITEM_NOT_FOUND));
+            verify(repository, never()).insertBatch(any());
+        }
     }
 }
