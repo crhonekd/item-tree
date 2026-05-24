@@ -19,6 +19,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -291,5 +292,24 @@ class ItemTreeApplicationE2EIT {
             assertThat(cacheB.getById(seedId))
                     .as("cacheB missing seed id=" + seedId).isPresent();
         }
+    }
+
+    @Test
+    void copyPropagatesAcrossInstances() throws Exception {
+        ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        TreeCache cacheB = pair.b().getBean(TreeCache.class);
+
+        long sourceId = 25L;    // leafItem seed (Report under deepuser depth-7 chain)
+        long destId   = 12L;    // deepuser home folder
+        UserContext ctx = new UserContext("deepuser", null);
+
+        List<CachedNode> result = itemServiceA.copyItem(sourceId, destId, ctx);
+        assertThat(result).hasSize(1);
+        long newId = result.get(0).itemTreeId();
+
+        Awaitility.await().atMost(java.time.Duration.ofSeconds(15))
+                .untilAsserted(() -> assertThat(cacheB.getById(newId)).isPresent());
+        assertThat(cacheB.getById(newId)).get()
+                .extracting(CachedNode::parentId).isEqualTo(destId);
     }
 }
