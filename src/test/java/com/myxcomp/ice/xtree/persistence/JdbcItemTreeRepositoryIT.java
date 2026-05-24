@@ -597,6 +597,31 @@ class JdbcItemTreeRepositoryIT {
         }
 
         @Test
+        void chunksLargeIdSetsWhenCopyingOver1000Children() {
+            Instant t = Instant.parse("2026-05-24T10:00:00Z");
+            long largeFolder = repository.insert(1L, "large-for-copy", "Folder",
+                    null, null, t, "test");
+            try {
+                // Insert 1001 children to force chunking (CHUNK_SIZE=1000)
+                for (int i = 0; i < 1001; i++) {
+                    repository.insert(largeFolder, "child-" + i, "Folder",
+                            null, null, t, "test");
+                }
+
+                // Request with limit high enough to not short-circuit
+                List<ItemTreeFullRow> rows = repository.findRowsForCopy(largeFolder, 2000);
+
+                // Should return parent (1) + all 1001 children = 1002 rows
+                assertThat(rows).hasSize(1002);
+                // First row should be the parent folder itself
+                assertThat(rows.get(0).itemTreeId()).isEqualTo(largeFolder);
+                assertThat(rows.get(0).parentId()).isEqualTo(1L);
+            } finally {
+                repository.cascadeDeleteSubtree(largeFolder);
+            }
+        }
+
+        @Test
         void payloadColumnsAreCopiedThrough() {
             Instant t = Instant.parse("2026-05-24T10:00:00Z");
             long folder = repository.insert(1L, "copy-payload-folder", "Folder",
