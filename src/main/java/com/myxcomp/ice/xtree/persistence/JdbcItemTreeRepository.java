@@ -230,6 +230,27 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     }
 
     @Override
+    public List<Long> allocateIds(int n) {
+        if (n < 0) {
+            throw new IllegalArgumentException("n must be >= 0, got " + n);
+        }
+        if (n == 0) {
+            return List.of();
+        }
+        // N individual NEXTVAL selects — one round-trip per id.
+        // A single-statement CONNECT BY approach is cleaner on Oracle but H2 does not
+        // support CONNECT BY on a sequence/DUAL in PreparedStatement mode.
+        List<Long> ids = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            long id = jdbcClient.sql("SELECT ITEMTREE_ID_SQN.NEXTVAL FROM DUAL")
+                    .query(Long.class)
+                    .single();
+            ids.add(id);
+        }
+        return ids;
+    }
+
+    @Override
     public boolean lastUpdateIndexExists() {
         DataSource ds = jdbcTemplate.getDataSource();
         if (ds == null) {

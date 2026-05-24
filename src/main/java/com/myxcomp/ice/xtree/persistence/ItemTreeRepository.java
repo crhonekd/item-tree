@@ -40,6 +40,13 @@ public interface ItemTreeRepository {
     List<Long> cascadeDeleteSubtree(long rootId);
 
     /**
+     * Allocates {@code n} fresh ids from {@code ITEMTREE_ID_SQN} in one round-trip
+     * (Oracle/H2 hierarchical {@code CONNECT BY} query). Returns an empty list when
+     * {@code n == 0}; throws {@link IllegalArgumentException} for negative {@code n}.
+     */
+    List<Long> allocateIds(int n);
+
+    /**
      * Returns {@code true} iff the {@code ITEMTREE} table has at least one index whose
      * column list includes {@code LASTUPDATE}. Implemented via JDBC {@code DatabaseMetaData}
      * for portability across H2 and Oracle. If the metadata lookup fails for any reason, the

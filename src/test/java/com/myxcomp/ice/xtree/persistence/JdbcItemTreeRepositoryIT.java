@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("dev")
@@ -359,6 +360,37 @@ class JdbcItemTreeRepositoryIT {
             long remaining = jdbcClient.sql("SELECT COUNT(*) FROM ITEMTREE")
                     .query(Long.class).single();
             assertThat(remaining).isZero();
+        }
+    }
+
+    @Nested
+    class AllocateIds {
+
+        @Test
+        void allocateIdsReturnsNUniqueStrictlyIncreasingIds() {
+            List<Long> ids = repository.allocateIds(10);
+
+            assertThat(ids).hasSize(10);
+            assertThat(ids).doesNotHaveDuplicates();
+            for (int i = 1; i < ids.size(); i++) {
+                assertThat(ids.get(i)).isGreaterThan(ids.get(i - 1));
+            }
+        }
+
+        @Test
+        void allocateIdsWithOneReturnsSingleId() {
+            List<Long> ids = repository.allocateIds(1);
+            assertThat(ids).hasSize(1);
+        }
+
+        @Test
+        void allocateIdsWithZeroReturnsEmpty() {
+            assertThat(repository.allocateIds(0)).isEmpty();
+        }
+
+        @Test
+        void allocateIdsRejectsNegative() {
+            assertThatIllegalArgumentException().isThrownBy(() -> repository.allocateIds(-1));
         }
     }
 
