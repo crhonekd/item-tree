@@ -12,11 +12,15 @@ import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.service.ItemService;
 import com.myxcomp.ice.xtree.service.ItemWithData;
+import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -396,5 +400,72 @@ class ItemControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // ── copy ─────────────────────────────────────────────────────────────
+
+    @Nested
+    class CopyItem {
+
+        @Test
+        void happyPathReturns201WithSubtree() throws Exception {
+            Instant t = Instant.parse("2026-05-24T10:00:00Z");
+            when(itemService.copyItem(eq(50L), eq(10L), any(UserContext.class)))
+                    .thenReturn(List.of(
+                            new CachedNode(900L, 10L, "Things (copy)", "Folder", t, "alice"),
+                            new CachedNode(901L, 900L, "leaf", "Report", t, "alice")));
+
+            mvc.perform(post("/api/v1/itemtree/items/50/copy")
+                            .header("X-Ice-User", "alice")
+                            .contentType("application/json")
+                            .content("{\"destinationFolderId\": 10}"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$[0].itemTreeId").value(900))
+                    .andExpect(jsonPath("$[0].name").value("Things (copy)"))
+                    .andExpect(jsonPath("$[1].itemTreeId").value(901));
+        }
+
+        @Test
+        void missingDestinationFolderIdReturns400() throws Exception {
+            mvc.perform(post("/api/v1/itemtree/items/50/copy")
+                            .header("X-Ice-User", "alice")
+                            .contentType("application/json")
+                            .content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @ParameterizedTest
+        @MethodSource("serviceErrorCases")
+        void serviceErrorsMappedToStatusAndErrorCode(
+                RuntimeException thrown, int expectedStatus, String expectedCode) throws Exception {
+            when(itemService.copyItem(anyLong(), anyLong(), any())).thenThrow(thrown);
+
+            mvc.perform(post("/api/v1/itemtree/items/50/copy")
+                            .header("X-Ice-User", "alice")
+                            .contentType("application/json")
+                            .content("{\"destinationFolderId\": 10}"))
+                    .andExpect(status().is(expectedStatus))
+                    .andExpect(jsonPath("$.errorCode").value(expectedCode));
+        }
+
+        static java.util.stream.Stream<org.junit.jupiter.params.provider.Arguments> serviceErrorCases() {
+            return java.util.stream.Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "x"), 404, "ITEM_NOT_FOUND"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new ValidationException(ErrorCode.CANNOT_COPY_ROOT, "x"), 400, "CANNOT_COPY_ROOT"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new NotFoundException(ErrorCode.DESTINATION_NOT_FOUND, "x"), 404, "DESTINATION_NOT_FOUND"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new ValidationException(ErrorCode.DESTINATION_NOT_FOLDER, "x"), 400, "DESTINATION_NOT_FOLDER"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND, "x"), 404, "HOME_FOLDER_NOT_FOUND"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new ValidationException(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER, "x"), 400, "DESTINATION_NOT_IN_USER_FOLDER"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new ValidationException(ErrorCode.COPY_INTO_DESCENDANT, "x"), 400, "COPY_INTO_DESCENDANT"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                    new CopyTooLargeException("too big"), 413, "COPY_TOO_LARGE"));
+        }
     }
 }

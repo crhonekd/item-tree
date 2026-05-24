@@ -11,6 +11,7 @@ import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.myxcomp.ice.xtree.generated.model.CopyItemRequest;
 import com.myxcomp.ice.xtree.generated.model.CreateItemRequest;
 import com.myxcomp.ice.xtree.generated.model.GetItemsRequest;
 import com.myxcomp.ice.xtree.generated.model.ItemNode;
@@ -54,6 +55,18 @@ public class ItemController implements ItemsApi {
         CachedNode created = itemService.createItem(
                 req.getParentId(), req.getName(), req.getType(), dataJson, ctx);
         return ResponseEntity.status(HttpStatus.CREATED).body(itemNodeMapper.toDto(created));
+    }
+
+    @Override
+    public ResponseEntity<List<ItemNode>> copyItem(Long id, String xIceUser,
+                                                   CopyItemRequest copyItemRequest,
+                                                   String xImpersonatedUser) {
+        UserContext ctx = new UserContext(xIceUser, xImpersonatedUser);
+        List<CachedNode> newSubtree = itemService.copyItem(id, copyItemRequest.getDestinationFolderId(), ctx);
+        List<ItemNode> dtos = newSubtree.stream()
+                .map(itemNodeMapper::toDto)
+                .toList();
+        return ResponseEntity.status(HttpStatus.CREATED).body(dtos);
     }
 
     @Override
