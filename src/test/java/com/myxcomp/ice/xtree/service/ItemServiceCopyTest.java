@@ -133,6 +133,36 @@ class ItemServiceCopyTest {
         }
 
         @Test
+        void impersonatedUserIsUsedForHomeFolderAndStamping() {
+            long sourceId = 50L;
+            long destId = 10L;
+            long newId = 999L;
+            UserContext impersonatedCtx = new UserContext("realUser", "alice");
+            CachedNode source = new CachedNode(sourceId, 99L, "Report A", "Report", T, "bob");
+            CachedNode dest = new CachedNode(destId, 1L, "alice", "Folder", T, "alice");
+            when(cache.getById(sourceId)).thenReturn(Optional.of(source));
+            when(cache.getById(destId)).thenReturn(Optional.of(dest));
+            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(cache.isAncestor(sourceId, destId)).thenReturn(false);
+            when(cache.getChildren(destId)).thenReturn(List.of());
+            when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
+            when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(List.of(
+                    new ItemTreeFullRow(sourceId, 99L, "Report A", "Report",
+                            "{\"k\":1}", null, T, "bob")));
+            when(repository.allocateIds(1)).thenReturn(List.of(newId));
+
+            List<CachedNode> result = service.copyItem(sourceId, destId, impersonatedCtx);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).lastUpdateUser()).isEqualTo("alice");
+
+            ArgumentCaptor<List<ItemTreeFullRow>> insertCaptor = ArgumentCaptor.captor();
+            verify(repository).insertBatch(insertCaptor.capture());
+            assertThat(insertCaptor.getValue()).hasSize(1);
+            assertThat(insertCaptor.getValue().get(0).lastUpdateUser()).isEqualTo("alice");
+        }
+
+        @Test
         void itemNotFoundOnUnknownSource() {
             when(cache.getById(123L)).thenReturn(Optional.empty());
             assertThatThrownBy(() -> service.copyItem(123L, 10L, ctx))

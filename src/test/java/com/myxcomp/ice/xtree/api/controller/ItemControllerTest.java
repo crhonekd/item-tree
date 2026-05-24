@@ -422,6 +422,7 @@ class ItemControllerTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$[0].itemTreeId").value(900))
                     .andExpect(jsonPath("$[0].name").value("Things (copy)"))
+                    .andExpect(jsonPath("$[0].path").doesNotExist())
                     .andExpect(jsonPath("$[1].itemTreeId").value(901));
         }
 
