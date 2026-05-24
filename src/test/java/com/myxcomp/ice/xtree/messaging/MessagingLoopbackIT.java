@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.common.InstanceIdProvider;
 import com.myxcomp.ice.xtree.common.UserContext;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.OptionalInt;
 import java.util.Set;
 
@@ -107,6 +109,54 @@ class MessagingLoopbackIT {
 
         assertThat(meterRegistry.counter("itemtree.event.published", "op", "CREATE").count())
                 .isEqualTo(publishedBefore + 1.0);
+        assertThat(meterRegistry.counter("itemtree.event.self_dropped").count())
+                .isEqualTo(droppedBefore + 1.0);
+    }
+
+    /**
+     * Verifies the COPY round-trip via the in-memory loopback bus.
+     *
+     * <p>This test uses a single Spring context (no peer cache), so the self-echo suppression
+     * path is exercised: {@code copyItem} writes the new node into the local cache via
+     * {@code applyCopy}, then publishes a COPY event; the consumer drops the event because the
+     * instance-id matches. The assertions confirm:
+     * <ol>
+     *   <li>The service returns the copied node(s).</li>
+     *   <li>The local cache contains the new node (placed there by {@code applyCopy}).</li>
+     *   <li>A COPY event was published (metric).</li>
+     *   <li>The self-echo was dropped (metric).</li>
+     * </ol>
+     *
+     * <p>Seed data: id=25 is {@code leafItem} (Report, deep under deepuser); id=12 is the
+     * {@code deepuser} home folder — a valid copy destination for user "deepuser".
+     */
+    @Test
+    void itemService_copy_publishes_and_self_drops() {
+        // deepuser home folder (id=12) is a valid destination for user "deepuser"
+        long sourceId = 25L;   // leafItem — Report under deepuser depth chain
+        long destId   = 12L;   // deepuser home folder
+
+        double publishedBefore = meterRegistry.counter("itemtree.event.published", "op", "COPY").count();
+        double droppedBefore   = meterRegistry.counter("itemtree.event.self_dropped").count();
+
+        List<CachedNode> result = itemService.copyItem(sourceId, destId,
+                new UserContext("deepuser", null));
+
+        // Register all new IDs for cache cleanup after this test.
+        result.forEach(n -> toCleanUp.add(n.itemTreeId()));
+
+        long newId = result.get(0).itemTreeId();
+
+        assertThat(result).hasSize(1);
+
+        // The local cache holds the copy (written by applyCopy before the event is published).
+        assertThat(cache.getById(newId)).isPresent();
+        assertThat(cache.getById(newId).get().parentId()).isEqualTo(destId);
+
+        // A COPY event was published to the bus …
+        assertThat(meterRegistry.counter("itemtree.event.published", "op", "COPY").count())
+                .isEqualTo(publishedBefore + 1.0);
+        // … and the local self-echo was suppressed.
         assertThat(meterRegistry.counter("itemtree.event.self_dropped").count())
                 .isEqualTo(droppedBefore + 1.0);
     }
