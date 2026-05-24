@@ -53,6 +53,8 @@ itemtree:
       bootstrap-retries:      3
       bootstrap-backoff:      PT1S,PT5S,PT25S
     name-search: {}
+  copy:
+    max-nodes: 100           # hard cap on subtree size per copy request (default 100)
   solace:
     topic: "BC/ICE/ITEMTREE"
     reconnect:
