@@ -40,9 +40,15 @@ public interface ItemTreeRepository {
     List<Long> cascadeDeleteSubtree(long rootId);
 
     /**
-     * Allocates {@code n} fresh ids from {@code ITEMTREE_ID_SQN} in one round-trip
-     * (Oracle/H2 hierarchical {@code CONNECT BY} query). Returns an empty list when
-     * {@code n == 0}; throws {@link IllegalArgumentException} for negative {@code n}.
+     * Allocates {@code n} fresh ids from {@code ITEMTREE_ID_SQN}.
+     * Returns an empty list when {@code n == 0}; throws {@link IllegalArgumentException}
+     * for negative {@code n}.
+     *
+     * <p>Implementation note: issues N individual {@code NEXTVAL} calls (one round-trip per id).
+     * A single-statement {@code CONNECT BY} approach is preferred on Oracle but H2 does not
+     * support {@code CONNECT BY} on a sequence in {@code PreparedStatement} mode — same
+     * limitation as {@link #cascadeDeleteSubtree}. Phase B may switch to the
+     * single-statement form once running against real Oracle.
      */
     List<Long> allocateIds(int n);
 
