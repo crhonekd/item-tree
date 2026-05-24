@@ -526,7 +526,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 - `MessagingLoopbackIT` (Task 17): the plan assumed a two-context fixture with a `peerCache`. The actual IT uses a single Spring context. Adapted to verify publish + self-echo-drop metrics instead; true two-instance convergence is covered by the E2E IT (Task 19).
 - `ItemServiceCopyTest` (Task 13): plan said extend `ItemServiceTest.java`. Implementer created a separate `ItemServiceCopyTest.java` — acceptable isolation.
-- `allocateIds` (Task 5): plan described `CONNECT BY LEVEL` one-round-trip query. H2 PreparedStatement cannot resolve the recursive self-reference; implemented as N individual `SELECT NEXTVAL FROM DUAL` calls. Consistent with the BFS workaround for the same H2 limitation; Oracle-portable.
+- `allocateIds` (Task 5): plan described `CONNECT BY LEVEL` one-round-trip query. H2 PreparedStatement cannot resolve the recursive self-reference; implemented as N individual `SELECT NEXTVAL FROM DUAL` calls. Consistent with the BFS workaround for the same H2 limitation; Oracle-portable. **Phase B candidate:** replace with a single `SELECT LEVEL FROM DUAL CONNECT BY LEVEL <= :n` once Oracle replaces H2, to reduce round-trips to 1 for large subtree copies.
 - **`path` field omitted from 201 response** (Task 16): design spec §2.3/§3 calls for each `ItemNode` in the copy response to include `path`. The implementation uses `itemNodeMapper::toDto(CachedNode)`, which does not populate `path`. This is consistent with all 5 existing mutation endpoints (`createItem`, `moveItem`, `renameItem`, `deleteItem`, `updateItemData`) — none of them compute `path` in the mutation response. Only read endpoints (`getItems`, `getTree`) populate `path`. If `path` is needed in the copy response, it can be added by injecting `PathResolver` into the controller and computing paths for the BFS list after `applyCopy`.
 
 ### Post-completion quality fixes
@@ -536,9 +536,17 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - Task 14 spec review found missing test for "source in cache but absent from DB" path — added.
 - Inner `@BeforeEach` stubs in `ItemServiceCopyTest` changed to `lenient()` to prevent `UnnecessaryStubbingException` in validation-exit paths.
 
+### Post-review quality fixes (2026-05-24)
+
+- `DefaultTreeCache.applyCopy`: added upsert prologue (matching `applyCreate`) to clean stale `childrenByParent` and `foldersByName` entries when a node-id already exists; updated and extended tests to cover both parent-change and name-change paths.
+- `JdbcItemTreeRepositoryIT.FindRowsForCopy`: added `>1000`-row test to cover `CHUNK_SIZE=1000` IN-list boundary in `findRowsForCopy`.
+- `ItemTreeApplicationE2EIT`: added `copySubtreePropagatesAcrossInstances` to cover multi-node BFS-payload path over the in-memory bus.
+- `ItemServiceCopyTest`: added impersonated-user test to lock `effectiveUser()` behavior on home-folder lookup and stamping.
+- `ItemControllerTest`: added `path doesNotExist` assertion to lock the documented path-omission deviation.
+
 ### Actual done state
 
-617 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+621 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
