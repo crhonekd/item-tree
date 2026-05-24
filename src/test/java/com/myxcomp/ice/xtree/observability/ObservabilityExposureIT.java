@@ -149,6 +149,45 @@ class ObservabilityExposureIT {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 
+    private HttpHeaders iceHeadersForUser(String user) {
+        HttpHeaders h = new HttpHeaders();
+        h.set("X-Ice-User", user);
+        h.setContentType(MediaType.APPLICATION_JSON);
+        return h;
+    }
+
+    /**
+     * POST /api/v1/itemtree/items/{id}/copy with the given destinationFolderId and user.
+     * Registers any created item ids (from 201 response) for cleanup.
+     * Returns the raw response so callers can assert on the status code.
+     */
+    @SuppressWarnings("unchecked")
+    private ResponseEntity<String> tryCopyItem(long sourceId, long destinationFolderId, String user) {
+        Map<String, Object> body = Map.of("destinationFolderId", destinationFolderId);
+        ResponseEntity<String> resp = rest.exchange(
+                "/api/v1/itemtree/items/" + sourceId + "/copy",
+                HttpMethod.POST,
+                new HttpEntity<>(body, iceHeadersForUser(user)),
+                String.class);
+        if (resp.getStatusCode() == HttpStatus.CREATED && resp.getBody() != null) {
+            // Response is a JSON array of copied nodes — extract all itemTreeId values.
+            String respBody = resp.getBody();
+            int pos = 0;
+            while (true) {
+                int idx = respBody.indexOf("\"itemTreeId\":", pos);
+                if (idx < 0) break;
+                int start = idx + "\"itemTreeId\":".length();
+                int end = respBody.indexOf(',', start);
+                if (end < 0) end = respBody.indexOf('}', start);
+                try {
+                    createdIds.add(Long.parseLong(respBody.substring(start, end).trim()));
+                } catch (NumberFormatException ignored) { }
+                pos = start;
+            }
+        }
+        return resp;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Workload + Prometheus scrape
     // ─────────────────────────────────────────────────────────────────────────
@@ -200,6 +239,18 @@ class ObservabilityExposureIT {
         //    accepted); it will be cleaned up by @AfterEach.
         tryCreateItem(1L, "ObsIT_Unknown", "Phase12_Unknown", Map.of("x", 1));
 
+        // 8. Copy workload — exercises itemtree.copy.* metrics.
+        //    Item 25 (leafItem/Report) is a seed leaf under deepuser's subtree.
+        //    Destination 12 is deepuser's home folder; user must be "deepuser" so that
+        //    HOME_FOLDER_NOT_FOUND is not triggered (destination must be under the caller's home).
+        //    The copy succeeds → result="success" + subtree-size summary fires.
+        ResponseEntity<String> copyResp = tryCopyItem(25L, 12L, "deepuser");
+        assertThat(copyResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        //    Copying root (id=1) is rejected by CANNOT_COPY_ROOT validation →
+        //    result="rejected" and itemtree.copy.rejected counters fire.
+        ResponseEntity<String> rejectedCopyResp = tryCopyItem(1L, 12L, "deepuser");
+        assertThat(rejectedCopyResp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
         // ── Scrape /actuator/prometheus ──────────────────────────────────────
         ResponseEntity<String> prom = rest.getForEntity("/actuator/prometheus", String.class);
         assertThat(prom.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -247,6 +298,13 @@ class ObservabilityExposureIT {
         // Standard Spring Boot / HikariCP / Micrometer metrics
         assertThat(body).contains("hikaricp_connections");
         assertThat(body).contains("http_server_requests_seconds");
+
+        // §18 Copy metrics (added in Phase 14)
+        assertThat(body).contains("itemtree_copy_requests_total{");
+        assertThat(body).contains("result=\"success\"");
+        assertThat(body).contains("result=\"rejected\"");
+        assertThat(body).contains("itemtree_copy_rejected_total{");
+        assertThat(body).contains("itemtree_copy_subtree_size_count");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
