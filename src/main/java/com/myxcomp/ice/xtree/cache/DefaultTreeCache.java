@@ -450,6 +450,13 @@ public class DefaultTreeCache implements TreeCache {
         lock.writeLock().lock();
         try {
             for (CachedNode n : newNodes) {
+                CachedNode existing = byId.get(n.itemTreeId());
+                if (existing != null) {
+                    removeFromChildren(existing.parentId(), existing.itemTreeId());
+                    if (Types.isFolder(existing.type())) {
+                        removeFromFoldersByName(existing.name(), existing.itemTreeId());
+                    }
+                }
                 byId.put(n.itemTreeId(), n);
                 childrenByParent
                         .computeIfAbsent(n.parentId(), k -> ConcurrentHashMap.newKeySet())

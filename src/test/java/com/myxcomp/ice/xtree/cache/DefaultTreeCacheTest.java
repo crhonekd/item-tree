@@ -631,12 +631,19 @@ class DefaultTreeCacheTest {
         }
 
         @Test
-        void idempotentReapplyOverwritesWithSameValues() {
+        void idempotentReapplyCleansStalIndexEntries() {
             cache.applyCreate(folder(10L, 0L, "dest"));
-            List<CachedNode> batch = List.of(folder(200L, 10L, "x"));
-            cache.applyCopy(batch);
-            cache.applyCopy(batch);
-            assertThat(cache.getById(200L)).get().extracting(CachedNode::name).isEqualTo("x");
+            cache.applyCreate(folder(20L, 0L, "dest2"));
+            cache.applyCopy(List.of(folder(200L, 10L, "x")));
+            // Re-apply the same id but under a different parent — stale entry for parent 10 must be cleaned up
+            cache.applyCopy(List.of(folder(200L, 20L, "x")));
+            assertThat(cache.getById(200L)).get().extracting(CachedNode::parentId).isEqualTo(20L);
+            assertThat(cache.getChildren(10L))
+                    .extracting(CachedNode::itemTreeId)
+                    .doesNotContain(200L);
+            assertThat(cache.getChildren(20L))
+                    .extracting(CachedNode::itemTreeId)
+                    .contains(200L);
         }
 
         @Test
