@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import com.myxcomp.ice.xtree.messaging.event.payload.CopyPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
@@ -91,6 +92,7 @@ class TreeMutationEventDeserializer extends StdDeserializer<TreeMutationEvent> {
             case MOVE    -> p.getCodec().treeToValue(payloadNode, MovePayload.class);
             case RENAME  -> p.getCodec().treeToValue(payloadNode, RenamePayload.class);
             case DELETE  -> p.getCodec().treeToValue(payloadNode, DeletePayload.class);
+            case COPY    -> p.getCodec().treeToValue(payloadNode, CopyPayload.class);
         };
     }
 
