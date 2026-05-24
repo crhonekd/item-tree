@@ -631,7 +631,7 @@ class DefaultTreeCacheTest {
         }
 
         @Test
-        void idempotentReapplyCleansStalIndexEntries() {
+        void idempotentReapplyCleansStaleIndexEntries() {
             cache.applyCreate(folder(10L, 0L, "dest"));
             cache.applyCreate(folder(20L, 0L, "dest2"));
             cache.applyCopy(List.of(folder(200L, 10L, "x")));
@@ -644,6 +644,15 @@ class DefaultTreeCacheTest {
             assertThat(cache.getChildren(20L))
                     .extracting(CachedNode::itemTreeId)
                     .contains(200L);
+        }
+
+        @Test
+        void idempotentReapplyCleansStaleNameIndex() {
+            cache.applyCreate(folder(10L, 0L, "dest"));
+            cache.applyCopy(List.of(new CachedNode(200L, 10L, "old-name", "Folder", T, "alice")));
+            cache.applyCopy(List.of(new CachedNode(200L, 10L, "new-name", "Folder", T, "alice")));
+            assertThat(cache.findHomeFolder("old-name")).isEmpty();
+            assertThat(cache.findHomeFolder("new-name")).isPresent();
         }
 
         @Test
