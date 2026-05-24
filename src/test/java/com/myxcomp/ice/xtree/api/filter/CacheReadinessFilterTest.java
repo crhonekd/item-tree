@@ -98,4 +98,58 @@ class CacheReadinessFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(200);
     }
+
+    @Test
+    void bypassesRootPath() throws Exception {
+        when(gate.isReady()).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void bypassesStaticHtml() throws Exception {
+        when(gate.isReady()).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/index.html");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void bypassesStaticJsAndCss() throws Exception {
+        when(gate.isReady()).thenReturn(false);
+
+        for (String path : new String[]{"/js/app.js", "/styles.css", "/favicon.ico"}) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            FilterChain chain = new MockFilterChain();
+
+            filter.doFilter(request, response, chain);
+
+            assertThat(response.getStatus())
+                    .as("path %s should bypass the readiness filter", path)
+                    .isEqualTo(200);
+        }
+    }
+
+    @Test
+    void stillGatesApiPathsWhenNotReady() throws Exception {
+        when(gate.isReady()).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/itemtree/search");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain, never()).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(503);
+    }
 }

@@ -14,12 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 
 public class CacheReadinessFilter extends OncePerRequestFilter {
 
-    private static final List<String> BYPASS_PREFIXES = List.of(
-            "/actuator/", "/v3/api-docs", "/swagger-ui");
+    private static final String API_PREFIX = "/api/";
 
     private final CacheReadinessGate gate;
     private final ProblemFactory problemFactory;
@@ -34,11 +32,7 @@ public class CacheReadinessFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        for (String prefix : BYPASS_PREFIXES) {
-            if (path.startsWith(prefix)) return true;
-        }
-        return false;
+        return !request.getRequestURI().startsWith(API_PREFIX);
     }
 
     @Override
