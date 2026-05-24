@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.myxcomp.ice.xtree.common.InstanceIdProvider;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
+import com.myxcomp.ice.xtree.messaging.event.payload.CopyPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -173,6 +174,48 @@ class EventConsumerServiceTest {
     void null_payload_throws_NPE() {
         assertThatThrownBy(() -> consumer.processPayload(null))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void copyEventDispatchedWhenNotSelfEcho() throws Exception {
+        String json = mapper.writeValueAsString(TreeMutationEvent.builder()
+                .eventId("e1")
+                .instanceId(PEER)                // != local instanceId
+                .sequence(1L)
+                .occurredAt(T)
+                .iceUser("alice")
+                .operationType(OperationType.COPY)
+                .payload(new CopyPayload(List.of(
+                        new CopyPayload.CopiedNode(100L, 10L, "x", "Folder", T, "alice"))))
+                .build());
+
+        consumer.processPayload(json);
+
+        ArgumentCaptor<TreeMutationEvent> cap = ArgumentCaptor.forClass(TreeMutationEvent.class);
+        verify(dispatcher).dispatch(cap.capture());
+        assertThat(cap.getValue().getOperationType()).isEqualTo(OperationType.COPY);
+        assertThat(registry.counter("itemtree.event.consumed", "op", "COPY").count()).isOne();
+    }
+
+    @Test
+    void copyEventDroppedOnSelfEcho() throws Exception {
+        when(idProvider.getInstanceId()).thenReturn(LOCAL);
+        String json = mapper.writeValueAsString(TreeMutationEvent.builder()
+                .eventId("e1")
+                .instanceId(LOCAL)                  // matches local instanceId
+                .sequence(1L)
+                .occurredAt(T)
+                .iceUser("alice")
+                .operationType(OperationType.COPY)
+                .payload(new CopyPayload(List.of(
+                        new CopyPayload.CopiedNode(100L, 10L, "x", "Folder", T, "alice"))))
+                .build());
+
+        consumer.processPayload(json);
+
+        verify(dispatcher, never()).dispatch(any());
+        assertThat(registry.counter("itemtree.event.self_dropped").count()).isOne();
+        assertThat(registry.counter("itemtree.event.consumed", "op", "COPY").count()).isZero();
     }
 
     @Nested
