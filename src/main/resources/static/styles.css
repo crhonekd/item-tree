@@ -1,0 +1,88 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font: 13px/1.4 -apple-system, "Segoe UI", sans-serif; color: #222; }
+
+.app-header {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px 10px; background: #f3f3f3; border-bottom: 1px solid #ccc;
+}
+.app-header .brand { font-weight: 600; }
+.header-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.header-controls input { padding: 2px 4px; }
+.probe-result { margin-left: 8px; font-family: monospace; }
+.probe-result.ok { color: #1b6e1b; }
+.probe-result.err { color: #b00020; }
+
+.search-bar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 4px 10px; background: #fafafa; border-bottom: 1px solid #ddd;
+}
+.search-results { list-style: none; margin: 0; padding: 0; max-height: 120px; overflow: auto; width: 100%; }
+.search-results li { padding: 2px 6px; cursor: pointer; font-family: monospace; }
+.search-results li:hover { background: #eef; }
+
+.main-grid {
+  display: grid; grid-template-columns: 320px 1fr;
+  height: calc(100vh - 110px); overflow: hidden;
+}
+.tree-pane, .detail-pane { padding: 8px 10px; overflow: auto; }
+.tree-pane { border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+.tree-pane h2, .detail-pane h2 { margin: 0 0 6px 0; font-size: 13px; text-transform: uppercase; color: #555; }
+
+.tree-root, .tree-children { list-style: none; margin: 0; padding: 0; }
+.tree-node { user-select: none; }
+.tree-row { display: flex; align-items: center; gap: 4px; padding: 1px 2px; cursor: default; }
+.tree-row:hover { background: #f0f0ff; }
+.tree-row.selected { background: #cde2ff; }
+.tree-row.cut { opacity: 0.5; }
+.tree-chevron { display: inline-block; width: 12px; cursor: pointer; color: #555; }
+.tree-icon { display: inline-block; width: 12px; color: #555; }
+.tree-label { cursor: pointer; }
+
+.refresh-strip { margin-top: auto; padding-top: 8px; border-top: 1px dotted #ccc; }
+.refresh-strip button { margin-right: 4px; }
+.refresh-status { font-size: 11px; color: #555; margin-top: 4px; font-family: monospace; }
+
+.detail-pane pre { background: #f7f7f7; border: 1px solid #ddd; padding: 8px; overflow: auto; max-height: 60vh; }
+.detail-pane table { border-collapse: collapse; }
+.detail-pane th, .detail-pane td { border: 1px solid #ddd; padding: 2px 6px; text-align: left; font-family: monospace; }
+.metadata { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; font-family: monospace; margin-bottom: 8px; }
+.metadata > .k { color: #555; }
+.detail-section-head { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; }
+.detail-section-head button { font-size: 11px; }
+
+.context-menu {
+  position: fixed; background: white; border: 1px solid #888; box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+  list-style: none; margin: 0; padding: 4px 0; min-width: 160px; z-index: 100;
+}
+.context-menu li { padding: 4px 12px; cursor: pointer; }
+.context-menu li:hover:not(.disabled) { background: #cde2ff; }
+.context-menu li.disabled { color: #aaa; cursor: default; }
+
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal {
+  background: white; padding: 16px; border-radius: 4px; min-width: 360px; max-width: 90vw;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.modal h3 { margin-top: 0; }
+.modal label { display: block; margin: 8px 0 2px; font-weight: 600; }
+.modal input[type=text], .modal select { width: 100%; padding: 4px; }
+.modal textarea { width: 100%; min-height: 200px; font-family: monospace; padding: 4px; }
+.modal-actions { margin-top: 12px; display: flex; justify-content: flex-end; gap: 8px; }
+.modal-error { color: #b00020; margin-top: 4px; min-height: 1em; }
+
+.toast-container {
+  position: fixed; bottom: 12px; right: 12px; z-index: 300;
+  display: flex; flex-direction: column; gap: 6px; max-width: 480px;
+}
+.toast {
+  background: #333; color: white; padding: 8px 12px; border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3); font-family: monospace; font-size: 12px;
+}
+.toast.success { background: #1b6e1b; }
+.toast.error { background: #8a1422; }
+.toast .toast-close { float: right; cursor: pointer; margin-left: 8px; }
+.toast details { margin-top: 4px; }
+.toast pre { background: rgba(0,0,0,0.2); color: inherit; border: none; padding: 4px; max-height: 200px; overflow: auto; font-size: 11px; }
