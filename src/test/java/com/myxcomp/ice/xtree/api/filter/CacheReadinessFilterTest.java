@@ -7,6 +7,8 @@ import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -62,82 +64,20 @@ class CacheReadinessFilterTest {
         assertThat(body.path("detail").asText()).isEqualTo("Cache not ready");
     }
 
-    @Test
-    void bypassesActuator() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/actuator/health", "/v3/api-docs", "/swagger-ui/index.html",
+        "/", "/index.html", "/js/app.js", "/styles.css", "/favicon.ico"
+    })
+    void bypassesNonApiPaths(String path) throws Exception {
         when(gate.isReady()).thenReturn(false);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/health");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = new MockFilterChain();
-
-        filter.doFilter(request, response, chain);
-
-        // Pass-through: response stays 200 (default for MockFilterChain).
-        assertThat(response.getStatus()).isEqualTo(200);
-    }
-
-    @Test
-    void bypassesV3ApiDocs() throws Exception {
-        when(gate.isReady()).thenReturn(false);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/v3/api-docs");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = new MockFilterChain();
 
         filter.doFilter(request, response, chain);
 
         assertThat(response.getStatus()).isEqualTo(200);
-    }
-
-    @Test
-    void bypassesSwaggerUi() throws Exception {
-        when(gate.isReady()).thenReturn(false);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/swagger-ui/index.html");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = new MockFilterChain();
-
-        filter.doFilter(request, response, chain);
-
-        assertThat(response.getStatus()).isEqualTo(200);
-    }
-
-    @Test
-    void bypassesRootPath() throws Exception {
-        when(gate.isReady()).thenReturn(false);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = new MockFilterChain();
-
-        filter.doFilter(request, response, chain);
-
-        assertThat(response.getStatus()).isEqualTo(200);
-    }
-
-    @Test
-    void bypassesStaticHtml() throws Exception {
-        when(gate.isReady()).thenReturn(false);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/index.html");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        FilterChain chain = new MockFilterChain();
-
-        filter.doFilter(request, response, chain);
-
-        assertThat(response.getStatus()).isEqualTo(200);
-    }
-
-    @Test
-    void bypassesStaticJsAndCss() throws Exception {
-        when(gate.isReady()).thenReturn(false);
-
-        for (String path : new String[]{"/js/app.js", "/styles.css", "/favicon.ico"}) {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            FilterChain chain = new MockFilterChain();
-
-            filter.doFilter(request, response, chain);
-
-            assertThat(response.getStatus())
-                    .as("path %s should bypass the readiness filter", path)
-                    .isEqualTo(200);
-        }
     }
 
     @Test
