@@ -14,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -482,6 +484,77 @@ class JdbcItemTreeRepositoryIT {
                     new JsonBackfillRow(300_011L, "{\"n\":11}")
             ));
             assertThat(updated).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    class FindRowsForCopy {
+
+        @Test
+        void unknownRootReturnsEmpty() {
+            assertThat(repository.findRowsForCopy(999_999L, 1000)).isEmpty();
+        }
+
+        @Test
+        void singleLeafReturnsOneRow() {
+            // id 25 is leafItem under deepuser/L2/L3/L4/L5/L6
+            List<ItemTreeFullRow> rows = repository.findRowsForCopy(25L, 1000);
+            assertThat(rows).hasSize(1);
+            assertThat(rows.get(0).itemTreeId()).isEqualTo(25L);
+        }
+
+        @Test
+        void folderSubtreeIsBfsOrdered() {
+            // id 2 = Users folder; has children 10, 11, 12 and descendants
+            List<ItemTreeFullRow> rows = repository.findRowsForCopy(2L, 1000);
+
+            assertThat(rows).isNotEmpty();
+            Set<Long> seen = new HashSet<>();
+            seen.add(rows.get(0).itemTreeId());
+            for (int i = 1; i < rows.size(); i++) {
+                ItemTreeFullRow row = rows.get(i);
+                assertThat(seen)
+                        .as("row %d parent %d must appear before child %d",
+                                i, row.parentId(), row.itemTreeId())
+                        .contains(row.parentId());
+                seen.add(row.itemTreeId());
+            }
+        }
+
+        @Test
+        void limitShortCircuitsAtLimitRows() {
+            Instant t = Instant.parse("2026-05-24T10:00:00Z");
+            long wideFolder = repository.insert(1L, "wide-for-copy", "Folder",
+                    null, null, t, "test");
+            try {
+                for (int i = 0; i < 200; i++) {
+                    repository.insert(wideFolder, "child-" + i, "Folder",
+                            null, null, t, "test");
+                }
+
+                List<ItemTreeFullRow> rows = repository.findRowsForCopy(wideFolder, 50);
+                assertThat(rows).hasSize(50);
+            } finally {
+                repository.cascadeDeleteSubtree(wideFolder);
+            }
+        }
+
+        @Test
+        void payloadColumnsAreCopiedThrough() {
+            Instant t = Instant.parse("2026-05-24T10:00:00Z");
+            long folder = repository.insert(1L, "copy-payload-folder", "Folder",
+                    null, null, t, "test");
+            try {
+                long withJson = repository.insert(folder, "with-json", "Report",
+                        "{\"a\":1}", "<r><a>1</a></r>", t, "test");
+
+                List<ItemTreeFullRow> rows = repository.findRowsForCopy(withJson, 10);
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).json()).isEqualTo("{\"a\":1}");
+                assertThat(rows.get(0).xml()).isEqualTo("<r><a>1</a></r>");
+            } finally {
+                repository.cascadeDeleteSubtree(folder);
+            }
         }
     }
 }

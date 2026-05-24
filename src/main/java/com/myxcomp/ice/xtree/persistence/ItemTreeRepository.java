@@ -53,6 +53,16 @@ public interface ItemTreeRepository {
     List<Long> allocateIds(int n);
 
     /**
+     * BFS read of {@code rootId} and all descendants — structural + payload columns
+     * in one combined row. Stops once {@code limit} rows have been collected; caller
+     * passes {@code cap + 1} to detect cap violations without traversing huge subtrees.
+     *
+     * @return list ordered such that every non-root node appears after its parent;
+     *         empty if {@code rootId} does not exist
+     */
+    List<ItemTreeFullRow> findRowsForCopy(long rootId, int limit);
+
+    /**
      * Returns {@code true} iff the {@code ITEMTREE} table has at least one index whose
      * column list includes {@code LASTUPDATE}. Implemented via JDBC {@code DatabaseMetaData}
      * for portability across H2 and Oracle. If the metadata lookup fails for any reason, the

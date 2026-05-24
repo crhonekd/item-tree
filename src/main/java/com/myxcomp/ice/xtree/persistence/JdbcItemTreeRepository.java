@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.persistence;
 
 import com.myxcomp.ice.xtree.common.TimeMapper;
+import com.myxcomp.ice.xtree.persistence.rowmapper.ItemTreeFullRowMapper;
 import com.myxcomp.ice.xtree.persistence.rowmapper.PayloadRowMapper;
 import com.myxcomp.ice.xtree.persistence.rowmapper.StructuralRowMapper;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
@@ -21,7 +22,9 @@ import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 @Repository
@@ -32,6 +35,11 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     private static final int CHUNK_SIZE = 1000;
     private static final String PARAM_LAST_UPDATE = "lastUpdate";
     private static final String PARAM_LAST_UPDATE_USER = "lastUpdateUser";
+    private static final String SQL_FIND_ROWS_FOR_COPY_BY_IDS =
+            "SELECT ITEMTREEID, PARENTID, NAME, TYPE, JSON, XML, LASTUPDATE, LASTUPDATEUSER " +
+            "FROM ITEMTREE WHERE ITEMTREEID IN (:ids)";
+    private static final String SQL_FIND_CHILD_IDS_BY_PARENTS =
+            "SELECT ITEMTREEID FROM ITEMTREE WHERE PARENTID IN (:parentIds)";
 
     private final JdbcClient jdbcClient;
     private final JdbcTemplate jdbcTemplate;
@@ -248,6 +256,48 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
             ids.add(id);
         }
         return ids;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ItemTreeFullRow> findRowsForCopy(long rootId, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        ItemTreeFullRowMapper mapper = new ItemTreeFullRowMapper(timeMapper);
+
+        List<Long> frontier = new ArrayList<>();
+        frontier.add(rootId);
+        List<ItemTreeFullRow> collected = new ArrayList<>();
+
+        while (!frontier.isEmpty() && collected.size() < limit) {
+            List<List<Long>> chunks = partition(frontier);
+            Map<Long, ItemTreeFullRow> byId = new HashMap<>();
+            List<Long> nextFrontier = new ArrayList<>();
+
+            for (List<Long> chunkIds : chunks) {
+                List<ItemTreeFullRow> rows = jdbcClient.sql(SQL_FIND_ROWS_FOR_COPY_BY_IDS)
+                        .param("ids", chunkIds)
+                        .query(mapper)
+                        .list();
+                for (ItemTreeFullRow row : rows) byId.put(row.itemTreeId(), row);
+
+                List<Long> childIds = jdbcClient.sql(SQL_FIND_CHILD_IDS_BY_PARENTS)
+                        .param("parentIds", chunkIds)
+                        .query(Long.class)
+                        .list();
+                nextFrontier.addAll(childIds);
+            }
+
+            // emit in frontier order to preserve BFS order
+            for (Long id : frontier) {
+                if (collected.size() >= limit) break;
+                ItemTreeFullRow row = byId.get(id);
+                if (row != null) collected.add(row);
+            }
+            frontier = nextFrontier;
+        }
+        return collected;
     }
 
     @Override
