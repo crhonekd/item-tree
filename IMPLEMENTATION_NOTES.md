@@ -491,7 +491,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - **Cache:** new `TreeCache.applyCopy(List<CachedNode>)` — single write lock, atomic from readers' view.
 - **Messaging:** new `OperationType.COPY`; new `CopyPayload(List<CopiedNode>)`; `EventDispatcher` + `TreeMutationEventDeserializer` extended for one new case each.
 - **Config:** new `CopyProperties` (`itemtree.copy.max-nodes`, default 100), `@PostConstruct` validates `>= 1`.
-- **Error model:** 5 new `errorCode`s (`CANNOT_COPY_ROOT`, `DESTINATION_NOT_FOUND`, `DESTINATION_NOT_FOLDER`, `DESTINATION_NOT_IN_USER_FOLDER`, `COPY_INTO_DESCENDANT`, `COPY_TOO_LARGE`); 2 reused (`ITEM_NOT_FOUND`, `HOME_FOLDER_NOT_FOUND`). `COPY_TOO_LARGE` → HTTP 413; rest → 400/404 per pattern.
+- **Error model:** 6 new `errorCode`s (`CANNOT_COPY_ROOT`, `DESTINATION_NOT_FOUND`, `DESTINATION_NOT_FOLDER`, `DESTINATION_NOT_IN_USER_FOLDER`, `COPY_INTO_DESCENDANT`, `COPY_TOO_LARGE`); 2 reused (`ITEM_NOT_FOUND`, `HOME_FOLDER_NOT_FOUND`). `COPY_TOO_LARGE` → HTTP 413; rest → 400/404 per pattern.
 - **Metrics:** `itemtree.copy.requests{result}`, `itemtree.copy.rejected{reason}`, `itemtree.copy.subtree.size`.
 
 ### Approach (per spec §3)
