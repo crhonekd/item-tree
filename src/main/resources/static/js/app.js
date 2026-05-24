@@ -53,15 +53,23 @@ async function doLogin() {
     ]);
     state.homeFolderId = home.itemTreeId;
     ingestNodes(tree);
-    // ensure root + ancestor chain are visible
-    const ROOT_ID = 1;
-    state.tree.expanded.add(ROOT_ID);
-    for (const n of tree) {
-      if (n.type === 'Folder') state.tree.expanded.add(n.itemTreeId);
+
+    // expand only the ancestor chain from root down to the home folder
+    state.tree.expanded.add(1);
+    let cur = state.tree.nodesById.get(home.itemTreeId);
+    while (cur && cur.parentId && cur.parentId !== 0) {
+      state.tree.expanded.add(cur.parentId);
+      cur = state.tree.nodesById.get(cur.parentId);
     }
 
     const subtree = await api.getSubtree(home.itemTreeId);
     ingestSubtreeResult(home.itemTreeId, subtree);
+
+    // expand the home folder itself and any folders directly within its loaded subtree
+    state.tree.expanded.add(home.itemTreeId);
+    for (const n of subtree) {
+      if (n.type === 'Folder') state.tree.expanded.add(n.itemTreeId);
+    }
 
     renderTree();
     $('detail-root').innerHTML = '(logged in as <b></b>; click a node)';
