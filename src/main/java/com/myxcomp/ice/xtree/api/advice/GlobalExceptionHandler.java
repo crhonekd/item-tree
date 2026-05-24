@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.api.advice;
 
 import com.myxcomp.ice.xtree.generated.model.Problem;
+import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import jakarta.validation.ConstraintViolationException;
@@ -36,6 +37,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Problem> handleValidation(ValidationException e) {
         return problemFactory.build(HttpStatus.BAD_REQUEST, e.errorCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(CopyTooLargeException.class)
+    public ResponseEntity<Problem> handleCopyTooLarge(CopyTooLargeException e) {
+        return problemFactory.build(HttpStatus.PAYLOAD_TOO_LARGE, e.errorCode(), e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

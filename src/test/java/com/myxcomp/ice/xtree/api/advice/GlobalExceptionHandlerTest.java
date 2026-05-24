@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.api.advice;
 
 import com.myxcomp.ice.xtree.generated.model.Problem;
+import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
@@ -137,5 +138,19 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getDetail()).isEqualTo("Internal Server Error");
         assertThat(response.getBody().getErrorCode()).isNull();
+    }
+
+    @Test
+    void copyTooLargeMapsTo413() {
+        CopyTooLargeException ex = new CopyTooLargeException(
+                "Source subtree has 250 nodes, cap is 100");
+
+        ResponseEntity<Problem> resp = handler.handleCopyTooLarge(ex);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(resp.getBody()).isNotNull();
+        assertThat(resp.getBody().getStatus()).isEqualTo(413);
+        assertThat(resp.getBody().getErrorCode()).isEqualTo(ErrorCode.COPY_TOO_LARGE.name());
+        assertThat(resp.getBody().getDetail()).contains("250 nodes");
     }
 }
