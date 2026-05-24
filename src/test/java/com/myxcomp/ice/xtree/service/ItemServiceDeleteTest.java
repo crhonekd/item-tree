@@ -10,6 +10,7 @@ import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
+import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -47,16 +49,18 @@ class ItemServiceDeleteTest {
     @Mock TimeMapper timeMapper;
     @Mock InstanceIdProvider instanceIdProvider;
     @Mock SequenceGenerator sequenceGenerator;
+    @Mock CopyProperties copyProperties;
 
     ItemService service;
     static final UserContext CTX = new UserContext("alice", null);
 
     @BeforeEach
     void setUp() {
+        lenient().when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
-                new SyncTaskExecutor(), new SimpleMeterRegistry());
+                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties);
     }
 
     @Test

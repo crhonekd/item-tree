@@ -11,6 +11,7 @@ import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
+import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
@@ -34,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -50,6 +52,7 @@ class ItemServiceRenameTest {
     @Mock TimeMapper timeMapper;
     @Mock InstanceIdProvider instanceIdProvider;
     @Mock SequenceGenerator sequenceGenerator;
+    @Mock CopyProperties copyProperties;
 
     ItemService service;
     static final Instant NOW = Instant.parse("2026-05-16T12:00:00Z");
@@ -57,9 +60,10 @@ class ItemServiceRenameTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), copyProperties);
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.common.InstanceIdProvider;
 import com.myxcomp.ice.xtree.common.TimeMapper;
+import com.myxcomp.ice.xtree.common.TreeConstants;
 import com.myxcomp.ice.xtree.common.Types;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
@@ -11,16 +12,20 @@ import com.myxcomp.ice.xtree.messaging.EventPublisher;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
+import com.myxcomp.ice.xtree.config.CopyProperties;
+import com.myxcomp.ice.xtree.messaging.event.payload.CopyPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.RenamePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload;
+import com.myxcomp.ice.xtree.persistence.ItemTreeFullRow;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.persistence.JsonBackfillRow;
 import com.myxcomp.ice.xtree.persistence.PayloadRow;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
+import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
@@ -43,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -60,6 +66,7 @@ public class ItemService {
     private final SequenceGenerator sequenceGenerator;
     private final TaskExecutor backfillExecutor;
     private final MeterRegistry meterRegistry;
+    private final CopyProperties copyProperties;
 
     public ItemService(TreeCache cache,
                        ItemTreeRepository repository,
@@ -70,7 +77,8 @@ public class ItemService {
                        InstanceIdProvider instanceIdProvider,
                        SequenceGenerator sequenceGenerator,
                        @Qualifier("backfillExecutor") TaskExecutor backfillExecutor,
-                       MeterRegistry meterRegistry) {
+                       MeterRegistry meterRegistry,
+                       CopyProperties copyProperties) {
         this.cache = cache;
         this.repository = repository;
         this.policy = policy;
@@ -81,6 +89,7 @@ public class ItemService {
         this.sequenceGenerator = sequenceGenerator;
         this.backfillExecutor = backfillExecutor;
         this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
+        this.copyProperties = Objects.requireNonNull(copyProperties, "copyProperties");
     }
 
     /**
@@ -439,6 +448,165 @@ public class ItemService {
         }
         return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
                 n.lastUpdate(), n.lastUpdateUser(), null, null, children);
+    }
+
+    /**
+     * Copies the subtree rooted at {@code sourceId} under {@code destinationFolderId}.
+     * Validation order: ITEM_NOT_FOUND, CANNOT_COPY_ROOT, DESTINATION_NOT_FOUND,
+     * DESTINATION_NOT_FOLDER, HOME_FOLDER_NOT_FOUND, DESTINATION_NOT_IN_USER_FOLDER,
+     * COPY_INTO_DESCENDANT, COPY_TOO_LARGE. Write order: DB → cache → event.
+     */
+    @Transactional
+    public List<CachedNode> copyItem(long sourceId, long destinationFolderId, UserContext userContext) {
+        Objects.requireNonNull(userContext, "userContext");
+
+        // 1. ITEM_NOT_FOUND
+        CachedNode source = cache.getById(sourceId).orElseThrow(() -> {
+            recordCopyRejection(ErrorCode.ITEM_NOT_FOUND);
+            return new NotFoundException(ErrorCode.ITEM_NOT_FOUND,
+                    "Item " + sourceId + " not found");
+        });
+
+        // 2. CANNOT_COPY_ROOT
+        if (sourceId == TreeConstants.ROOT_ID) {
+            recordCopyRejection(ErrorCode.CANNOT_COPY_ROOT);
+            throw new ValidationException(ErrorCode.CANNOT_COPY_ROOT,
+                    "Cannot copy the root folder");
+        }
+
+        // 3. DESTINATION_NOT_FOUND
+        CachedNode destination = cache.getById(destinationFolderId).orElseThrow(() -> {
+            recordCopyRejection(ErrorCode.DESTINATION_NOT_FOUND);
+            return new NotFoundException(ErrorCode.DESTINATION_NOT_FOUND,
+                    "Destination folder " + destinationFolderId + " not found");
+        });
+
+        // 4. DESTINATION_NOT_FOLDER
+        if (!Types.isFolder(destination.type())) {
+            recordCopyRejection(ErrorCode.DESTINATION_NOT_FOLDER);
+            throw new ValidationException(ErrorCode.DESTINATION_NOT_FOLDER,
+                    "Destination " + destinationFolderId + " is not a folder (type="
+                            + destination.type() + ")");
+        }
+
+        // 5. HOME_FOLDER_NOT_FOUND
+        String effectiveUser = userContext.effectiveUser();
+        CachedNode homeFolder = cache.findHomeFolder(effectiveUser).orElseThrow(() -> {
+            recordCopyRejection(ErrorCode.HOME_FOLDER_NOT_FOUND);
+            return new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
+                    "No home folder for user '" + effectiveUser + "'");
+        });
+
+        // 6. DESTINATION_NOT_IN_USER_FOLDER
+        boolean destInUserFolder = destination.itemTreeId() == homeFolder.itemTreeId()
+                || cache.isAncestor(homeFolder.itemTreeId(), destination.itemTreeId());
+        if (!destInUserFolder) {
+            recordCopyRejection(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER);
+            throw new ValidationException(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER,
+                    "Destination " + destinationFolderId
+                            + " is not under home folder of '" + effectiveUser + "'");
+        }
+
+        // 7. COPY_INTO_DESCENDANT
+        if (sourceId == destinationFolderId || cache.isAncestor(sourceId, destinationFolderId)) {
+            recordCopyRejection(ErrorCode.COPY_INTO_DESCENDANT);
+            throw new ValidationException(ErrorCode.COPY_INTO_DESCENDANT,
+                    "Cannot copy id=" + sourceId + " into itself or a descendant");
+        }
+
+        int cap = copyProperties.maxNodes();
+
+        // 8a. Pre-flight cap check (cache)
+        List<CachedNode> cachePreview = cache.getSubtreeFlat(sourceId);
+        if (cachePreview.size() > cap) {
+            recordCopyRejection(ErrorCode.COPY_TOO_LARGE);
+            throw new CopyTooLargeException(
+                    "Source subtree has " + cachePreview.size() + " nodes (cache); cap is " + cap);
+        }
+
+        // 8b. DB snapshot — authoritative
+        List<ItemTreeFullRow> sourceRows = repository.findRowsForCopy(sourceId, cap + 1);
+        if (sourceRows.isEmpty()) {
+            recordCopyRejection(ErrorCode.ITEM_NOT_FOUND);
+            throw new NotFoundException(ErrorCode.ITEM_NOT_FOUND,
+                    "Item " + sourceId + " not found in DB");
+        }
+        if (sourceRows.size() > cap) {
+            recordCopyRejection(ErrorCode.COPY_TOO_LARGE);
+            throw new CopyTooLargeException(
+                    "Source subtree has more than " + cap + " nodes (DB)");
+        }
+
+        // Allocate ids and build oldId→newId map
+        List<Long> newIds = repository.allocateIds(sourceRows.size());
+        Map<Long, Long> idMap = new HashMap<>();
+        for (int i = 0; i < sourceRows.size(); i++) {
+            idMap.put(sourceRows.get(i).itemTreeId(), newIds.get(i));
+        }
+
+        // Compute top-level name (suffix on collision)
+        String newRootName = chooseRootName(source.name(), destinationFolderId);
+
+        Instant now = timeMapper.now();
+        String stampUser = effectiveUser;
+
+        // Build new rows
+        List<ItemTreeFullRow> newRows = new ArrayList<>(sourceRows.size());
+        List<CachedNode> newCacheNodes = new ArrayList<>(sourceRows.size());
+        for (int i = 0; i < sourceRows.size(); i++) {
+            ItemTreeFullRow src = sourceRows.get(i);
+            long newId = newIds.get(i);
+            long newParent = (i == 0)
+                    ? destinationFolderId
+                    : idMap.get(src.parentId());
+            String name = (i == 0) ? newRootName : src.name();
+
+            newRows.add(new ItemTreeFullRow(
+                    newId, newParent, name, src.type(),
+                    src.json(), src.xml(), now, stampUser));
+            newCacheNodes.add(new CachedNode(
+                    newId, newParent, name, src.type(), now, stampUser));
+        }
+
+        repository.insertBatch(newRows);
+        cache.applyCopy(newCacheNodes);
+
+        // Publish event
+        List<CopyPayload.CopiedNode> payloadNodes = new ArrayList<>(newCacheNodes.size());
+        for (CachedNode n : newCacheNodes) {
+            payloadNodes.add(new CopyPayload.CopiedNode(
+                    n.itemTreeId(), n.parentId(), n.name(), n.type(),
+                    n.lastUpdate(), n.lastUpdateUser()));
+        }
+        try {
+            publisher.publish(buildEvent(userContext, OperationType.COPY,
+                    new CopyPayload(payloadNodes), now));
+        } catch (RuntimeException e) {
+            log.error("EventPublisher threw on {}; event dropped", OperationType.COPY, e);
+        }
+
+        meterRegistry.counter("itemtree.copy.requests", "result", "success").increment();
+        meterRegistry.summary("itemtree.copy.subtree.size").record(newCacheNodes.size());
+
+        return newCacheNodes;
+    }
+
+    private String chooseRootName(String sourceName, long destinationFolderId) {
+        Set<String> sibs = new HashSet<>();
+        for (CachedNode c : cache.getChildren(destinationFolderId)) sibs.add(c.name());
+        if (!sibs.contains(sourceName)) return sourceName;
+        String first = sourceName + " (copy)";
+        if (!sibs.contains(first)) return first;
+        int n = 2;
+        while (sibs.contains(sourceName + " (copy " + n + ")")) {
+            n++;
+        }
+        return sourceName + " (copy " + n + ")";
+    }
+
+    private void recordCopyRejection(ErrorCode reason) {
+        meterRegistry.counter("itemtree.copy.requests", "result", "rejected").increment();
+        meterRegistry.counter("itemtree.copy.rejected", "reason", reason.name()).increment();
     }
 
     private TreeMutationEvent buildEvent(UserContext ctx, OperationType op,

@@ -9,6 +9,7 @@ import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
 import com.myxcomp.ice.xtree.messaging.EventPublisher;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
+import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.persistence.PayloadRow;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
@@ -63,8 +64,11 @@ class ItemServiceMetricsTest {
         when(instanceIdProvider.getInstanceId()).thenReturn("test-instance");
         SequenceGenerator seq = new SequenceGenerator();
         meterRegistry = new SimpleMeterRegistry();
+        CopyProperties copyProperties = mock(CopyProperties.class);
+        when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(cache, repository, policy, converter, publisher,
-                timeMapper, instanceIdProvider, seq, new SyncTaskExecutor(), meterRegistry);
+                timeMapper, instanceIdProvider, seq, new SyncTaskExecutor(), meterRegistry,
+                copyProperties);
     }
 
     @Test

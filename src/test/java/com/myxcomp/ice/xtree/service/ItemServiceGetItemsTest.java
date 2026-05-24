@@ -8,6 +8,7 @@ import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
 import com.myxcomp.ice.xtree.messaging.EventPublisher;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
+import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.persistence.JsonBackfillRow;
 import com.myxcomp.ice.xtree.persistence.PayloadRow;
@@ -29,6 +30,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -45,15 +47,17 @@ class ItemServiceGetItemsTest {
     @Mock TimeMapper timeMapper;
     @Mock InstanceIdProvider instanceIdProvider;
     @Mock SequenceGenerator sequenceGenerator;
+    @Mock CopyProperties copyProperties;
 
     ItemService service;
     static final Instant T = Instant.EPOCH;
 
     @BeforeEach
     void setUp() {
+        lenient().when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), copyProperties);
     }
 
     private CachedNode folder(long id, long parentId, String name) {
@@ -278,7 +282,7 @@ class ItemServiceGetItemsTest {
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
                 task -> { throw new TaskRejectedException("queue full"); },
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), copyProperties);
 
         List<ItemWithData> result = saturatingService.getItemsWithData(List.of(7L));
 
