@@ -477,7 +477,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 14 — Copy Item
+## Phase 14 — Copy Item ✅ COMPLETE (2026-05-24, tagged `phase-14-copy-item`)
 
 **Goal:** add a new `copy` mutation. Copies a single item or an entire folder subtree (up to a configurable cap, default 100 nodes) into a folder owned by the caller. Full design in `docs/superpowers/specs/2026-05-24-copy-item-design.md`.
 
@@ -521,6 +521,23 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `./gradlew clean build` → BUILD SUCCESSFUL.
 - `POST /api/v1/itemtree/items/{id}/copy` exercised manually against the running dev profile; new subtree returned; cache state reflects the copy; in-memory bus delivers a COPY event to peer-context (via E2E test).
 - Memory note added: `project-phase14-copy-item-done.md`.
+
+### Deviations from plan
+
+- `MessagingLoopbackIT` (Task 17): the plan assumed a two-context fixture with a `peerCache`. The actual IT uses a single Spring context. Adapted to verify publish + self-echo-drop metrics instead; true two-instance convergence is covered by the E2E IT (Task 19).
+- `ItemServiceCopyTest` (Task 13): plan said extend `ItemServiceTest.java`. Implementer created a separate `ItemServiceCopyTest.java` — acceptable isolation.
+- `allocateIds` (Task 5): plan described `CONNECT BY LEVEL` one-round-trip query. H2 PreparedStatement cannot resolve the recursive self-reference; implemented as N individual `SELECT NEXTVAL FROM DUAL` calls. Consistent with the BFS workaround for the same H2 limitation; Oracle-portable.
+
+### Post-completion quality fixes
+
+- Implementer initially created `ItemTreeFullRowMapper` as an inline instance; refactored to `@Component` (consistent with `StructuralRowMapper` / `PayloadRowMapper` pattern).
+- `allocateIds` Javadoc corrected from "one round-trip" to accurate N-call description.
+- Task 14 spec review found missing test for "source in cache but absent from DB" path — added.
+- Inner `@BeforeEach` stubs in `ItemServiceCopyTest` changed to `lenient()` to prevent `UnnecessaryStubbingException` in validation-exit paths.
+
+### Actual done state
+
+617 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
