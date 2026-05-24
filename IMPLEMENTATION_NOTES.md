@@ -527,6 +527,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - `MessagingLoopbackIT` (Task 17): the plan assumed a two-context fixture with a `peerCache`. The actual IT uses a single Spring context. Adapted to verify publish + self-echo-drop metrics instead; true two-instance convergence is covered by the E2E IT (Task 19).
 - `ItemServiceCopyTest` (Task 13): plan said extend `ItemServiceTest.java`. Implementer created a separate `ItemServiceCopyTest.java` — acceptable isolation.
 - `allocateIds` (Task 5): plan described `CONNECT BY LEVEL` one-round-trip query. H2 PreparedStatement cannot resolve the recursive self-reference; implemented as N individual `SELECT NEXTVAL FROM DUAL` calls. Consistent with the BFS workaround for the same H2 limitation; Oracle-portable.
+- **`path` field omitted from 201 response** (Task 16): design spec §2.3/§3 calls for each `ItemNode` in the copy response to include `path`. The implementation uses `itemNodeMapper::toDto(CachedNode)`, which does not populate `path`. This is consistent with all 5 existing mutation endpoints (`createItem`, `moveItem`, `renameItem`, `deleteItem`, `updateItemData`) — none of them compute `path` in the mutation response. Only read endpoints (`getItems`, `getTree`) populate `path`. If `path` is needed in the copy response, it can be added by injecting `PathResolver` into the controller and computing paths for the BFS list after `applyCopy`.
 
 ### Post-completion quality fixes
 
