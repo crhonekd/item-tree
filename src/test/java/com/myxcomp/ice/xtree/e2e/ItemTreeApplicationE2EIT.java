@@ -312,4 +312,56 @@ class ItemTreeApplicationE2EIT {
         assertThat(cacheB.getById(newId)).get()
                 .extracting(CachedNode::parentId).isEqualTo(destId);
     }
+
+    @Test
+    void copySubtreePropagatesAcrossInstances() {
+        ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        TreeCache cacheB = pair.b().getBean(TreeCache.class);
+
+        long destId = 12L;    // deepuser home folder
+        UserContext ctx = new UserContext("deepuser", null);
+
+        // 1) Build a 2-level folder subtree under deepuser's home folder on A.
+        CachedNode sourceParent = itemServiceA.createItem(
+                destId, "E2E_CopySubtree_Parent", "Folder", null, ctx);
+        CachedNode sourceChild = itemServiceA.createItem(
+                sourceParent.itemTreeId(), "E2E_CopySubtree_Child", "Folder", null, ctx);
+
+        long sourceParentId = sourceParent.itemTreeId();
+        long sourceChildId  = sourceChild.itemTreeId();
+
+        // 2) Wait for both source folders to be visible in B's cache.
+        Awaitility.await().atMost(Duration.ofSeconds(15))
+                .untilAsserted(() -> {
+                    assertThat(cacheB.getById(sourceParentId)).isPresent();
+                    assertThat(cacheB.getById(sourceChildId)).isPresent();
+                });
+
+        // 3) Copy the parent folder subtree from A to destId.
+        List<CachedNode> result = itemServiceA.copyItem(sourceParentId, destId, ctx);
+
+        // 4) The copy should return 2 nodes: copied parent + copied child.
+        assertThat(result).hasSize(2);
+
+        // 5) Extract the new IDs from the copy result.
+        long newParentId = result.get(0).itemTreeId();
+        long newChildId  = result.get(1).itemTreeId();
+
+        // 6) Wait until both new nodes are present in B's cache.
+        Awaitility.await().atMost(Duration.ofSeconds(15))
+                .untilAsserted(() -> {
+                    assertThat(cacheB.getById(newParentId)).isPresent();
+                    assertThat(cacheB.getById(newChildId)).isPresent();
+                });
+
+        // 7) Assert correct parent relationships on B.
+        assertThat(cacheB.getById(newParentId)).get()
+                .extracting(CachedNode::parentId)
+                .as("copied parent's parent should be destId")
+                .isEqualTo(destId);
+        assertThat(cacheB.getById(newChildId)).get()
+                .extracting(CachedNode::parentId)
+                .as("copied child's parent should be the new parent")
+                .isEqualTo(newParentId);
+    }
 }
