@@ -17,6 +17,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
 import javax.sql.DataSource;
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 @Repository
@@ -40,6 +42,10 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
             "FROM ITEMTREE WHERE ITEMTREEID IN (:ids)";
     private static final String SQL_FIND_CHILD_IDS_BY_PARENTS =
             "SELECT ITEMTREEID FROM ITEMTREE WHERE PARENTID IN (:parentIds)";
+    private static final String SQL_INSERT_BATCH =
+            "INSERT INTO ITEMTREE " +
+            "  (ITEMTREEID, PARENTID, NAME, TYPE, JSON, XML, LASTUPDATE, LASTUPDATEUSER) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
     private final JdbcClient jdbcClient;
     private final JdbcTemplate jdbcTemplate;
@@ -123,6 +129,33 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
         int total = 0;
         for (int c : counts) total += (c > 0 ? c : 0);
         return total;
+    }
+
+    @Override
+    @Transactional
+    public void insertBatch(List<ItemTreeFullRow> rows) {
+        Objects.requireNonNull(rows, "rows");
+        if (rows.isEmpty()) return;
+
+        jdbcTemplate.batchUpdate(SQL_INSERT_BATCH, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                ItemTreeFullRow row = rows.get(i);
+                ps.setLong(1, row.itemTreeId());
+                ps.setLong(2, row.parentId());
+                ps.setString(3, row.name());
+                ps.setString(4, row.type());
+                if (row.json() != null) ps.setString(5, row.json()); else ps.setNull(5, Types.CLOB);
+                if (row.xml()  != null) ps.setString(6, row.xml());  else ps.setNull(6, Types.CLOB);
+                ps.setObject(7, timeMapper.toLocalDateTime(row.lastUpdate()));
+                ps.setString(8, row.lastUpdateUser());
+            }
+
+            @Override
+            public int getBatchSize() {
+                return rows.size();
+            }
+        });
     }
 
     @Override

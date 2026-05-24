@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -21,6 +22,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("dev")
@@ -484,6 +486,60 @@ class JdbcItemTreeRepositoryIT {
                     new JsonBackfillRow(300_011L, "{\"n\":11}")
             ));
             assertThat(updated).isEqualTo(2);
+        }
+    }
+
+    @Nested
+    class InsertBatch {
+
+        @Test
+        void insertsAllRowsInOrder() {
+            Instant t = Instant.parse("2026-05-24T10:00:00Z");
+            List<Long> ids = repository.allocateIds(3);
+
+            List<ItemTreeFullRow> rows = List.of(
+                    new ItemTreeFullRow(ids.get(0), 1L, "batch-root", "Folder",
+                            null, null, t, "test"),
+                    new ItemTreeFullRow(ids.get(1), ids.get(0), "batch-child", "Folder",
+                            null, null, t, "test"),
+                    new ItemTreeFullRow(ids.get(2), ids.get(1), "batch-leaf", "Report",
+                            "{\"x\":1}", null, t, "test")
+            );
+            try {
+                repository.insertBatch(rows);
+
+                List<ItemTreeFullRow> read = repository.findRowsForCopy(ids.get(0), 100);
+                assertThat(read).extracting(ItemTreeFullRow::itemTreeId)
+                        .containsExactlyInAnyOrderElementsOf(ids);
+                assertThat(read).filteredOn(r -> r.itemTreeId() == ids.get(2))
+                        .singleElement()
+                        .satisfies(r -> assertThat(r.json()).isEqualTo("{\"x\":1}"));
+            } finally {
+                repository.cascadeDeleteSubtree(ids.get(0));
+            }
+        }
+
+        @Test
+        void emptyListIsNoOp() {
+            int before = repository.findRowsForCopy(1L, Integer.MAX_VALUE).size();
+            repository.insertBatch(List.of());
+            int after = repository.findRowsForCopy(1L, Integer.MAX_VALUE).size();
+            assertThat(after).isEqualTo(before);
+        }
+
+        @Test
+        @Transactional(propagation = Propagation.NOT_SUPPORTED)
+        void rollsBackOnDuplicateId() {
+            Instant t = Instant.parse("2026-05-24T10:00:00Z");
+            long sharedId = repository.allocateIds(1).get(0);
+            List<ItemTreeFullRow> rows = List.of(
+                    new ItemTreeFullRow(sharedId, 1L, "dup-1", "Folder", null, null, t, "test"),
+                    new ItemTreeFullRow(sharedId, 1L, "dup-2", "Folder", null, null, t, "test")
+            );
+            assertThatThrownBy(() -> repository.insertBatch(rows))
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+            // verify neither row was committed (PK violation should roll back the batch)
+            assertThat(repository.findRowsForCopy(sharedId, 10)).isEmpty();
         }
     }
 

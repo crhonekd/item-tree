@@ -63,6 +63,13 @@ public interface ItemTreeRepository {
     List<ItemTreeFullRow> findRowsForCopy(long rootId, int limit);
 
     /**
+     * Inserts N rows in a single batched JDBC statement. Ids and parentIds are
+     * supplied by the caller (no SEQUENCE.NEXTVAL inside the INSERT). Empty input
+     * is a no-op. All-or-nothing: a constraint violation rolls back the batch.
+     */
+    void insertBatch(List<ItemTreeFullRow> rows);
+
+    /**
      * Returns {@code true} iff the {@code ITEMTREE} table has at least one index whose
      * column list includes {@code LASTUPDATE}. Implemented via JDBC {@code DatabaseMetaData}
      * for portability across H2 and Oracle. If the metadata lookup fails for any reason, the
