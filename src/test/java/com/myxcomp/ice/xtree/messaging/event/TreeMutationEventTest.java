@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.myxcomp.ice.xtree.messaging.event.payload.CopyPayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.CreatePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.messaging.event.payload.EventPayload;
@@ -162,6 +163,23 @@ class TreeMutationEventTest {
     }
 
     @Nested
+    class CopyRoundTrip {
+        @Test
+        void payload_is_deserialized_as_CopyPayload() throws Exception {
+            Instant t = Instant.parse("2026-05-13T14:30:00Z");
+            var payload = new CopyPayload(List.of(
+                    new CopyPayload.CopiedNode(100L, 10L, "x", "Folder", t, "alice")));
+            TreeMutationEvent restored = roundTrip(buildEvent(OperationType.COPY, payload));
+
+            assertThat(restored.getOperationType()).isEqualTo(OperationType.COPY);
+            assertThat(restored.getPayload()).isInstanceOf(CopyPayload.class);
+            CopyPayload rp = (CopyPayload) restored.getPayload();
+            assertThat(rp.newNodes()).hasSize(1);
+            assertThat(rp.newNodes().get(0).itemTreeId()).isEqualTo(100L);
+        }
+    }
+
+    @Nested
     class WireFormat {
 
         @Test
@@ -315,6 +333,22 @@ class TreeMutationEventTest {
                     """;
             TreeMutationEvent restored = mapper.readValue(json, TreeMutationEvent.class);
             assertThat(((com.myxcomp.ice.xtree.messaging.event.payload.UpdatePayload) restored.getPayload()).itemTreeId()).isEqualTo(1L);
+        }
+
+        @Test
+        void unknown_copy_payload_fields_are_ignored() throws Exception {
+            String json = """
+                    {"eventId":"e","instanceId":"i","sequence":1,
+                     "occurredAt":"2026-05-13T14:30:00Z","iceUser":"alice","operationType":"COPY",
+                     "payload":{"newNodes":[{"itemTreeId":100,"parentId":10,"name":"x",
+                                            "type":"Folder","lastUpdate":"2026-05-13T14:30:00Z",
+                                            "lastUpdateUser":"alice","futureNodeField":"y"}],
+                                "futurePayloadField":"z"}}
+                    """;
+            TreeMutationEvent restored = mapper.readValue(json, TreeMutationEvent.class);
+            CopyPayload rp = (CopyPayload) restored.getPayload();
+            assertThat(rp.newNodes()).hasSize(1);
+            assertThat(rp.newNodes().get(0).itemTreeId()).isEqualTo(100L);
         }
     }
 }
