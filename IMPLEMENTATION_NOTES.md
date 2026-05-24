@@ -477,7 +477,54 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
-## Phase 14 — Work PC wiring (Phase B, user-managed)
+## Phase 14 — Copy Item
+
+**Goal:** add a new `copy` mutation. Copies a single item or an entire folder subtree (up to a configurable cap, default 100 nodes) into a folder owned by the caller. Full design in `docs/superpowers/specs/2026-05-24-copy-item-design.md`.
+
+**Implementable end-to-end in Phase A.** No Phase B blockers; same write-path discipline as the existing five mutations.
+
+### Surface
+
+- **OpenAPI:** new `POST /api/v1/itemtree/items/{id}/copy` with `CopyItemRequest { destinationFolderId }`, returns 201 + `List<ItemNode>` (BFS-ordered new subtree with `path`).
+- **Service:** new `ItemService.copyItem(sourceId, destinationFolderId, UserContext)`.
+- **Persistence:** new `ItemTreeRepository.findRowsForCopy(rootId, limit)`, `insertBatch(rows)`, `allocateIds(n)`; new `ItemTreeFullRow` record.
+- **Cache:** new `TreeCache.applyCopy(List<CachedNode>)` — single write lock, atomic from readers' view.
+- **Messaging:** new `OperationType.COPY`; new `CopyPayload(List<CopiedNode>)`; `EventDispatcher` + `TreeMutationEventDeserializer` extended for one new case each.
+- **Config:** new `CopyProperties` (`itemtree.copy.max-nodes`, default 100), `@PostConstruct` validates `>= 1`.
+- **Error model:** 5 new `errorCode`s (`CANNOT_COPY_ROOT`, `DESTINATION_NOT_FOUND`, `DESTINATION_NOT_FOLDER`, `DESTINATION_NOT_IN_USER_FOLDER`, `COPY_INTO_DESCENDANT`, `COPY_TOO_LARGE`); 2 reused (`ITEM_NOT_FOUND`, `HOME_FOLDER_NOT_FOUND`). `COPY_TOO_LARGE` → HTTP 413; rest → 400/404 per pattern.
+- **Metrics:** `itemtree.copy.requests{result}`, `itemtree.copy.rejected{reason}`, `itemtree.copy.subtree.size`.
+
+### Approach (per spec §3)
+
+1. **Cache validation** (read lock) — source / destination / home-folder-containment / self-or-descendant / pre-flight subtree-size count.
+2. **`@Transactional`** — `findRowsForCopy(sourceId, cap + 1)` for authoritative DB snapshot; re-check count; allocate N ids; remap parentIds and suffix top-level name on sibling collision (`(copy)`, `(copy 2)`, …); `insertBatch`.
+3. **Cache apply** — `applyCopy(newSubtree)` under one write lock.
+4. **Broadcast** — single COPY event with BFS-ordered subtree payload (JSON/XML never broadcast).
+
+### Tests
+
+~40–55 new tests (spec §10):
+
+- `ItemServiceTest` new nested `CopyItem` — all 8 validation orderings + happy paths + suffix algorithm + verbatim payload preservation.
+- `DefaultTreeCacheTest` new nested `ApplyCopy` — happy / idempotency / tolerance / concurrency-stress (writer rotation extended) / atomicity / null guards.
+- `JdbcItemTreeRepositoryIT` — `findRowsForCopy` (BFS order, IN-list chunking, `limit = cap + 1` short-circuit, unknown id), `insertBatch`, `allocateIds`.
+- `EventDispatcherTest` / `EventConsumerServiceTest` / `TreeMutationEventTest` — COPY round-trip + ClassCast + forward-compat.
+- `ItemControllerTest` new nested `CopyItem` — 201 happy + each of the 8 errors mapped.
+- `CopyPropertiesTest` (new) — `< 1` rejected; default applied.
+- `MessagingLoopbackIT` — copy round-trip through the bus.
+- `ObservabilityExposureIT` — new `itemtree.copy.*` assertions.
+- `ItemTreeApplicationE2EIT` — new `copyPropagatesAcrossInstances` test.
+
+### Done when
+
+- Spec §10 tests all green; existing 548 → ~590–600 tests.
+- `./gradlew clean build` → BUILD SUCCESSFUL.
+- `POST /api/v1/itemtree/items/{id}/copy` exercised manually against the running dev profile; new subtree returned; cache state reflects the copy; in-memory bus delivers a COPY event to peer-context (via E2E test).
+- Memory note added: `project-phase14-copy-item-done.md`.
+
+---
+
+## Phase 15 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
 
