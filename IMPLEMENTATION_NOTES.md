@@ -550,6 +550,45 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 
 ---
 
+## Phase 15 — Testing Web UI ✅ COMPLETE (2026-05-24)
+
+**Goal:** ship a no-build, static, single-page web UI under `src/main/resources/static/` that exercises every ITEMTREE REST endpoint manually. Full design in `docs/superpowers/specs/2026-05-24-test-ui-design.md`; implementation plan in `docs/superpowers/plans/2026-05-24-test-ui.md`.
+
+**Implementable end-to-end in Phase A.** Works against the dev profile (H2 + stubbed Solace); the configurable Backend URL field makes the same UI reusable against Phase B Oracle/Solace deployments without rebuild.
+
+### Surface
+
+- **UI files** (all under `src/main/resources/static/`):
+  - `index.html`, `styles.css`
+  - `js/app.js` (entry), `js/state.js`, `js/api.js`, `js/toast.js`,
+    `js/tree.js`, `js/detail.js`, `js/menu.js`, `js/modal.js`,
+    `js/search.js`, `js/refresh.js`
+- **Backend change** (one method): `CacheReadinessFilter.shouldNotFilter` narrowed to gate only `/api/**` so static assets always load.
+- **Configuration** persisted in `localStorage`: `iceUser`, `impersonatedUser`, `backendBaseUrl`.
+
+### Endpoints covered
+
+All 12 service endpoints plus the `/actuator/itemtree-refresh/{type}` actuator: home-folder lookup, tree view, subtree, items/get, create, move, copy, rename, update-data, delete, search, actuator refresh.
+
+### Deviations from plan
+
+- One extra JS file (`toast.js`) added vs. the spec's listed 9 modules, to break a `tree.js` ↔ `app.js` circular import. Documented in the plan's File Structure section.
+- `CacheReadinessFilterTest` bypass tests collapsed into a single `@ParameterizedTest @ValueSource` (`bypassesNonApiPaths`) covering 8 paths (5 pre-existing + 3 new). Net test count: 627 (vs 625 projected by the plan, because each `@ParameterizedTest` input counts as a separate test execution).
+
+### Tests
+
+- **10 new backend test executions** in `CacheReadinessFilterTest`: 1 `@ParameterizedTest` × 8 paths (bypass for `/actuator/health`, `/v3/api-docs`, `/swagger-ui/index.html`, `/`, `/index.html`, `/js/app.js`, `/styles.css`, `/favicon.ico`) and 1 `@Test` asserting `/api/v1/itemtree/search` is still gated when the cache is not ready.
+- **No automated UI tests** — by design (test harness; manual exercise is the test).
+
+### Done when
+
+- 627 backend tests green (621 + 6 new executions via @ParameterizedTest).
+- `./gradlew clean build` → BUILD SUCCESSFUL.
+- Manual smoke test (plan Task 14) passes against the dev profile.
+- Memory note added: `project-phase15-test-ui-done.md`.
+
+---
+
 ## Phase 16 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
