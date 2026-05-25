@@ -320,6 +320,10 @@ public class ItemService {
                     "Update of id=" + id + " requires data");
         }
 
+        String effectiveUser = userContext.effectiveUser();
+        CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
+        ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Item");
+
         String xmlOrNull = null;
         if (policy.isAlsoPersistedAsXmlOnWrite(existing.type())) {
             try {
@@ -332,7 +336,7 @@ public class ItemService {
         }
 
         Instant now = timeMapper.now();
-        String stampUser = userContext.effectiveUser();
+        String stampUser = effectiveUser;
 
         repository.updateJson(id, dataJson, xmlOrNull, now, stampUser);
         cache.applyMetadataUpdate(id, now, stampUser);

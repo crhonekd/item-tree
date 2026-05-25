@@ -16,9 +16,11 @@ import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,9 +37,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -63,6 +68,9 @@ class ItemServiceUpdateDataTest {
     @BeforeEach
     void setUp() {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
+        CachedNode anyHome = new CachedNode(10L, 2L, "alice", "Folder",
+                Instant.EPOCH, "sys");
+        lenient().when(ownershipChecker.requireHomeFolderExists(anyString())).thenReturn(anyHome);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
                 new SimpleMeterRegistry(), copyProperties, ownershipChecker);
@@ -206,5 +214,65 @@ class ItemServiceUpdateDataTest {
         verify(repository).updateJson(7L, "{\"a\":2}", null, NOW, "alice");
         verify(cache).applyMetadataUpdate(7L, NOW, "alice");
         verify(publisher).publish(any());
+    }
+
+    @Nested
+    class Ownership {
+
+        private final UserContext ctx = new UserContext("alice", null);
+        private final java.time.Instant T = java.time.Instant.parse("2026-05-25T10:00:00Z");
+        private final CachedNode target = new CachedNode(50L, 10L, "Report1", "Report", T, "sys");
+        private final CachedNode aliceHome = new CachedNode(10L, 2L, "alice", "Folder", T, "sys");
+
+        @org.junit.jupiter.api.BeforeEach
+        void stubCommon() {
+            lenient().when(cache.getById(50L)).thenReturn(Optional.of(target));
+            lenient().when(policy.isKnown("Report")).thenReturn(true);
+            lenient().when(policy.hasData("Report")).thenReturn(true);
+            lenient().when(policy.isAlsoPersistedAsXmlOnWrite("Report")).thenReturn(false);
+        }
+
+        @Test
+        void updatingItemNotInUserHomeRejectsWith403() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            org.mockito.Mockito.doThrow(new ForbiddenException(
+                    ErrorCode.NOT_IN_USER_FOLDER, "Item 50 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(50L, aliceHome, "alice", "Item");
+
+            assertThatThrownBy(() -> service.updateItemData(50L, "{\"x\":1}", ctx))
+                    .isInstanceOf(ForbiddenException.class)
+                    .satisfies(e -> assertThat(
+                            ((ForbiddenException) e).errorCode())
+                            .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
+
+            verify(repository, never()).updateJson(anyLong(), any(), any(), any(), any());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void typeValidationFiresBeforeOwnership() {
+            CachedNode folder = new CachedNode(50L, 10L, "F", "Folder", T, "sys");
+            when(cache.getById(50L)).thenReturn(Optional.of(folder));
+            when(policy.isKnown("Folder")).thenReturn(true);
+
+            assertThatThrownBy(() -> service.updateItemData(50L, "{\"x\":1}", ctx))
+                    .isInstanceOf(ValidationException.class)
+                    .satisfies(e -> assertThat(((ValidationException) e).errorCode())
+                            .isEqualTo(ErrorCode.FOLDER_CANNOT_HAVE_DATA));
+
+            verifyNoInteractions(ownershipChecker);
+        }
+
+        @Test
+        void noHomeFolderRejectsWith404() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenThrow(
+                    new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
+                            "No home folder for user 'alice'"));
+
+            assertThatThrownBy(() -> service.updateItemData(50L, "{\"x\":1}", ctx))
+                    .isInstanceOf(NotFoundException.class);
+
+            verify(repository, never()).updateJson(anyLong(), any(), any(), any(), any());
+        }
     }
 }
