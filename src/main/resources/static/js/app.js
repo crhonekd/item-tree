@@ -84,5 +84,10 @@ document.addEventListener('DOMContentLoaded', () => {
   bindHeader();
   bindSearch();
   bindRefresh();
-  renderTree();
+  if (!state.iceUser) {
+    state.iceUser = 'testuser1';
+    $('ice-user').value = 'testuser1';
+    savePersisted();
+  }
+  doLogin();
 });
