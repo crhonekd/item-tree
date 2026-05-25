@@ -532,7 +532,7 @@ public class ItemService {
             throw e;
         }
 
-        // 6. NOT_IN_USER_FOLDER (was DESTINATION_NOT_IN_USER_FOLDER, now 403)
+        // 6. NOT_IN_USER_FOLDER
         try {
             ownershipChecker.requireOwned(destinationFolderId, homeFolder, effectiveUser, "Destination");
         } catch (ForbiddenException e) {
