@@ -71,6 +71,8 @@ class ItemServiceCreateTest {
     @BeforeEach
     void setUp() {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
+        lenient().when(ownershipChecker.requireHomeFolderExists(anyString()))
+                .thenReturn(folder(10L, 2L, "alice-home"));
         service = new ItemService(
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,

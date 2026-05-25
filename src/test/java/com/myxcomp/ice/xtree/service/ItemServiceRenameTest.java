@@ -67,6 +67,8 @@ class ItemServiceRenameTest {
     @BeforeEach
     void setUp() {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
+        lenient().when(ownershipChecker.requireHomeFolderExists(anyString()))
+                .thenReturn(new CachedNode(10L, 2L, "alice", "Folder", NOW, "sys"));
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
                 new SimpleMeterRegistry(), copyProperties, ownershipChecker);
