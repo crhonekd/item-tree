@@ -16,9 +16,11 @@ import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -256,5 +258,79 @@ class ItemServiceCreateTest {
         verify(repository).insert(eq(2L), eq("R"), eq("Report"), eq("{}"), eq(null), eq(NOW), eq("alice"));
         verify(cache).applyCreate(result[0]);
         verify(publisher).publish(any());
+    }
+
+    @Nested
+    class Ownership {
+
+        private final UserContext ctx = new UserContext("alice", null);
+        private final CachedNode parentFolder = new CachedNode(2L, 1L, "Users", "Folder", NOW, "sys");
+        private final CachedNode aliceHome = new CachedNode(10L, 2L, "alice", "Folder", NOW, "sys");
+
+        @BeforeEach
+        void stubCommon() {
+            lenient().when(cache.getById(2L)).thenReturn(Optional.of(parentFolder));
+            lenient().when(policy.hasData("Folder")).thenReturn(false);
+            lenient().when(policy.isKnown("Folder")).thenReturn(true);
+        }
+
+        @Test
+        void parentNotInUserHomeRejectsWith403() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            doThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                    "Parent 2 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(2L, aliceHome, "alice", "Parent");
+
+            assertThatThrownBy(() -> service.createItem(2L, "x", "Folder", null, ctx))
+                    .isInstanceOf(ForbiddenException.class)
+                    .satisfies(e -> assertThat(((ForbiddenException) e).errorCode())
+                            .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
+
+            verify(repository, never()).insert(anyLong(), any(), any(), any(), any(), any(), any());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void noHomeFolderRejectsWith404() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenThrow(
+                    new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
+                            "No home folder for user 'alice'"));
+
+            assertThatThrownBy(() -> service.createItem(2L, "x", "Folder", null, ctx))
+                    .isInstanceOf(NotFoundException.class)
+                    .satisfies(e -> assertThat(((NotFoundException) e).errorCode())
+                            .isEqualTo(ErrorCode.HOME_FOLDER_NOT_FOUND));
+
+            verify(repository, never()).insert(anyLong(), any(), any(), any(), any(), any(), any());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void ownershipCheckUsesEffectiveUserNotIceUser() {
+            UserContext impersonating = new UserContext("alice", "bob");
+            CachedNode bobHome = new CachedNode(11L, 2L, "bob", "Folder", NOW, "sys");
+            when(ownershipChecker.requireHomeFolderExists("bob")).thenReturn(bobHome);
+            doThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                    "Parent 2 is not under home folder of 'bob'"))
+                    .when(ownershipChecker).requireOwned(2L, bobHome, "bob", "Parent");
+
+            assertThatThrownBy(() -> service.createItem(2L, "x", "Folder", null, impersonating))
+                    .isInstanceOf(ForbiddenException.class);
+
+            verify(ownershipChecker, never()).requireHomeFolderExists("alice");
+        }
+
+        @Test
+        void ownershipCheckFiresAfterParentNotFolder() {
+            CachedNode notAFolder = new CachedNode(99L, 1L, "x", "Report", NOW, "sys");
+            when(cache.getById(99L)).thenReturn(Optional.of(notAFolder));
+
+            assertThatThrownBy(() -> service.createItem(99L, "x", "Folder", null, ctx))
+                    .isInstanceOf(ValidationException.class)
+                    .satisfies(e -> assertThat(((ValidationException) e).errorCode())
+                            .isEqualTo(ErrorCode.PARENT_NOT_FOLDER));
+
+            verifyNoInteractions(ownershipChecker);
+        }
     }
 }

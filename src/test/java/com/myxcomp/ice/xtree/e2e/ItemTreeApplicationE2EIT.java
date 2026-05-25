@@ -45,10 +45,10 @@ class ItemTreeApplicationE2EIT {
         TreeCache cacheA = pair.a().getBean(TreeCache.class);
         TreeCache cacheB = pair.b().getBean(TreeCache.class);
 
-        // 'Users' folder (id=2 in data.sql) is a valid parent.
+        // testuser1 home folder (id=10 in data.sql) is a valid parent for user 'testuser1'.
         CachedNode created = itemServiceA.createItem(
-                2L, "E2E_PeerCreate", "Folder", null,
-                new UserContext("alice", null));
+                10L, "E2E_PeerCreate", "Folder", null,
+                new UserContext("testuser1", null));
 
         Optional<CachedNode> onA = cacheA.getById(created.itemTreeId());
         Optional<CachedNode> onB = cacheB.getById(created.itemTreeId());
@@ -57,7 +57,7 @@ class ItemTreeApplicationE2EIT {
         assertThat(onA.get().name()).isEqualTo("E2E_PeerCreate");
         assertThat(onB).as("peer cache").isPresent();
         assertThat(onB.get().name()).isEqualTo("E2E_PeerCreate");
-        assertThat(onB.get().parentId()).isEqualTo(2L);
+        assertThat(onB.get().parentId()).isEqualTo(10L);
     }
 
     @Test
@@ -71,8 +71,8 @@ class ItemTreeApplicationE2EIT {
         double aDroppedBefore  = registryA.counter("itemtree.event.self_dropped").count();
         double bConsumedBefore = registryB.counter("itemtree.event.consumed", "op", "CREATE").count();
 
-        itemServiceA.createItem(2L, "E2E_SelfEcho", "Folder", null,
-                new UserContext("alice", null));
+        itemServiceA.createItem(10L, "E2E_SelfEcho", "Folder", null,
+                new UserContext("testuser1", null));
 
         assertThat(registryA.counter("itemtree.event.self_dropped").count())
                 .isEqualTo(aDroppedBefore + 1.0);
@@ -88,11 +88,11 @@ class ItemTreeApplicationE2EIT {
         ItemService itemServiceA = pair.a().getBean(ItemService.class);
         TreeCache cacheA = pair.a().getBean(TreeCache.class);
         TreeCache cacheB = pair.b().getBean(TreeCache.class);
-        UserContext alice = new UserContext("alice", null);
+        UserContext alice = new UserContext("testuser1", null);
 
-        // Seed a target Folder node under Users (id=2) via ItemService so both caches see it.
+        // Seed a target Folder node under testuser1 home folder (id=10) via ItemService so both caches see it.
         CachedNode target = itemServiceA.createItem(
-                2L, "E2E_" + operation + "_target", "Folder", null, alice);
+                10L, "E2E_" + operation + "_target", "Folder", null, alice);
         long id = target.itemTreeId();
         assertThat(cacheB.getById(id)).as("seed visible on B").isPresent();
 
@@ -101,7 +101,7 @@ class ItemTreeApplicationE2EIT {
                 // updateItemData requires a data-bearing type — delete the Folder and create a Report.
                 itemServiceA.deleteItem(id, alice);
                 CachedNode report = itemServiceA.createItem(
-                        3L, "E2E_UPDATE_report", "Report",
+                        10L, "E2E_UPDATE_report", "Report",
                         "{\"name\":\"before\",\"n\":1}", alice);
                 long reportId = report.itemTreeId();
                 assertThat(cacheB.getById(reportId)).isPresent();
@@ -115,7 +115,7 @@ class ItemTreeApplicationE2EIT {
                         .isGreaterThanOrEqualTo(1.0);
                 assertThat(cacheB.getById(reportId).orElseThrow().lastUpdateUser())
                         .as("B sees the updated lastUpdateUser")
-                        .isEqualTo("alice");
+                        .isEqualTo("testuser1");
             }
             case "MOVE" -> {
                 itemServiceA.moveItem(id, 3L, alice);   // move under Reports (id=3)
@@ -239,10 +239,10 @@ class ItemTreeApplicationE2EIT {
         ItemService itemServiceA = pair.a().getBean(ItemService.class);
         TreeCache cacheA = pair.a().getBean(TreeCache.class);
         TreeCache cacheB = pair.b().getBean(TreeCache.class);
-        UserContext alice = new UserContext("alice", null);
+        UserContext alice = new UserContext("testuser1", null);
 
-        // Build a three-level subtree under Users (id=2): parent → child → grandchild.
-        CachedNode parent = itemServiceA.createItem(2L, "E2E_CascadeParent", "Folder", null, alice);
+        // Build a three-level subtree under testuser1 home folder (id=10): parent → child → grandchild.
+        CachedNode parent = itemServiceA.createItem(10L, "E2E_CascadeParent", "Folder", null, alice);
         CachedNode child = itemServiceA.createItem(parent.itemTreeId(), "E2E_CascadeChild", "Folder", null, alice);
         CachedNode grandchild = itemServiceA.createItem(child.itemTreeId(), "E2E_CascadeGrandchild", "Folder", null, alice);
 

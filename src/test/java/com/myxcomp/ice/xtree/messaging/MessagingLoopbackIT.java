@@ -98,8 +98,8 @@ class MessagingLoopbackIT {
         double publishedBefore = meterRegistry.counter("itemtree.event.published", "op", "CREATE").count();
         double droppedBefore = meterRegistry.counter("itemtree.event.self_dropped").count();
 
-        itemService.createItem(1L, "PhaseTenTestFolder", "Folder", null,
-                new UserContext("alice", null));
+        itemService.createItem(10L, "PhaseTenTestFolder", "Folder", null,
+                new UserContext("testuser1", null));
 
         // Capture the auto-generated ID so @AfterEach can evict it from the cache.
         // The self-echo path drops the event, so the node should NOT be in the cache;

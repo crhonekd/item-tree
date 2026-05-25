@@ -79,7 +79,7 @@ class ObservabilityExposureIT {
 
     private HttpHeaders iceHeaders() {
         HttpHeaders h = new HttpHeaders();
-        h.set("X-Ice-User", "testuser");
+        h.set("X-Ice-User", "testuser1");
         h.setContentType(MediaType.APPLICATION_JSON);
         return h;
     }
@@ -194,8 +194,8 @@ class ObservabilityExposureIT {
 
     @Test
     void allSection18MetricsArePresentOnPrometheusEndpoint() {
-        // 1. Create a Folder under root (parentId=1)
-        long folderId = createItem(1L, "ObsIT_Folder", "Folder", null);
+        // 1. Create a Folder under testuser1 home folder (id=10 in data.sql)
+        long folderId = createItem(10L, "ObsIT_Folder", "Folder", null);
 
         // 2. Create a Report under that folder (has data)
         long reportId = createItem(folderId, "ObsIT_Report", "Report",
@@ -230,14 +230,14 @@ class ObservabilityExposureIT {
 
         // 6. Attempt to create a Folder WITH data → TYPE_CANNOT_HAVE_DATA validation rejection
         //    This is rejected (400) so no item is persisted; nothing to clean up.
-        ResponseEntity<String> rejResp = tryCreateItem(1L, "ObsIT_InvalidFolder", "Folder",
+        ResponseEntity<String> rejResp = tryCreateItem(10L, "ObsIT_InvalidFolder", "Folder",
                 Map.of("illegal", true));
         assertThat(rejResp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         // 7. Create an item with unknown type WITH data → unknown_type counter is incremented.
         //    The item is persisted (unknown types are not in types-without-data, so data is
         //    accepted); it will be cleaned up by @AfterEach.
-        tryCreateItem(1L, "ObsIT_Unknown", "Phase12_Unknown", Map.of("x", 1));
+        tryCreateItem(10L, "ObsIT_Unknown", "Phase12_Unknown", Map.of("x", 1));
 
         // 8. Copy workload — exercises itemtree.copy.* metrics.
         //    Item 25 (leafItem/Report) is a seed leaf under deepuser's subtree.

@@ -116,6 +116,10 @@ public class ItemService {
                     "Parent " + parentId + " is not a folder (type=" + parent.type() + ")");
         }
 
+        String effectiveUser = userContext.effectiveUser();
+        CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
+        ownershipChecker.requireOwned(parentId, homeFolder, effectiveUser, "Parent");
+
         boolean hasData = policy.hasData(type);
         if (!policy.isKnown(type)) {
             meterRegistry.counter("itemtree.policy.unknown_type", "type", type).increment();
@@ -145,7 +149,7 @@ public class ItemService {
         }
 
         Instant now = timeMapper.now();
-        String stampUser = userContext.effectiveUser();
+        String stampUser = effectiveUser;
 
         long id = repository.insert(parentId, name, type, dataJson, xmlOrNull, now, stampUser);
 
