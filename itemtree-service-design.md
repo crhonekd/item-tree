@@ -173,12 +173,12 @@ Base path: `/api/v1/itemtree`.
 - `move` validates the new parent exists, is a folder, is not the moved node itself, and is not a descendant of the moved node.
 - `create` rejects non-null `data` when `type` is in `types-without-data` (returns 400, `errorCode = TYPE_CANNOT_HAVE_DATA`).
 - `update` rejects calls against folders (returns 400, `errorCode = FOLDER_CANNOT_HAVE_DATA`).
-- Cascade delete is unbounded; permissions are enforced UI-side.
+- All 6 mutation endpoints enforce home-folder ownership server-side: the target item and/or destination folder must be inside the effective user's home subtree. Returns 403 `NOT_IN_USER_FOLDER` on violation. See §13 → "Home-folder ownership enforcement".
 
 ### Error model
 
 RFC 7807 `application/problem+json` for all error responses. Standard fields (`type`, `title`, `status`, `detail`, `instance`) plus extensions:
-- `errorCode` — machine-readable (e.g. `PARENT_NOT_FOUND`, `MOVE_INTO_DESCENDANT`).
+- `errorCode` — machine-readable (e.g. `PARENT_NOT_FOUND`, `MOVE_INTO_DESCENDANT`, `NOT_IN_USER_FOLDER`).
 - `traceId` — from Micrometer Tracing.
 
 ---
@@ -971,6 +971,19 @@ Returns the full descendant id set for the cascade `DELETE` event payload.
 ### `UserContext`
 
 Plain value object built by `UserContextInterceptor` from the headers. Passed explicitly to service methods (recommended) rather than as a request-scoped bean — clearer dependencies, more testable.
+
+### Home-folder ownership enforcement
+
+All 6 mutation operations (`createItem`, `deleteItem`, `renameItem`, `moveItem`, `updateItemData`, `copyItem`) enforce that the affected item(s) are inside the effective user's home subtree. **Item X is owned by user U** iff:
+
+- `X.itemTreeId == homeFolder(U).itemTreeId` — X is U's home folder itself, or
+- `cache.isAncestor(homeFolder(U).itemTreeId, X.itemTreeId) == true` — X is anywhere in U's home subtree.
+
+where `homeFolder(U)` is the folder with `type=Folder` and `name=U` directly under root's `Users` node, resolved by `TreeCache.findHomeFolder(effectiveUser)`.
+
+**Violations** return HTTP 403 with `errorCode = NOT_IN_USER_FOLDER`. If the effective user has no home folder, every mutation fails with HTTP 404 `HOME_FOLDER_NOT_FOUND`.
+
+The check lives in `service/OwnershipChecker` (`@Component`), injected into `ItemService`. `copyItem` source is unrestricted (any user can copy any item into their own folder); only the destination is gated.
 
 ---
 
