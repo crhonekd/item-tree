@@ -28,6 +28,7 @@ import com.myxcomp.ice.xtree.persistence.PayloadRow;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -485,7 +486,7 @@ public class ItemService {
     /**
      * Copies the subtree rooted at {@code sourceId} under {@code destinationFolderId}.
      * Validation order: ITEM_NOT_FOUND, CANNOT_COPY_ROOT, DESTINATION_NOT_FOUND,
-     * DESTINATION_NOT_FOLDER, HOME_FOLDER_NOT_FOUND, DESTINATION_NOT_IN_USER_FOLDER,
+     * DESTINATION_NOT_FOLDER, HOME_FOLDER_NOT_FOUND, NOT_IN_USER_FOLDER,
      * COPY_INTO_DESCENDANT, COPY_TOO_LARGE. Write order: DB → cache → event.
      */
     @Transactional
@@ -523,20 +524,20 @@ public class ItemService {
 
         // 5. HOME_FOLDER_NOT_FOUND
         String effectiveUser = userContext.effectiveUser();
-        CachedNode homeFolder = cache.findHomeFolder(effectiveUser).orElseThrow(() -> {
+        CachedNode homeFolder;
+        try {
+            homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
+        } catch (NotFoundException e) {
             recordCopyRejection(ErrorCode.HOME_FOLDER_NOT_FOUND);
-            return new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
-                    "No home folder for user '" + effectiveUser + "'");
-        });
+            throw e;
+        }
 
-        // 6. DESTINATION_NOT_IN_USER_FOLDER
-        boolean destInUserFolder = destination.itemTreeId() == homeFolder.itemTreeId()
-                || cache.isAncestor(homeFolder.itemTreeId(), destination.itemTreeId());
-        if (!destInUserFolder) {
-            recordCopyRejection(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER);
-            throw new ValidationException(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER,
-                    "Destination " + destinationFolderId
-                            + " is not under home folder of '" + effectiveUser + "'");
+        // 6. NOT_IN_USER_FOLDER (was DESTINATION_NOT_IN_USER_FOLDER, now 403)
+        try {
+            ownershipChecker.requireOwned(destinationFolderId, homeFolder, effectiveUser, "Destination");
+        } catch (ForbiddenException e) {
+            recordCopyRejection(ErrorCode.NOT_IN_USER_FOLDER);
+            throw e;
         }
 
         // 7. COPY_INTO_DESCENDANT

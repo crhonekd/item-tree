@@ -19,6 +19,7 @@ import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -94,7 +95,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(destId, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(sourceId)).thenReturn(Optional.of(source));
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getChildren(destId)).thenReturn(List.of());
             when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
@@ -144,7 +145,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(destId, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(sourceId)).thenReturn(Optional.of(source));
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getChildren(destId)).thenReturn(List.of());
             when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
@@ -212,7 +213,9 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(10L, 1L, "anotherUser", "Folder", T, "x");
             when(cache.getById(50L)).thenReturn(Optional.of(source));
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.empty());
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenThrow(
+                    new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
+                            "No home folder for user 'alice'"));
             assertThatThrownBy(() -> service.copyItem(50L, 10L, ctx))
                     .isInstanceOf(NotFoundException.class)
                     .satisfies(e -> assertThat(((NotFoundException) e).errorCode())
@@ -226,19 +229,22 @@ class ItemServiceCopyTest {
             CachedNode home = new CachedNode(20L, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(50L)).thenReturn(Optional.of(source));
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(home));
-            when(cache.isAncestor(20L, 10L)).thenReturn(false);
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(home);
+            org.mockito.Mockito.doThrow(new ForbiddenException(
+                    ErrorCode.NOT_IN_USER_FOLDER,
+                    "Destination 10 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(10L, home, "alice", "Destination");
             assertThatThrownBy(() -> service.copyItem(50L, 10L, ctx))
-                    .isInstanceOf(ValidationException.class)
-                    .satisfies(e -> assertThat(((ValidationException) e).errorCode())
-                            .isEqualTo(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER));
+                    .isInstanceOf(ForbiddenException.class)
+                    .satisfies(e -> assertThat(((ForbiddenException) e).errorCode())
+                            .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
         }
 
         @Test
         void copyIntoSelf() {
             CachedNode source = new CachedNode(10L, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(10L)).thenReturn(Optional.of(source));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(source));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(source);
             assertThatThrownBy(() -> service.copyItem(10L, 10L, ctx))
                     .isInstanceOf(ValidationException.class)
                     .satisfies(e -> assertThat(((ValidationException) e).errorCode())
@@ -252,8 +258,7 @@ class ItemServiceCopyTest {
             CachedNode home = new CachedNode(20L, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(50L)).thenReturn(Optional.of(source));
             when(cache.getById(60L)).thenReturn(Optional.of(descendant));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(home));
-            when(cache.isAncestor(20L, 60L)).thenReturn(true);
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(home);
             when(cache.isAncestor(50L, 60L)).thenReturn(true);
             assertThatThrownBy(() -> service.copyItem(50L, 60L, ctx))
                     .isInstanceOf(ValidationException.class)
@@ -267,7 +272,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(10L, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(50L)).thenReturn(Optional.of(source));
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(50L, 10L)).thenReturn(false);
             List<CachedNode> oversized = new ArrayList<>();
             for (int i = 0; i < 101; i++) {
@@ -287,7 +292,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(10L, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(50L)).thenReturn(Optional.of(source));
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(50L, 10L)).thenReturn(false);
             when(cache.getSubtreeFlat(50L)).thenReturn(List.of(source));
             List<ItemTreeFullRow> dbRows = new ArrayList<>();
@@ -312,7 +317,7 @@ class ItemServiceCopyTest {
             CachedNode existingSibling = new CachedNode(destChildExisting, destId, "Things", "Folder", T, "alice");
             when(cache.getById(sourceId)).thenReturn(Optional.of(source));
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(
                     source,
@@ -340,7 +345,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(destId, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(sourceId)).thenReturn(Optional.of(source));
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
             when(cache.getChildren(destId)).thenReturn(List.of(
@@ -363,7 +368,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(destId, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(sourceId)).thenReturn(Optional.of(source));
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
             when(cache.getChildren(destId)).thenReturn(List.of());
@@ -384,7 +389,7 @@ class ItemServiceCopyTest {
             CachedNode dest = new CachedNode(10L, 1L, "alice", "Folder", T, "alice");
             when(cache.getById(50L)).thenReturn(Optional.of(source));
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
-            when(cache.findHomeFolder("alice")).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(50L, 10L)).thenReturn(false);
             when(cache.getSubtreeFlat(50L)).thenReturn(List.of(source));
             when(repository.findRowsForCopy(eq(50L), anyInt())).thenReturn(List.of());
