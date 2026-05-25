@@ -1240,12 +1240,12 @@ Plain text via Logback (for now). Option to switch to a structured JSON encoder 
 These were considered and deliberately deferred:
 
 - Concurrent edit of the same item (optimistic locking, version column).
-- Per-user visibility filtering — permissions are UI-side.
+- Per-user visibility filtering — reads are unconstrained, write ownership enforced server-side since Phase 16.
 - Bulk move.
 - Real-time push to UI (WebSocket / SSE).
 - Search inside JSON payload.
 - Search response pagination cap (no default limit).
-- Cascade delete safety cap (UI enforces permissions).
+- Cascade delete safety cap (write ownership enforced server-side since Phase 16; size cap is not implemented).
 - WebFlux (deferred until traffic demands).
 - Flyway-managed schema migrations (DBA-owned schema).
 

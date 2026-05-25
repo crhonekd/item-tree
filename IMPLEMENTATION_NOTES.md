@@ -491,7 +491,7 @@ Every phase below is implementable in Phase A. **There is no need to wait for co
 - **Cache:** new `TreeCache.applyCopy(List<CachedNode>)` — single write lock, atomic from readers' view.
 - **Messaging:** new `OperationType.COPY`; new `CopyPayload(List<CopiedNode>)`; `EventDispatcher` + `TreeMutationEventDeserializer` extended for one new case each.
 - **Config:** new `CopyProperties` (`itemtree.copy.max-nodes`, default 100), `@PostConstruct` validates `>= 1`.
-- **Error model:** 6 new `errorCode`s (`CANNOT_COPY_ROOT`, `DESTINATION_NOT_FOUND`, `DESTINATION_NOT_FOLDER`, `DESTINATION_NOT_IN_USER_FOLDER`, `COPY_INTO_DESCENDANT`, `COPY_TOO_LARGE`); 2 reused (`ITEM_NOT_FOUND`, `HOME_FOLDER_NOT_FOUND`). `COPY_TOO_LARGE` → HTTP 413; rest → 400/404 per pattern.
+- **Error model:** 6 new `errorCode`s (`CANNOT_COPY_ROOT`, `DESTINATION_NOT_FOUND`, `DESTINATION_NOT_FOLDER`, `DESTINATION_NOT_IN_USER_FOLDER`, `COPY_INTO_DESCENDANT`, `COPY_TOO_LARGE`); 2 reused (`ITEM_NOT_FOUND`, `HOME_FOLDER_NOT_FOUND`). `COPY_TOO_LARGE` → HTTP 413; rest → 400/404 per pattern. _(Note: `DESTINATION_NOT_IN_USER_FOLDER` was renamed to `NOT_IN_USER_FOLDER` and reclassified from 400 to 403 in Phase 16.)_
 - **Metrics:** `itemtree.copy.requests{result}`, `itemtree.copy.rejected{reason}`, `itemtree.copy.subtree.size`.
 
 ### Approach (per spec §3)
@@ -589,13 +589,46 @@ All 12 service endpoints plus the `/actuator/itemtree-refresh/{type}` actuator: 
 
 ---
 
-## Phase 16 — User-folder ownership enforcement
+## Phase 16 — User-folder ownership enforcement ✅ COMPLETE (2026-05-25)
 
-Server-side enforcement that a user can only mutate items inside their own home-folder subtree. Six mutation operations affected: `createItem`, `deleteItem`, `renameItem`, `moveItem`, `updateItemData`, `copyItem`. Violations return HTTP 403 with `errorCode = NOT_IN_USER_FOLDER`.
+**Goal:** enforce server-side that a user can only mutate items within their own home-folder subtree. Six mutation operations affected: `createItem`, `deleteItem`, `renameItem`, `moveItem`, `updateItemData`, `copyItem`. Violations return HTTP 403 with `errorCode = NOT_IN_USER_FOLDER`. Full design in `docs/superpowers/specs/2026-05-25-user-folder-ownership-design.md`.
 
-Key additions: `ForbiddenException` (extends `ItemTreeException`, HTTP 403), `ErrorCode.NOT_IN_USER_FOLDER`, `OwnershipChecker` @Component (injected into `ItemService`). Existing `DESTINATION_NOT_IN_USER_FOLDER` (400/Validation) removed and replaced everywhere. `deleteItem` probe point shifted from DB to cache.
+**Implementable end-to-end in Phase A.** No Phase B blockers; ownership check is cache-resident.
 
-See spec: `docs/superpowers/specs/2026-05-25-user-folder-ownership-design.md`.
+### Surface
+
+- **New exception:** `ForbiddenException extends ItemTreeException` → HTTP 403.
+- **New error code:** `ErrorCode.NOT_IN_USER_FOLDER` (replaces and removes the Phase 14 `DESTINATION_NOT_IN_USER_FOLDER` which was 400/Validation — see Phase 14 footnote).
+- **New component:** `OwnershipChecker` — two methods: `requireHomeFolderExists(effectiveUser)` returning `CachedNode` or throwing `NotFoundException(HOME_FOLDER_NOT_FOUND)`; `requireOwned(itemId, homeFolder, effectiveUser, contextLabel)` throwing `ForbiddenException(NOT_IN_USER_FOLDER)` if the item is not inside the subtree.
+- **`ItemService`:** `OwnershipChecker` injected; all six mutation methods call the checker in the correct validation order (structural checks first, ownership after, then the write).
+- **`deleteItem` probe shift:** cache probe first; if absent → silent no-op without auth check; if present → ownership check → cascade delete.
+- **`GlobalExceptionHandler`:** new `@ExceptionHandler(ForbiddenException.class)` → HTTP 403 + `application/problem+json`.
+- **`itemtree-service-design.md`:** §3 validation rules updated; §13 "Home-folder ownership enforcement" subsection added; §19 out-of-scope bullets corrected.
+
+### Tests
+
+~38 new test executions across 9 classes (665 total, up from 627):
+- `ForbiddenExceptionTest` (3): carries errorCode + message, extends ItemTreeException, null errorCode rejected.
+- `OwnershipCheckerTest` (10): requireHomeFolderExists happy/absent/null-user; requireOwned item=home/in-subtree/outside/contextLabel/null-homeFolder/null-user/null-contextLabel.
+- `GlobalExceptionHandlerTest` (1): forbiddenException maps to 403 + problem JSON.
+- `ItemControllerTest` (5): one 403 test per mutation endpoint.
+- `ItemServiceCreateTest` (4 Ownership nested): parentNotInUserHome, noHomeFolder, effectiveUser vs iceUser, ownershipAfterParentNotFolder.
+- `ItemServiceDeleteTest` (4 Ownership nested): notInUserHome, missingIdIsNoopNoAuth, noHomeFolder, ownedFlowsThroughToCascade.
+- `ItemServiceRenameTest` (3 Ownership nested): notInUserHome, noHomeFolder, itemNotFoundBeforeOwnership.
+- `ItemServiceMoveTest` (5 Ownership nested): sourceOut, newParentOut, bothIn, itemNotFoundFirst, descendantFirst.
+- `ItemServiceUpdateDataTest` (3 Ownership nested): notInUserHome, noHomeFolder, validationBeforeOwnership.
+- `ItemTreeApplicationE2EIT` (1): mutationsForbiddenOutsideOwnFolder.
+- `ErrorCodeTest`: EXPECTED_NAMES updated (18 values, DESTINATION_NOT_IN_USER_FOLDER removed).
+
+### Done when
+
+- 665 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+- All six mutation endpoints return 403 + `NOT_IN_USER_FOLDER` when the target is outside the caller's home subtree.
+- Memory note added: `project-phase16-ownership-done.md`.
+
+### Actual done state
+
+665 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
 
 ---
 
