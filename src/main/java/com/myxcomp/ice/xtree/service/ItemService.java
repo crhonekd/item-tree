@@ -214,8 +214,12 @@ public class ItemService {
             throw new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found");
         }
 
+        String effectiveUser = userContext.effectiveUser();
+        CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
+        ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Item");
+
         Instant now = timeMapper.now();
-        String stampUser = userContext.effectiveUser();
+        String stampUser = effectiveUser;
 
         repository.updateName(id, newName, now, stampUser);
         cache.applyRename(id, newName, now, stampUser);

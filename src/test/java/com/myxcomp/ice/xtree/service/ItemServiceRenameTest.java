@@ -16,8 +16,10 @@ import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -128,5 +132,57 @@ class ItemServiceRenameTest {
         verify(repository).updateName(7L, "New", NOW, "alice");
         verify(cache).applyRename(7L, "New", NOW, "alice");
         verify(publisher).publish(any());
+    }
+
+    @Nested
+    class Ownership {
+
+        private final UserContext ctx = new UserContext("alice", null);
+        private final java.time.Instant T = java.time.Instant.parse("2026-05-25T10:00:00Z");
+        private final CachedNode targetItem = new CachedNode(50L, 10L, "OldName", "Report", T, "sys");
+        private final CachedNode aliceHome = new CachedNode(10L, 2L, "alice", "Folder", T, "sys");
+
+        @Test
+        void renamingItemNotInUserHomeRejectsWith403() {
+            when(cache.getById(50L)).thenReturn(Optional.of(targetItem));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            org.mockito.Mockito.doThrow(new ForbiddenException(
+                    ErrorCode.NOT_IN_USER_FOLDER, "Item 50 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(50L, aliceHome, "alice", "Item");
+
+            assertThatThrownBy(() -> service.renameItem(50L, "NewName", ctx))
+                    .isInstanceOf(ForbiddenException.class)
+                    .satisfies(e -> assertThat(
+                            ((ForbiddenException) e).errorCode())
+                            .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
+
+            verify(repository, never()).updateName(anyLong(), any(), any(), any());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void noHomeFolderRejectsWith404() {
+            when(cache.getById(50L)).thenReturn(Optional.of(targetItem));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenThrow(
+                    new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
+                            "No home folder for user 'alice'"));
+
+            assertThatThrownBy(() -> service.renameItem(50L, "NewName", ctx))
+                    .isInstanceOf(NotFoundException.class);
+
+            verify(repository, never()).updateName(anyLong(), any(), any(), any());
+        }
+
+        @Test
+        void itemNotFoundFiresBeforeOwnershipCheck() {
+            when(cache.getById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.renameItem(999L, "NewName", ctx))
+                    .isInstanceOf(NotFoundException.class)
+                    .satisfies(e -> assertThat(((NotFoundException) e).errorCode())
+                            .isEqualTo(ErrorCode.ITEM_NOT_FOUND));
+
+            verifyNoInteractions(ownershipChecker);
+        }
     }
 }
