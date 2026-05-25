@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.*;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
@@ -46,6 +47,9 @@ class ObservabilityExposureIT {
     @Autowired
     private CacheReadinessGate gate;
 
+    @Autowired
+    private JdbcClient jdbcClient;
+
     /** Item ids created during a test that must be deleted in @AfterEach. */
     private final List<Long> createdIds = new ArrayList<>();
 
@@ -71,6 +75,9 @@ class ObservabilityExposureIT {
                     Void.class);
         }
         createdIds.clear();
+        // SQL fallback: remove any auto-allocated rows the HTTP DELETE could not reach
+        // (e.g. copies under another user's home folder that now return 403 due to ownership enforcement).
+        jdbcClient.sql("DELETE FROM ITEMTREE WHERE ITEMTREEID >= 100000").update();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
