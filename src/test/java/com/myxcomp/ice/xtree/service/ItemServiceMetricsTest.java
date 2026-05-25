@@ -11,6 +11,7 @@ import com.myxcomp.ice.xtree.messaging.EventPublisher;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
+import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.persistence.PayloadRow;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import io.micrometer.core.instrument.Counter;
@@ -66,9 +67,10 @@ class ItemServiceMetricsTest {
         meterRegistry = new SimpleMeterRegistry();
         CopyProperties copyProperties = mock(CopyProperties.class);
         when(copyProperties.maxNodes()).thenReturn(100);
+        OwnershipChecker ownershipChecker = mock(OwnershipChecker.class);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, seq, new SyncTaskExecutor(), meterRegistry,
-                copyProperties);
+                copyProperties, ownershipChecker);
     }
 
     @Test

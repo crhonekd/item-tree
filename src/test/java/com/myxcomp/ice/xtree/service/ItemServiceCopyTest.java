@@ -8,6 +8,7 @@ import com.myxcomp.ice.xtree.common.TreeConstants;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
+import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.messaging.EventPublisher;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
@@ -59,6 +60,7 @@ class ItemServiceCopyTest {
     @Mock InstanceIdProvider instanceIdProvider;
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
+    @Mock OwnershipChecker ownershipChecker;
 
     ItemService service;
 
@@ -67,7 +69,7 @@ class ItemServiceCopyTest {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
-                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties);
+                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker);
     }
 
     @Nested

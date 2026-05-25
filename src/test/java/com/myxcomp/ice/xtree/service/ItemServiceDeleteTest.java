@@ -12,6 +12,7 @@ import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.DeletePayload;
 import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
+import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ class ItemServiceDeleteTest {
     @Mock InstanceIdProvider instanceIdProvider;
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
+    @Mock OwnershipChecker ownershipChecker;
 
     ItemService service;
     static final UserContext CTX = new UserContext("alice", null);
@@ -60,7 +62,7 @@ class ItemServiceDeleteTest {
         service = new ItemService(
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
-                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties);
+                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker);
     }
 
     @Test

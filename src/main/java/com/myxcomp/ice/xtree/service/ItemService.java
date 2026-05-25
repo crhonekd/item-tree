@@ -9,6 +9,7 @@ import com.myxcomp.ice.xtree.common.Types;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.conversion.XmlJsonConverter;
 import com.myxcomp.ice.xtree.messaging.EventPublisher;
+import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.messaging.SequenceGenerator;
 import com.myxcomp.ice.xtree.messaging.event.OperationType;
 import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
@@ -67,6 +68,7 @@ public class ItemService {
     private final TaskExecutor backfillExecutor;
     private final MeterRegistry meterRegistry;
     private final CopyProperties copyProperties;
+    private final OwnershipChecker ownershipChecker;
 
     public ItemService(TreeCache cache,
                        ItemTreeRepository repository,
@@ -78,7 +80,8 @@ public class ItemService {
                        SequenceGenerator sequenceGenerator,
                        @Qualifier("backfillExecutor") TaskExecutor backfillExecutor,
                        MeterRegistry meterRegistry,
-                       CopyProperties copyProperties) {
+                       CopyProperties copyProperties,
+                       OwnershipChecker ownershipChecker) {
         this.cache = cache;
         this.repository = repository;
         this.policy = policy;
@@ -90,6 +93,7 @@ public class ItemService {
         this.backfillExecutor = backfillExecutor;
         this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
         this.copyProperties = Objects.requireNonNull(copyProperties, "copyProperties");
+        this.ownershipChecker = Objects.requireNonNull(ownershipChecker, "ownershipChecker");
     }
 
     /**

@@ -13,6 +13,7 @@ import com.myxcomp.ice.xtree.messaging.event.TreeMutationEvent;
 import com.myxcomp.ice.xtree.messaging.event.payload.MovePayload;
 import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
+import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
@@ -53,6 +54,7 @@ class ItemServiceMoveTest {
     @Mock InstanceIdProvider instanceIdProvider;
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
+    @Mock OwnershipChecker ownershipChecker;
 
     ItemService service;
     static final Instant NOW = Instant.parse("2026-05-16T12:00:00Z");
@@ -63,7 +65,7 @@ class ItemServiceMoveTest {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
-                new SimpleMeterRegistry(), copyProperties);
+                new SimpleMeterRegistry(), copyProperties, ownershipChecker);
     }
 
     private CachedNode folder(long id, long parentId, String name) {
