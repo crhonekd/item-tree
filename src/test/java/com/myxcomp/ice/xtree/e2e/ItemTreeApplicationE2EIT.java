@@ -333,13 +333,27 @@ class ItemTreeApplicationE2EIT {
         // testuser1 attempts to create an item under testuser2's home folder (id=11 in seed data).
         // The ownership check in ItemService throws ForbiddenException(NOT_IN_USER_FOLDER).
         ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        TreeCache cacheB = pair.b().getBean(TreeCache.class);
+        JdbcClient jdbc = pair.a().getBean(JdbcClient.class);
         UserContext testuser1 = new UserContext("testuser1", null);
+
+        int childrenBeforeOnB = cacheB.getChildren(11L).size();
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
                 () -> itemServiceA.createItem(11L, "ForbiddenItem", "Folder", null, testuser1))
                 .isInstanceOf(ForbiddenException.class)
                 .satisfies(ex -> assertThat(((ForbiddenException) ex).errorCode())
                         .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
+
+        // No DB row must have been persisted — the ownership check fires before any DB write.
+        int dbRowCount = jdbc.sql("SELECT COUNT(*) FROM ITEMTREE WHERE NAME = 'ForbiddenItem'")
+                .query(Integer.class).single();
+        assertThat(dbRowCount).as("no DB row created for forbidden item").isZero();
+
+        // No event must have propagated to instance B's cache.
+        assertThat(cacheB.getChildren(11L).size())
+                .as("cacheB child count for parent 11 unchanged after forbidden mutation")
+                .isEqualTo(childrenBeforeOnB);
     }
 
     @Test
