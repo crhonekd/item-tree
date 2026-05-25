@@ -173,6 +173,21 @@ class ItemControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("TYPE_CANNOT_HAVE_DATA"));
     }
 
+    @Test
+    void createItemForbiddenWhenNotInUserFolder() throws Exception {
+        when(itemService.createItem(anyLong(), any(), any(), any(), any(UserContext.class)))
+                .thenThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                        "Parent 2 is not under home folder of 'alice'"));
+
+        mvc.perform(post("/api/v1/itemtree/items")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentId\":2,\"name\":\"x\",\"type\":\"Folder\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("NOT_IN_USER_FOLDER"));
+    }
+
     // ── delete ───────────────────────────────────────────────────────────
 
     @Test
@@ -201,6 +216,19 @@ class ItemControllerTest {
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
+    }
+
+    @Test
+    void deleteItemForbiddenWhenNotInUserFolder() throws Exception {
+        doThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                "Item 42 is not under home folder of 'alice'"))
+                .when(itemService).deleteItem(anyLong(), any(UserContext.class));
+
+        mvc.perform(delete("/api/v1/itemtree/items/42")
+                        .header("X-Ice-User", "alice"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("NOT_IN_USER_FOLDER"));
     }
 
     // ── move ─────────────────────────────────────────────────────────────
@@ -271,6 +299,21 @@ class ItemControllerTest {
                 .andExpect(jsonPath("$.errorCode").value("NEW_PARENT_NOT_FOLDER"));
     }
 
+    @Test
+    void moveItemForbiddenWhenNotInUserFolder() throws Exception {
+        when(itemService.moveItem(anyLong(), anyLong(), any(UserContext.class)))
+                .thenThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                        "Item 42 is not under home folder of 'alice'"));
+
+        mvc.perform(post("/api/v1/itemtree/items/42/move")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newParentId\":7}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("NOT_IN_USER_FOLDER"));
+    }
+
     // ── rename ───────────────────────────────────────────────────────────
 
     @Test
@@ -308,6 +351,21 @@ class ItemControllerTest {
                         .content("{\"newName\":\"Report-2\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
+    }
+
+    @Test
+    void renameItemForbiddenWhenNotInUserFolder() throws Exception {
+        when(itemService.renameItem(anyLong(), any(), any(UserContext.class)))
+                .thenThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                        "Item 42 is not under home folder of 'alice'"));
+
+        mvc.perform(post("/api/v1/itemtree/items/42/rename")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newName\":\"Report-2\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("NOT_IN_USER_FOLDER"));
     }
 
     // ── update data ──────────────────────────────────────────────────────
@@ -350,6 +408,21 @@ class ItemControllerTest {
                         .content("{\"data\":{\"foo\":\"bar\"}}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
+    }
+
+    @Test
+    void updateItemDataForbiddenWhenNotInUserFolder() throws Exception {
+        when(itemService.updateItemData(anyLong(), any(), any(UserContext.class)))
+                .thenThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                        "Item 42 is not under home folder of 'alice'"));
+
+        mvc.perform(put("/api/v1/itemtree/items/42/data")
+                        .header("X-Ice-User", "alice")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"data\":{\"foo\":\"bar\"}}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.errorCode").value("NOT_IN_USER_FOLDER"));
     }
 
     // ── getItems ─────────────────────────────────────────────────────────
