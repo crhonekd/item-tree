@@ -14,6 +14,7 @@ import com.myxcomp.ice.xtree.service.ItemService;
 import com.myxcomp.ice.xtree.service.ItemWithData;
 import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
@@ -462,7 +463,7 @@ class ItemControllerTest {
                 org.junit.jupiter.params.provider.Arguments.of(
                     new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND, "x"), 404, "HOME_FOLDER_NOT_FOUND"),
                 org.junit.jupiter.params.provider.Arguments.of(
-                    new ValidationException(ErrorCode.DESTINATION_NOT_IN_USER_FOLDER, "x"), 400, "DESTINATION_NOT_IN_USER_FOLDER"),
+                    new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER, "x"), 403, "NOT_IN_USER_FOLDER"),
                 org.junit.jupiter.params.provider.Arguments.of(
                     new ValidationException(ErrorCode.COPY_INTO_DESCENDANT, "x"), 400, "COPY_INTO_DESCENDANT"),
                 org.junit.jupiter.params.provider.Arguments.of(

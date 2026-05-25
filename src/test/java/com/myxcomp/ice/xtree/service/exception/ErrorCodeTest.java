@@ -28,7 +28,6 @@ class ErrorCodeTest {
             "CANNOT_COPY_ROOT",
             "DESTINATION_NOT_FOUND",
             "DESTINATION_NOT_FOLDER",
-            "DESTINATION_NOT_IN_USER_FOLDER",
             "COPY_INTO_DESCENDANT",
             "COPY_TOO_LARGE",
             "NOT_IN_USER_FOLDER"
@@ -45,7 +44,6 @@ class ErrorCodeTest {
         "CANNOT_COPY_ROOT",
         "DESTINATION_NOT_FOUND",
         "DESTINATION_NOT_FOLDER",
-        "DESTINATION_NOT_IN_USER_FOLDER",
         "COPY_INTO_DESCENDANT",
         "COPY_TOO_LARGE"
     })
