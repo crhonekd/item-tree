@@ -589,7 +589,17 @@ All 12 service endpoints plus the `/actuator/itemtree-refresh/{type}` actuator: 
 
 ---
 
-## Phase 16 — Work PC wiring (Phase B, user-managed)
+## Phase 16 — User-folder ownership enforcement
+
+Server-side enforcement that a user can only mutate items inside their own home-folder subtree. Six mutation operations affected: `createItem`, `deleteItem`, `renameItem`, `moveItem`, `updateItemData`, `copyItem`. Violations return HTTP 403 with `errorCode = NOT_IN_USER_FOLDER`.
+
+Key additions: `ForbiddenException` (extends `ItemTreeException`, HTTP 403), `ErrorCode.NOT_IN_USER_FOLDER`, `OwnershipChecker` @Component (injected into `ItemService`). Existing `DESTINATION_NOT_IN_USER_FOLDER` (400/Validation) removed and replaced everywhere. `deleteItem` probe point shifted from DB to cache.
+
+See spec: `docs/superpowers/specs/2026-05-25-user-folder-ownership-design.md`.
+
+---
+
+## Phase 17 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
 
