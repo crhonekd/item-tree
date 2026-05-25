@@ -6,6 +6,8 @@ import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener;
 import com.myxcomp.ice.xtree.service.ItemService;
+import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
@@ -324,6 +326,20 @@ class ItemTreeApplicationE2EIT {
                 .untilAsserted(() -> assertThat(cacheB.getById(newId)).isPresent());
         assertThat(cacheB.getById(newId)).get()
                 .extracting(CachedNode::parentId).isEqualTo(destId);
+    }
+
+    @Test
+    void mutationsForbiddenOutsideOwnFolder() {
+        // testuser1 attempts to create an item under testuser2's home folder (id=11 in seed data).
+        // The ownership check in ItemService throws ForbiddenException(NOT_IN_USER_FOLDER).
+        ItemService itemServiceA = pair.a().getBean(ItemService.class);
+        UserContext testuser1 = new UserContext("testuser1", null);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> itemServiceA.createItem(11L, "ForbiddenItem", "Folder", null, testuser1))
+                .isInstanceOf(ForbiddenException.class)
+                .satisfies(ex -> assertThat(((ForbiddenException) ex).errorCode())
+                        .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
     }
 
     @Test
