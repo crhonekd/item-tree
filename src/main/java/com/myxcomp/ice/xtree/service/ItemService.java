@@ -167,15 +167,26 @@ public class ItemService {
     }
 
     /**
-     * Cascade-deletes {@code id} and all descendants. Silent no-op if {@code id} is unknown.
-     * Order: DB cascade → cache.applyDelete → event.
+     * Cascade-deletes {@code id} and all descendants. Silent no-op if {@code id} is absent
+     * from the cache (no auth check, no DB call). Ownership is enforced after the cache probe.
+     * Order: cache probe → ownership check → DB cascade → cache.applyDelete → event.
      */
     @Transactional
     public void deleteItem(long id, UserContext userContext) {
         Objects.requireNonNull(userContext, "userContext");
+
+        if (cache.getById(id).isEmpty()) {
+            log.info("deleteItem: id={} not present in cache; no-op", id);
+            return;
+        }
+
+        String effectiveUser = userContext.effectiveUser();
+        CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
+        ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Item");
+
         List<Long> deletedIds = repository.cascadeDeleteSubtree(id);
         if (deletedIds.isEmpty()) {
-            log.info("deleteItem: id={} not present in DB; no-op", id);
+            log.info("deleteItem: id={} present in cache but not DB (drift); no-op", id);
             return;
         }
         meterRegistry.summary("itemtree.delete.cascade.size").record(deletedIds.size());

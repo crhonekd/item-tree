@@ -1,5 +1,6 @@
 package com.myxcomp.ice.xtree.service;
 
+import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import com.myxcomp.ice.xtree.common.InstanceIdProvider;
 import com.myxcomp.ice.xtree.common.TimeMapper;
@@ -14,7 +15,11 @@ import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
+import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
+import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -26,11 +31,15 @@ import org.springframework.core.task.SyncTaskExecutor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -65,8 +74,15 @@ class ItemServiceDeleteTest {
                 new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker);
     }
 
+    private static final CachedNode NODE_50 = new CachedNode(50L, 10L, "Report", "Report",
+            Instant.parse("2026-05-16T12:00:00Z"), "sys");
+    private static final CachedNode HOME_ALICE = new CachedNode(10L, 2L, "alice", "Folder",
+            Instant.parse("2026-05-16T12:00:00Z"), "sys");
+
     @Test
     void deleteCascadesAndBroadcasts() {
+        when(cache.getById(50L)).thenReturn(Optional.of(NODE_50));
+        when(ownershipChecker.requireHomeFolderExists(CTX.effectiveUser())).thenReturn(HOME_ALICE);
         when(repository.cascadeDeleteSubtree(50L)).thenReturn(List.of(50L, 51L, 52L));
         when(timeMapper.now()).thenReturn(Instant.parse("2026-05-16T12:00:00Z"));
         when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
@@ -89,17 +105,23 @@ class ItemServiceDeleteTest {
 
     @Test
     void deleteOfMissingIdIsSilentNoOp() {
-        when(repository.cascadeDeleteSubtree(999L)).thenReturn(List.of());
+        when(cache.getById(999L)).thenReturn(Optional.empty());
 
         service.deleteItem(999L, CTX);
 
-        verify(repository).cascadeDeleteSubtree(999L);
+        verify(repository, never()).cascadeDeleteSubtree(anyLong());
         verifyNoInteractions(publisher);
         verify(cache, never()).applyDelete(any());
     }
 
     @Test
     void publisherThrowDoesNotPropagateOnDelete() {
+        when(cache.getById(50L)).thenReturn(Optional.of(
+                new CachedNode(50L, 10L, "Report", "Report",
+                        Instant.parse("2026-05-16T12:00:00Z"), "sys")));
+        when(ownershipChecker.requireHomeFolderExists(anyString())).thenReturn(
+                new CachedNode(10L, 2L, CTX.effectiveUser(), "Folder",
+                        Instant.parse("2026-05-16T12:00:00Z"), "sys"));
         when(repository.cascadeDeleteSubtree(50L)).thenReturn(List.of(50L));
         when(timeMapper.now()).thenReturn(Instant.parse("2026-05-16T12:00:00Z"));
         when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
@@ -111,5 +133,75 @@ class ItemServiceDeleteTest {
         verify(repository).cascadeDeleteSubtree(50L);
         verify(cache).applyDelete(Set.of(50L));
         verify(publisher).publish(any());
+    }
+
+    @Nested
+    class Ownership {
+
+        private final UserContext ctx = new UserContext("alice", null);
+        private final CachedNode targetItem = new CachedNode(50L, 10L, "Report", "Report",
+                Instant.parse("2026-05-25T10:00:00Z"), "sys");
+        private final CachedNode aliceHome = new CachedNode(10L, 2L, "alice", "Folder",
+                Instant.parse("2026-05-25T10:00:00Z"), "sys");
+
+        @Test
+        void deletingItemNotInUserHomeRejectsWith403() {
+            when(cache.getById(50L)).thenReturn(Optional.of(targetItem));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            doThrow(new ForbiddenException(ErrorCode.NOT_IN_USER_FOLDER,
+                    "Item 50 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(50L, aliceHome, "alice", "Item");
+
+            assertThatThrownBy(() -> service.deleteItem(50L, ctx))
+                    .isInstanceOf(ForbiddenException.class)
+                    .satisfies(e -> assertThat(((ForbiddenException) e).errorCode())
+                            .isEqualTo(ErrorCode.NOT_IN_USER_FOLDER));
+
+            verify(repository, never()).cascadeDeleteSubtree(anyLong());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void deletingMissingIdIsNoopWithoutAuthCheck() {
+            when(cache.getById(999L)).thenReturn(Optional.empty());
+
+            assertThatCode(() -> service.deleteItem(999L, ctx))
+                    .doesNotThrowAnyException();
+
+            verify(repository, never()).cascadeDeleteSubtree(anyLong());
+            verifyNoInteractions(ownershipChecker);
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void noHomeFolderRejectsWith404WhenItemExists() {
+            when(cache.getById(50L)).thenReturn(Optional.of(targetItem));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenThrow(
+                    new NotFoundException(ErrorCode.HOME_FOLDER_NOT_FOUND,
+                            "No home folder for user 'alice'"));
+
+            assertThatThrownBy(() -> service.deleteItem(50L, ctx))
+                    .isInstanceOf(NotFoundException.class)
+                    .satisfies(e -> assertThat(((NotFoundException) e).errorCode())
+                            .isEqualTo(ErrorCode.HOME_FOLDER_NOT_FOUND));
+
+            verify(repository, never()).cascadeDeleteSubtree(anyLong());
+        }
+
+        @Test
+        void ownedItemFlowsThroughToCascadeDelete() {
+            when(cache.getById(50L)).thenReturn(Optional.of(targetItem));
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            // requireOwned returns void → default mock = passes
+            when(repository.cascadeDeleteSubtree(50L)).thenReturn(List.of(50L));
+            when(timeMapper.now()).thenReturn(Instant.parse("2026-05-25T11:00:00Z"));
+            when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+            when(sequenceGenerator.next()).thenReturn(1L);
+
+            service.deleteItem(50L, ctx);
+
+            verify(repository).cascadeDeleteSubtree(50L);
+            verify(publisher).publish(any());
+        }
     }
 }

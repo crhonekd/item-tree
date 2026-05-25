@@ -38,6 +38,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -50,6 +51,7 @@ class ItemServiceMetricsTest {
     private EventPublisher publisher;
     private TimeMapper timeMapper;
     private SimpleMeterRegistry meterRegistry;
+    private OwnershipChecker ownershipChecker;
     private ItemService service;
 
     @BeforeEach
@@ -67,7 +69,7 @@ class ItemServiceMetricsTest {
         meterRegistry = new SimpleMeterRegistry();
         CopyProperties copyProperties = mock(CopyProperties.class);
         when(copyProperties.maxNodes()).thenReturn(100);
-        OwnershipChecker ownershipChecker = mock(OwnershipChecker.class);
+        ownershipChecker = mock(OwnershipChecker.class);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, seq, new SyncTaskExecutor(), meterRegistry,
                 copyProperties, ownershipChecker);
@@ -75,6 +77,10 @@ class ItemServiceMetricsTest {
 
     @Test
     void deleteRecordsCascadeSize() {
+        CachedNode node = new CachedNode(10L, 5L, "item", "Report", Instant.EPOCH, "u");
+        CachedNode home = new CachedNode(5L, 1L, "u", Types.FOLDER, Instant.EPOCH, "sys");
+        when(cache.getById(10L)).thenReturn(Optional.of(node));
+        lenient().when(ownershipChecker.requireHomeFolderExists(anyString())).thenReturn(home);
         when(repository.cascadeDeleteSubtree(anyLong())).thenReturn(List.of(10L, 11L, 12L, 13L));
 
         service.deleteItem(10L, new UserContext("u", null));
@@ -87,7 +93,7 @@ class ItemServiceMetricsTest {
 
     @Test
     void deleteOnUnknownIdDoesNotRecordCascadeSize() {
-        when(repository.cascadeDeleteSubtree(anyLong())).thenReturn(List.of());
+        when(cache.getById(999L)).thenReturn(Optional.empty());
 
         service.deleteItem(999L, new UserContext("u", null));
 
