@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ItemTreeApplicationE2EIT {
 
@@ -339,7 +340,7 @@ class ItemTreeApplicationE2EIT {
 
         int childrenBeforeOnB = cacheB.getChildren(11L).size();
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                 () -> itemServiceA.createItem(11L, "ForbiddenItem", "Folder", null, testuser1))
                 .isInstanceOf(ForbiddenException.class)
                 .satisfies(ex -> assertThat(((ForbiddenException) ex).errorCode())
@@ -351,9 +352,9 @@ class ItemTreeApplicationE2EIT {
         assertThat(dbRowCount).as("no DB row created for forbidden item").isZero();
 
         // No event must have propagated to instance B's cache.
-        assertThat(cacheB.getChildren(11L).size())
+        assertThat(cacheB.getChildren(11L))
                 .as("cacheB child count for parent 11 unchanged after forbidden mutation")
-                .isEqualTo(childrenBeforeOnB);
+                .hasSize(childrenBeforeOnB);
     }
 
     @Test
