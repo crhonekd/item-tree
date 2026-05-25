@@ -3,6 +3,7 @@ package com.myxcomp.ice.xtree.api.advice;
 import com.myxcomp.ice.xtree.generated.model.Problem;
 import com.myxcomp.ice.xtree.service.exception.CopyTooLargeException;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import jakarta.validation.ConstraintViolation;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -152,5 +154,22 @@ class GlobalExceptionHandlerTest {
         assertThat(resp.getBody().getStatus()).isEqualTo(413);
         assertThat(resp.getBody().getErrorCode()).isEqualTo(ErrorCode.COPY_TOO_LARGE.name());
         assertThat(resp.getBody().getDetail()).contains("250 nodes");
+    }
+
+    @Test
+    void forbiddenExceptionMapsTo403WithErrorCodeAndProblemJson() {
+        ForbiddenException ex = new ForbiddenException(
+                ErrorCode.NOT_IN_USER_FOLDER, "Parent 42 is not under home folder of 'alice'");
+
+        ResponseEntity<Problem> response = handler.handleForbidden(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getHeaders().getContentType())
+                .isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getStatus()).isEqualTo(403);
+        assertThat(response.getBody().getErrorCode()).isEqualTo("NOT_IN_USER_FOLDER");
+        assertThat(response.getBody().getDetail())
+                .isEqualTo("Parent 42 is not under home folder of 'alice'");
     }
 }
