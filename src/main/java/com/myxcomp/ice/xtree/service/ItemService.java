@@ -264,8 +264,13 @@ public class ItemService {
                     "Cannot move id=" + id + " under its own descendant " + newParentId);
         }
 
+        String effectiveUser = userContext.effectiveUser();
+        CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
+        ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Source");
+        ownershipChecker.requireOwned(newParentId, homeFolder, effectiveUser, "New parent");
+
         Instant now = timeMapper.now();
-        String stampUser = userContext.effectiveUser();
+        String stampUser = effectiveUser;
         long oldParentId = item.parentId();
 
         repository.updateParent(id, newParentId, now, stampUser);

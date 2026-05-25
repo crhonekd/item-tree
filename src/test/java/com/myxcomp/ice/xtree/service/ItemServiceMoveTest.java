@@ -16,8 +16,10 @@ import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
+import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,9 +37,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -63,6 +68,8 @@ class ItemServiceMoveTest {
     @BeforeEach
     void setUp() {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
+        lenient().when(ownershipChecker.requireHomeFolderExists(anyString()))
+                .thenReturn(new CachedNode(10L, 2L, "alice", "Folder", Instant.EPOCH, "sys"));
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
                 new SimpleMeterRegistry(), copyProperties, ownershipChecker);
@@ -209,5 +216,95 @@ class ItemServiceMoveTest {
         verify(repository).updateParent(7L, 3L, NOW, "alice");
         verify(cache).applyMove(7L, 3L, NOW, "alice");
         verify(publisher).publish(any());
+    }
+
+    @Nested
+    class Ownership {
+
+        private final UserContext ctx = new UserContext("alice", null);
+        private final java.time.Instant T = java.time.Instant.parse("2026-05-25T10:00:00Z");
+        private final CachedNode item = new CachedNode(50L, 10L, "X", "Report", T, "sys");
+        private final CachedNode newParent = new CachedNode(60L, 10L, "Folder1", "Folder", T, "sys");
+        private final CachedNode aliceHome = new CachedNode(10L, 2L, "alice", "Folder", T, "sys");
+
+        @org.junit.jupiter.api.BeforeEach
+        void stubMoveCommon() {
+            lenient().when(cache.getById(50L)).thenReturn(Optional.of(item));
+            lenient().when(cache.getById(60L)).thenReturn(Optional.of(newParent));
+            lenient().when(cache.isAncestor(50L, 60L)).thenReturn(false);
+        }
+
+        @Test
+        void sourceOutOfUserHomeRejectsWith403() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            org.mockito.Mockito.doThrow(new ForbiddenException(
+                    ErrorCode.NOT_IN_USER_FOLDER, "Source 50 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(50L, aliceHome, "alice", "Source");
+
+            assertThatThrownBy(() -> service.moveItem(50L, 60L, ctx))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessageContaining("Source 50");
+
+            verify(repository, never()).updateParent(anyLong(), anyLong(), any(), any());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void newParentOutOfUserHomeRejectsWith403() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            // requireOwned(source) passes (lenient — won't cause strict-stub mismatch),
+            // requireOwned(newParent) throws:
+            lenient().doNothing().when(ownershipChecker).requireOwned(50L, aliceHome, "alice", "Source");
+            org.mockito.Mockito.doThrow(new ForbiddenException(
+                    ErrorCode.NOT_IN_USER_FOLDER, "New parent 60 is not under home folder of 'alice'"))
+                    .when(ownershipChecker).requireOwned(60L, aliceHome, "alice", "New parent");
+
+            assertThatThrownBy(() -> service.moveItem(50L, 60L, ctx))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessageContaining("New parent 60");
+
+            verify(repository, never()).updateParent(anyLong(), anyLong(), any(), any());
+            verifyNoInteractions(publisher);
+        }
+
+        @Test
+        void bothInUserHomeAllowsMove() {
+            when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(aliceHome);
+            when(timeMapper.now()).thenReturn(T);
+            when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+            when(sequenceGenerator.next()).thenReturn(1L);
+            CachedNode movedItem = new CachedNode(50L, 60L, "X", "Report", T, "alice");
+            when(cache.getById(50L)).thenReturn(Optional.of(item), Optional.of(movedItem));
+
+            service.moveItem(50L, 60L, ctx);
+
+            verify(ownershipChecker).requireOwned(50L, aliceHome, "alice", "Source");
+            verify(ownershipChecker).requireOwned(60L, aliceHome, "alice", "New parent");
+            verify(repository).updateParent(50L, 60L, T, "alice");
+        }
+
+        @Test
+        void itemNotFoundFiresBeforeOwnership() {
+            when(cache.getById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.moveItem(999L, 60L, ctx))
+                    .isInstanceOf(NotFoundException.class)
+                    .satisfies(e -> assertThat(((NotFoundException) e).errorCode())
+                            .isEqualTo(ErrorCode.ITEM_NOT_FOUND));
+
+            verifyNoInteractions(ownershipChecker);
+        }
+
+        @Test
+        void moveIntoDescendantFiresBeforeOwnership() {
+            when(cache.isAncestor(50L, 60L)).thenReturn(true);
+
+            assertThatThrownBy(() -> service.moveItem(50L, 60L, ctx))
+                    .isInstanceOf(ValidationException.class)
+                    .satisfies(e -> assertThat(((ValidationException) e).errorCode())
+                            .isEqualTo(ErrorCode.MOVE_INTO_DESCENDANT));
+
+            verifyNoInteractions(ownershipChecker);
+        }
     }
 }

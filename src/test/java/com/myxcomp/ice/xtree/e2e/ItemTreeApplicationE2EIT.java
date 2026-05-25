@@ -36,7 +36,14 @@ class ItemTreeApplicationE2EIT {
 
     @AfterEach
     void shutdown() {
-        if (pair != null) pair.close();
+        if (pair != null) {
+            // Delete E2E-created rows (allocated IDs >= 100000) before closing the context,
+            // so the shared H2 in-memory DB is clean for subsequent test classes.
+            pair.a().getBean(JdbcClient.class)
+                    .sql("DELETE FROM ITEMTREE WHERE ITEMTREEID >= 100000")
+                    .update();
+            pair.close();
+        }
     }
 
     @Test
@@ -118,10 +125,16 @@ class ItemTreeApplicationE2EIT {
                         .isEqualTo("testuser1");
             }
             case "MOVE" -> {
-                itemServiceA.moveItem(id, 3L, alice);   // move under Reports (id=3)
-                assertThat(cacheA.getById(id).orElseThrow().parentId()).isEqualTo(3L);
+                // Create a second folder under testuser1's home so we have an owned destination.
+                CachedNode moveDestination = itemServiceA.createItem(
+                        10L, "E2E_MOVE_destination", "Folder", null, alice);
+                long destId = moveDestination.itemTreeId();
+                assertThat(cacheB.getById(destId)).as("destination visible on B").isPresent();
+
+                itemServiceA.moveItem(id, destId, alice);
+                assertThat(cacheA.getById(id).orElseThrow().parentId()).isEqualTo(destId);
                 assertThat(cacheB.getById(id).orElseThrow().parentId())
-                        .as("B sees the new parent").isEqualTo(3L);
+                        .as("B sees the new parent").isEqualTo(destId);
             }
             case "RENAME" -> {
                 itemServiceA.renameItem(id, "E2E_RENAME_after", alice);
