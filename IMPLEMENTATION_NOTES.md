@@ -601,22 +601,23 @@ All 12 service endpoints plus the `/actuator/itemtree-refresh/{type}` actuator: 
 - **New error code:** `ErrorCode.NOT_IN_USER_FOLDER` (replaces and removes the Phase 14 `DESTINATION_NOT_IN_USER_FOLDER` which was 400/Validation — see Phase 14 footnote).
 - **New component:** `OwnershipChecker` — two methods: `requireHomeFolderExists(effectiveUser)` returning `CachedNode` or throwing `NotFoundException(HOME_FOLDER_NOT_FOUND)`; `requireOwned(itemId, homeFolder, effectiveUser, contextLabel)` throwing `ForbiddenException(NOT_IN_USER_FOLDER)` if the item is not inside the subtree.
 - **`ItemService`:** `OwnershipChecker` injected; all six mutation methods call the checker in the correct validation order (structural checks first, ownership after, then the write).
-- **`deleteItem` probe shift:** cache probe first; if absent → silent no-op without auth check; if present → ownership check → cascade delete.
+- **`deleteItem` probe shift:** cache probe first; if absent → silent no-op without auth check (an absent item cannot be owned); if present → ownership check → cascade delete.
 - **`GlobalExceptionHandler`:** new `@ExceptionHandler(ForbiddenException.class)` → HTTP 403 + `application/problem+json`.
 - **`itemtree-service-design.md`:** §3 validation rules updated; §13 "Home-folder ownership enforcement" subsection added; §19 out-of-scope bullets corrected.
 
 ### Tests
 
-~38 new test executions across 9 classes (665 total, up from 627):
+38 new test executions across 11 classes (665 total, up from 627):
 - `ForbiddenExceptionTest` (3): carries errorCode + message, extends ItemTreeException, null errorCode rejected.
 - `OwnershipCheckerTest` (10): requireHomeFolderExists happy/absent/null-user; requireOwned item=home/in-subtree/outside/contextLabel/null-homeFolder/null-user/null-contextLabel.
 - `GlobalExceptionHandlerTest` (1): forbiddenException maps to 403 + problem JSON.
-- `ItemControllerTest` (5): one 403 test per mutation endpoint.
+- `ItemControllerTest` (5 standalone + 1 via `@ParameterizedTest`): one 403 test per mutation endpoint (5 `createItem`/`deleteItem`/`renameItem`/`moveItem`/`updateItemData` standalone tests; `copyItem` covered as one input to the `serviceErrorCases` parameterized test).
 - `ItemServiceCreateTest` (4 Ownership nested): parentNotInUserHome, noHomeFolder, effectiveUser vs iceUser, ownershipAfterParentNotFolder.
 - `ItemServiceDeleteTest` (4 Ownership nested): notInUserHome, missingIdIsNoopNoAuth, noHomeFolder, ownedFlowsThroughToCascade.
 - `ItemServiceRenameTest` (3 Ownership nested): notInUserHome, noHomeFolder, itemNotFoundBeforeOwnership.
 - `ItemServiceMoveTest` (5 Ownership nested): sourceOut, newParentOut, bothIn, itemNotFoundFirst, descendantFirst.
 - `ItemServiceUpdateDataTest` (3 Ownership nested): notInUserHome, noHomeFolder, validationBeforeOwnership.
+- `ItemServiceCopyTest` (2 ownership-relevant): `homeFolderNotFound`, `destinationNotInUserFolder` — both adapted to Phase 16 semantics.
 - `ItemTreeApplicationE2EIT` (1): mutationsForbiddenOutsideOwnFolder.
 - `ErrorCodeTest`: EXPECTED_NAMES updated (18 values, DESTINATION_NOT_IN_USER_FOLDER removed).
 
