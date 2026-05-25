@@ -192,7 +192,6 @@ Tests mirror these packages, plus an `e2e/` package for `@SpringBootTest` agains
 - Introduce Hibernate, JPA, jOOQ, MyBatis, Spring Data, or any other persistence framework.
 - Add WebSocket / SSE — explicitly out of scope.
 - Add Flyway / Liquibase or any other schema migration tool. (Schema is initialised via plain `schema.sql` for H2 in Phase A; Oracle DBA owns it in Phase B.)
-- Add per-user authorization checks — UI enforces permissions.
 - Catch and swallow `Throwable` in mutation paths.
 - Touch `LASTUPDATE` / `LASTUPDATEUSER` in the silent XML→JSON backfill.
 - Hold the cache write lock across I/O (DB calls, network calls, anything that can block).
