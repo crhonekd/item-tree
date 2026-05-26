@@ -11,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.OptionalInt;
 
 @RestController
@@ -26,25 +25,14 @@ public class SearchController implements SearchApi {
     }
 
     @Override
-    public ResponseEntity<List<SearchHit>> search(String xIceUser, String xImpersonatedUser,
-                                                  Long id, String name, Integer limit) {
-        boolean hasId = id != null;
-        boolean hasName = name != null && !name.isEmpty();
-        if (hasId == hasName) {
-            throw new ValidationException(ErrorCode.INVALID_SEARCH_PARAMS,
-                    "Search requires exactly one of 'id' or 'name'");
-        }
+    public ResponseEntity<List<SearchHit>> search(String xIceUser, String q,
+                                                  String xImpersonatedUser, Integer limit) {
         if (limit != null && limit <= 0) {
             throw new ValidationException(ErrorCode.INVALID_SEARCH_PARAMS,
                     "limit must be a positive integer");
         }
-        if (hasId) {
-            Optional<CachedNode> found = searchService.searchById(id);
-            return ResponseEntity.ok(found.map(searchHitMapper::toDto)
-                    .map(List::of).orElseGet(List::of));
-        }
         OptionalInt limitOpt = limit != null ? OptionalInt.of(limit) : OptionalInt.empty();
-        List<CachedNode> hits = searchService.searchByName(name, limitOpt);
+        List<CachedNode> hits = searchService.search(q, limitOpt);
         return ResponseEntity.ok(searchHitMapper.toDtos(hits));
     }
 }

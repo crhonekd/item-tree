@@ -4,8 +4,8 @@ import com.myxcomp.ice.xtree.api.advice.GlobalExceptionHandler;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
 import com.myxcomp.ice.xtree.api.mapper.SearchHitMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
-import com.myxcomp.ice.xtree.config.SecurityProperties;
 import com.myxcomp.ice.xtree.cache.CachedNode;
+import com.myxcomp.ice.xtree.config.SecurityProperties;
 import com.myxcomp.ice.xtree.service.SearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,18 +14,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.OptionalInt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,10 +50,11 @@ class SearchControllerTest {
     }
 
     @Test
-    void searchByIdReturnsSingleHit() throws Exception {
-        when(searchService.searchById(42L)).thenReturn(Optional.of(node(42L, "Report-1", "Report")));
+    void numericQueryReturnsServiceResult() throws Exception {
+        when(searchService.search(eq("42"), any(OptionalInt.class)))
+                .thenReturn(List.of(node(42L, "Report-1", "Report")));
 
-        mvc.perform(get("/api/v1/itemtree/search?id=42")
+        mvc.perform(get("/api/v1/itemtree/search?q=42")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
@@ -62,63 +62,51 @@ class SearchControllerTest {
     }
 
     @Test
-    void searchByIdMissingReturnsEmptyList() throws Exception {
-        when(searchService.searchById(anyLong())).thenReturn(Optional.empty());
+    void nameQueryReturnsServiceResult() throws Exception {
+        when(searchService.search(eq("Repo"), any(OptionalInt.class)))
+                .thenReturn(List.of(node(42L, "Report-1", "Report"),
+                                    node(43L, "Report-2", "Report")));
 
-        mvc.perform(get("/api/v1/itemtree/search?id=999")
-                        .header("X-Ice-User", "alice"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
-    }
-
-    @Test
-    void searchByNameReturnsList() throws Exception {
-        when(searchService.searchByName("Repo", OptionalInt.empty()))
-                .thenReturn(List.of(node(42L, "Report-1", "Report"), node(43L, "Report-2", "Report")));
-
-        mvc.perform(get("/api/v1/itemtree/search?name=Repo")
+        mvc.perform(get("/api/v1/itemtree/search?q=Repo")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
-    void searchByNamePropagatesLimit() throws Exception {
-        when(searchService.searchByName("Repo", OptionalInt.of(5))).thenReturn(List.of());
+    void emptyQueryReturnsEmptyList() throws Exception {
+        when(searchService.search(eq(""), any(OptionalInt.class))).thenReturn(List.of());
 
-        mvc.perform(get("/api/v1/itemtree/search?name=Repo&limit=5")
+        mvc.perform(get("/api/v1/itemtree/search?q=")
+                        .header("X-Ice-User", "alice"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void limitIsPropagatedToService() throws Exception {
+        when(searchService.search(eq("Repo"), eq(OptionalInt.of(5)))).thenReturn(List.of());
+
+        mvc.perform(get("/api/v1/itemtree/search?q=Repo&limit=5")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk());
 
         ArgumentCaptor<OptionalInt> captor = ArgumentCaptor.forClass(OptionalInt.class);
-        verify(searchService).searchByName(any(), captor.capture());
+        verify(searchService).search(eq("Repo"), captor.capture());
         assertThat(captor.getValue()).isEqualTo(OptionalInt.of(5));
     }
 
     @Test
-    void searchWithBothIdAndNameReturns400() throws Exception {
-        mvc.perform(get("/api/v1/itemtree/search?id=1&name=foo")
-                        .header("X-Ice-User", "alice"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value(
-                        org.hamcrest.Matchers.containsString("exactly one")))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"));
-    }
-
-    @Test
-    void searchWithNeitherIdNorNameReturns400() throws Exception {
+    void missingQueryParamReturns400FromGenerator() throws Exception {
         mvc.perform(get("/api/v1/itemtree/search")
                         .header("X-Ice-User", "alice"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value(
-                        org.hamcrest.Matchers.containsString("exactly one")))
-                .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"));
+                .andExpect(status().isBadRequest());
     }
 
     @ParameterizedTest
     @ValueSource(ints = {0, -1})
-    void searchWithNonPositiveLimitReturns400(int limit) throws Exception {
-        mvc.perform(get("/api/v1/itemtree/search?name=Repo&limit=" + limit)
+    void nonPositiveLimitReturns400(int limit) throws Exception {
+        mvc.perform(get("/api/v1/itemtree/search?q=Repo&limit=" + limit)
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_SEARCH_PARAMS"))
