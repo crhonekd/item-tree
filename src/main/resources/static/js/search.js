@@ -4,17 +4,13 @@ import { toastError } from './toast.js';
 import { renderTree, ingestSubtreeResult } from './tree.js';
 
 export async function runSearch() {
-  const input = document.getElementById('search-input').value.trim();
-  const mode = document.querySelector('input[name="search-mode"]:checked').value;
+  const q = document.getElementById('search-input').value.trim();
   const limit = document.getElementById('search-limit').value.trim() || undefined;
   const results = document.getElementById('search-results');
   results.innerHTML = '';
-  if (!input) return;
-  const args = mode === 'id'
-    ? { id: Number(input), limit }
-    : { name: input, limit };
+  if (!q) return;
   try {
-    const hits = await api.search(args);
+    const hits = await api.search({ q, limit });
     if (!hits || hits.length === 0) {
       results.innerHTML = '<li>(no results)</li>';
       return;
@@ -32,7 +28,6 @@ export async function runSearch() {
 
 async function navigateTo(id) {
   if (!state.tree.nodesById.has(id)) {
-    // load the node's subtree so it appears in the tree
     try {
       const subtree = await api.getSubtree(id);
       ingestSubtreeResult(id, subtree);
@@ -41,7 +36,6 @@ async function navigateTo(id) {
       return;
     }
   }
-  // expand all ancestors so the row is visible
   let cur = state.tree.nodesById.get(id);
   while (cur && cur.parentId && cur.parentId !== 0) {
     state.tree.expanded.add(cur.parentId);

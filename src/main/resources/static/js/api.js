@@ -73,10 +73,9 @@ export const api = {
     request('PUT', `/api/v1/itemtree/items/${id}/data`, { data }),
   deleteItem: (id) =>
     request('DELETE', `/api/v1/itemtree/items/${id}`),
-  search: ({ id, name, limit }) => {
+  search: ({ q, limit }) => {
     const params = new URLSearchParams();
-    if (id !== undefined && id !== '') params.set('id', String(id));
-    if (name !== undefined && name !== '') params.set('name', name);
+    params.set('q', q ?? '');
     if (limit !== undefined && limit !== '') params.set('limit', String(limit));
     return request('GET', `/api/v1/itemtree/search?${params.toString()}`);
   },
