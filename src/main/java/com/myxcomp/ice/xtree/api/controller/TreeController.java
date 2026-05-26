@@ -34,4 +34,10 @@ public class TreeController implements TreeApi {
         List<TreeNodeView> views = treeService.getSubtree(rootId);
         return ResponseEntity.ok(itemNodeMapper.toDtos(views));
     }
+
+    @Override
+    public ResponseEntity<List<ItemNode>> getSubtreeFull(Long rootId, String xIceUser, String xImpersonatedUser) {
+        List<TreeNodeView> views = treeService.getSubtreeFull(rootId);
+        return ResponseEntity.ok(itemNodeMapper.toDtos(views));
+    }
 }

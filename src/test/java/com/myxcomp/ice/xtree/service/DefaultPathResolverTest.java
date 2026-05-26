@@ -217,7 +217,7 @@ class DefaultPathResolverTest {
             return delegate.getById(id);
         }
         @Override public java.util.List<CachedNode> getChildren(long parentId) { return delegate.getChildren(parentId); }
-        @Override public java.util.List<CachedNode> getSubtreeFlat(long rootId) { return delegate.getSubtreeFlat(rootId); }
+        @Override public java.util.List<CachedNode> getSubtreeFlatFull(long rootId) { return delegate.getSubtreeFlatFull(rootId); }
         @Override public java.util.List<CachedNode> getTreeView(long homeFolderId) { return delegate.getTreeView(homeFolderId); }
         @Override public java.util.Optional<CachedNode> findHomeFolder(String userName) { return delegate.findHomeFolder(userName); }
         @Override public java.util.Optional<CachedNode> searchById(long id) { return delegate.searchById(id); }

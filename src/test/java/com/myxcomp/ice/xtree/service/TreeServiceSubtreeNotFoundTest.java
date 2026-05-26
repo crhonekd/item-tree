@@ -37,7 +37,7 @@ class TreeServiceSubtreeNotFoundTest {
     void throwsNotFoundWhenRootMissing() {
         when(cache.getById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getSubtree(99L))
+        assertThatThrownBy(() -> service.getSubtreeFull(99L))
                 .isInstanceOf(NotFoundException.class)
                 .satisfies(t -> assertThat(((NotFoundException) t).errorCode())
                         .isEqualTo(ErrorCode.ITEM_NOT_FOUND))
@@ -48,10 +48,10 @@ class TreeServiceSubtreeNotFoundTest {
     void returnsTheSubtreeWhenRootExists() {
         CachedNode root = new CachedNode(99L, 0L, "n", "Folder", Instant.EPOCH, "sys");
         when(cache.getById(99L)).thenReturn(Optional.of(root));
-        when(cache.getSubtreeFlat(99L)).thenReturn(List.of(root));
+        when(cache.getSubtreeFlatFull(99L)).thenReturn(List.of(root));
         when(pathResolver.pathsOf(List.of(99L))).thenReturn(Map.of(99L, "root/n"));
 
-        List<TreeNodeView> result = service.getSubtree(99L);
+        List<TreeNodeView> result = service.getSubtreeFull(99L);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).path()).isEqualTo("root/n");

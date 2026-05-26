@@ -39,17 +39,35 @@ public class TreeService {
     }
 
     /**
-     * Returns every node in the subtree rooted at {@code rootId}, each paired with its path.
+     * Returns every node in the subtree rooted at {@code rootId} (root + all descendants
+     * in BFS order), each paired with its path.
      *
      * @throws NotFoundException (ITEM_NOT_FOUND) when no item with {@code rootId} exists in the cache
      */
-    public List<TreeNodeView> getSubtree(long rootId) {
+    public List<TreeNodeView> getSubtreeFull(long rootId) {
         if (cache.getById(rootId).isEmpty()) {
             throw new NotFoundException(ErrorCode.ITEM_NOT_FOUND,
                     "Item " + rootId + " not found");
         }
-        List<CachedNode> nodes = cache.getSubtreeFlat(rootId);
+        List<CachedNode> nodes = cache.getSubtreeFlatFull(rootId);
         return pairWithPaths(nodes);
+    }
+
+    /**
+     * Returns the root node and its immediate children (level 1 only),
+     * each paired with its path. Cheap by design — does not walk further.
+     *
+     * @throws NotFoundException (ITEM_NOT_FOUND) when no item with {@code rootId} exists in the cache
+     */
+    public List<TreeNodeView> getSubtree(long rootId) {
+        CachedNode root = cache.getById(rootId)
+                .orElseThrow(() -> new NotFoundException(ErrorCode.ITEM_NOT_FOUND,
+                        "Item " + rootId + " not found"));
+        List<CachedNode> children = cache.getChildren(rootId);
+        List<CachedNode> result = new ArrayList<>(children.size() + 1);
+        result.add(root);
+        result.addAll(children);
+        return pairWithPaths(result);
     }
 
     private List<TreeNodeView> pairWithPaths(List<CachedNode> nodes) {

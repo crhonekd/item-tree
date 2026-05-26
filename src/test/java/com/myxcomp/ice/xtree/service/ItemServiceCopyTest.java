@@ -98,7 +98,7 @@ class ItemServiceCopyTest {
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getChildren(destId)).thenReturn(List.of());
-            when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(List.of(source));
             when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(List.of(
                     new ItemTreeFullRow(sourceId, 99L, "Report A", "Report",
                             "{\"k\":1}", null, T, "bob")));
@@ -148,7 +148,7 @@ class ItemServiceCopyTest {
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
             when(cache.getChildren(destId)).thenReturn(List.of());
-            when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(List.of(source));
             when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(List.of(
                     new ItemTreeFullRow(sourceId, 99L, "Report A", "Report",
                             "{\"k\":1}", null, T, "bob")));
@@ -279,7 +279,7 @@ class ItemServiceCopyTest {
                 oversized.add(new CachedNode(50L + i, i == 0 ? 99L : 50L + i - 1,
                         "n" + i, "Folder", T, "bob"));
             }
-            when(cache.getSubtreeFlat(50L)).thenReturn(oversized);
+            when(cache.getSubtreeFlatFull(50L)).thenReturn(oversized);
 
             assertThatThrownBy(() -> service.copyItem(50L, 10L, ctx))
                     .isInstanceOf(CopyTooLargeException.class);
@@ -294,7 +294,7 @@ class ItemServiceCopyTest {
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(50L, 10L)).thenReturn(false);
-            when(cache.getSubtreeFlat(50L)).thenReturn(List.of(source));
+            when(cache.getSubtreeFlatFull(50L)).thenReturn(List.of(source));
             List<ItemTreeFullRow> dbRows = new ArrayList<>();
             for (int i = 0; i < 101; i++) {
                 dbRows.add(new ItemTreeFullRow(50L + i, i == 0 ? 99L : 50L + i - 1,
@@ -319,7 +319,7 @@ class ItemServiceCopyTest {
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
-            when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(List.of(
                     source,
                     new CachedNode(51L, sourceId, "leaf", "Report", T, "bob")));
             when(cache.getChildren(destId)).thenReturn(List.of(existingSibling));
@@ -347,7 +347,7 @@ class ItemServiceCopyTest {
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
-            when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(List.of(source));
             when(cache.getChildren(destId)).thenReturn(List.of(
                     new CachedNode(30L, destId, "X", "Folder", T, "alice"),
                     new CachedNode(31L, destId, "X (copy)", "Folder", T, "alice"),
@@ -370,7 +370,7 @@ class ItemServiceCopyTest {
             when(cache.getById(destId)).thenReturn(Optional.of(dest));
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
-            when(cache.getSubtreeFlat(sourceId)).thenReturn(List.of(source));
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(List.of(source));
             when(cache.getChildren(destId)).thenReturn(List.of());
             when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(List.of(
                     new ItemTreeFullRow(sourceId, 99L, "X", "Report", null, null, T, "bob")));
@@ -391,7 +391,7 @@ class ItemServiceCopyTest {
             when(cache.getById(10L)).thenReturn(Optional.of(dest));
             when(ownershipChecker.requireHomeFolderExists("alice")).thenReturn(dest);
             when(cache.isAncestor(50L, 10L)).thenReturn(false);
-            when(cache.getSubtreeFlat(50L)).thenReturn(List.of(source));
+            when(cache.getSubtreeFlatFull(50L)).thenReturn(List.of(source));
             when(repository.findRowsForCopy(eq(50L), anyInt())).thenReturn(List.of());
 
             assertThatThrownBy(() -> service.copyItem(50L, 10L, ctx))

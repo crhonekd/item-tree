@@ -550,7 +550,7 @@ public class ItemService {
         int cap = copyProperties.maxNodes();
 
         // 8a. Pre-flight cap check (cache)
-        List<CachedNode> cachePreview = cache.getSubtreeFlat(sourceId);
+        List<CachedNode> cachePreview = cache.getSubtreeFlatFull(sourceId);
         if (cachePreview.size() > cap) {
             recordCopyRejection(ErrorCode.COPY_TOO_LARGE);
             throw new CopyTooLargeException(

@@ -256,7 +256,7 @@ paths:
     get:
       tags: [tree]
       operationId: getSubtree
-      summary: Get subtree rooted at rootId as a flat list with paths
+      summary: Get root + immediate children of rootId as a flat list with paths
       parameters:
         - name: rootId
           in: path
@@ -268,7 +268,35 @@ paths:
         - $ref: '#/components/parameters/XImpersonatedUser'
       responses:
         '200':
-          description: Flat list of ItemNode each with path populated
+          description: Flat list of ItemNode (root first, then immediate children) each with path populated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemNode'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/itemtree/tree/{rootId}/subtree-full:
+    get:
+      tags: [tree]
+      operationId: getSubtreeFull
+      summary: Get the full recursive subtree rooted at rootId as a flat list with paths
+      parameters:
+        - name: rootId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      responses:
+        '200':
+          description: Flat list of ItemNode (root + all descendants in BFS order) each with path populated
           content:
             application/json:
               schema:

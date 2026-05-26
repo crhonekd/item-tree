@@ -239,21 +239,21 @@ class DefaultTreeCacheTest {
         }
 
         @Test
-        void getSubtreeFlatIncludesRootAndAllDescendants() {
-            List<CachedNode> subtree = cache.getSubtreeFlat(2L);
+        void getSubtreeFlatFullIncludesRootAndAllDescendants() {
+            List<CachedNode> subtree = cache.getSubtreeFlatFull(2L);
             assertThat(subtree).extracting(CachedNode::itemTreeId)
                     .containsExactlyInAnyOrder(2L, 3L, 100L);
         }
 
         @Test
-        void getSubtreeFlatOnLeafReturnsOnlyThatNode() {
-            List<CachedNode> subtree = cache.getSubtreeFlat(100L);
+        void getSubtreeFlatFullOnLeafReturnsOnlyThatNode() {
+            List<CachedNode> subtree = cache.getSubtreeFlatFull(100L);
             assertThat(subtree).extracting(CachedNode::itemTreeId).containsExactly(100L);
         }
 
         @Test
-        void getSubtreeFlatOnMissingIdReturnsEmpty() {
-            assertThat(cache.getSubtreeFlat(999L)).isEmpty();
+        void getSubtreeFlatFullOnMissingIdReturnsEmpty() {
+            assertThat(cache.getSubtreeFlatFull(999L)).isEmpty();
         }
 
         @Test
@@ -345,8 +345,8 @@ class DefaultTreeCacheTest {
         }
 
         @Test
-        void getSubtreeFlatResultIsUnmodifiable() {
-            List<CachedNode> subtree = cache.getSubtreeFlat(1L);
+        void getSubtreeFlatFullResultIsUnmodifiable() {
+            List<CachedNode> subtree = cache.getSubtreeFlatFull(1L);
             assertThatThrownBy(() -> subtree.add(folder(99L, 1L, "x")))
                     .isInstanceOf(UnsupportedOperationException.class);
         }

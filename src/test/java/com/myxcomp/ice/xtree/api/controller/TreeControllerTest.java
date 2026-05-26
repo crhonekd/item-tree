@@ -96,12 +96,12 @@ class TreeControllerTest {
     }
 
     @Test
-    void getSubtreeReturns200WithPaths() throws Exception {
-        when(treeService.getSubtree(7L)).thenReturn(List.of(
+    void getSubtreeFullReturns200WithPaths() throws Exception {
+        when(treeService.getSubtreeFull(7L)).thenReturn(List.of(
                 view(7L, 0L, "root",  "Folder", "root"),
                 view(8L, 7L, "child", "Folder", "root/child")));
 
-        mvc.perform(get("/api/v1/itemtree/tree/7/subtree")
+        mvc.perform(get("/api/v1/itemtree/tree/7/subtree-full")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
@@ -109,20 +109,58 @@ class TreeControllerTest {
     }
 
     @Test
-    void getSubtreeReturns404WhenRootMissing() throws Exception {
-        when(treeService.getSubtree(anyLong()))
+    void getSubtreeFullReturns404WhenRootMissing() throws Exception {
+        when(treeService.getSubtreeFull(anyLong()))
                 .thenThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 99 not found"));
 
-        mvc.perform(get("/api/v1/itemtree/tree/99/subtree")
+        mvc.perform(get("/api/v1/itemtree/tree/99/subtree-full")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
     }
 
     @Test
-    void getSubtreeWithNonNumericRootReturns400() throws Exception {
-        mvc.perform(get("/api/v1/itemtree/tree/abc/subtree")
+    void getSubtreeFullWithNonNumericRootReturns400() throws Exception {
+        mvc.perform(get("/api/v1/itemtree/tree/abc/subtree-full")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @org.junit.jupiter.api.Nested
+    class GetSubtree {
+
+        @Test
+        void returns200WithRootAndChildren() throws Exception {
+            when(treeService.getSubtree(5L)).thenReturn(List.of(
+                    view(5L, 1L, "Group",  "Folder", "root/Group"),
+                    view(6L, 5L, "ChildA", "Folder", "root/Group/ChildA"),
+                    view(7L, 5L, "ChildB", "Report", "root/Group/ChildB")));
+
+            mvc.perform(get("/api/v1/itemtree/tree/5/subtree")
+                            .header("X-Ice-User", "alice"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(3))
+                    .andExpect(jsonPath("$[0].itemTreeId").value(5))
+                    .andExpect(jsonPath("$[0].path").value("root/Group"))
+                    .andExpect(jsonPath("$[1].path").value("root/Group/ChildA"));
+        }
+
+        @Test
+        void returns404WhenRootMissing() throws Exception {
+            when(treeService.getSubtree(anyLong()))
+                    .thenThrow(new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item 999 not found"));
+
+            mvc.perform(get("/api/v1/itemtree/tree/999/subtree")
+                            .header("X-Ice-User", "alice"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("ITEM_NOT_FOUND"));
+        }
+
+        @Test
+        void returns400OnNonNumericRoot() throws Exception {
+            mvc.perform(get("/api/v1/itemtree/tree/abc/subtree")
+                            .header("X-Ice-User", "alice"))
+                    .andExpect(status().isBadRequest());
+        }
     }
 }

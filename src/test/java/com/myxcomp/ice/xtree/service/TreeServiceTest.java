@@ -86,17 +86,17 @@ class TreeServiceTest {
     }
 
     @Test
-    void getSubtreeReturnsPairsForEveryNodeInSubtree() {
+    void getSubtreeFullReturnsPairsForEveryNodeInSubtree() {
         CachedNode parent = folder(20L, 1L, "Group");
         CachedNode child  = folder(21L, 20L, "Sub");
         when(cache.getById(20L)).thenReturn(Optional.of(parent));
-        when(cache.getSubtreeFlat(20L)).thenReturn(List.of(parent, child));
+        when(cache.getSubtreeFlatFull(20L)).thenReturn(List.of(parent, child));
         when(pathResolver.pathsOf(List.of(20L, 21L))).thenReturn(Map.of(
                 20L, "root/Group",
                 21L, "root/Group/Sub"
         ));
 
-        List<TreeNodeView> result = service.getSubtree(20L);
+        List<TreeNodeView> result = service.getSubtreeFull(20L);
 
         assertThat(result).containsExactly(
                 new TreeNodeView(parent, "root/Group"),
@@ -105,23 +105,88 @@ class TreeServiceTest {
     }
 
     @Test
-    void getSubtreeThrowsNotFoundForUnknownRoot() {
+    void getSubtreeFullThrowsNotFoundForUnknownRoot() {
         when(cache.getById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.getSubtree(999L))
+        assertThatThrownBy(() -> service.getSubtreeFull(999L))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessageContaining("999");
     }
 
     @Test
-    void getSubtreeFallsBackToEmptyStringPathWhenResolverOmitsId() {
+    void getSubtreeFullFallsBackToEmptyStringPathWhenResolverOmitsId() {
         CachedNode node = folder(30L, 1L, "X");
         when(cache.getById(30L)).thenReturn(Optional.of(node));
-        when(cache.getSubtreeFlat(30L)).thenReturn(List.of(node));
+        when(cache.getSubtreeFlatFull(30L)).thenReturn(List.of(node));
         when(pathResolver.pathsOf(anyCollection())).thenReturn(Map.of());
 
-        List<TreeNodeView> result = service.getSubtree(30L);
+        List<TreeNodeView> result = service.getSubtreeFull(30L);
 
         assertThat(result).containsExactly(new TreeNodeView(node, ""));
+    }
+
+    @org.junit.jupiter.api.Nested
+    class GetSubtree {
+
+        @Test
+        void returnsRootAndImmediateChildrenWithPaths() {
+            CachedNode root = folder(50L, 1L, "Root");
+            CachedNode c1   = folder(51L, 50L, "A");
+            CachedNode c2   = folder(52L, 50L, "B");
+            CachedNode c3   = folder(53L, 50L, "C");
+            when(cache.getById(50L)).thenReturn(Optional.of(root));
+            when(cache.getChildren(50L)).thenReturn(List.of(c1, c2, c3));
+            when(pathResolver.pathsOf(List.of(50L, 51L, 52L, 53L))).thenReturn(Map.of(
+                    50L, "root/Root",
+                    51L, "root/Root/A",
+                    52L, "root/Root/B",
+                    53L, "root/Root/C"
+            ));
+
+            List<TreeNodeView> result = service.getSubtree(50L);
+
+            assertThat(result).hasSize(4);
+            assertThat(result.get(0)).isEqualTo(new TreeNodeView(root, "root/Root"));
+            assertThat(result.subList(1, 4)).containsExactlyInAnyOrder(
+                    new TreeNodeView(c1, "root/Root/A"),
+                    new TreeNodeView(c2, "root/Root/B"),
+                    new TreeNodeView(c3, "root/Root/C")
+            );
+        }
+
+        @Test
+        void leafRootReturnsRootAlone() {
+            CachedNode leaf = new CachedNode(60L, 1L, "rep", "Report", T, "sys");
+            when(cache.getById(60L)).thenReturn(Optional.of(leaf));
+            when(cache.getChildren(60L)).thenReturn(List.of());
+            when(pathResolver.pathsOf(List.of(60L))).thenReturn(Map.of(60L, "root/rep"));
+
+            List<TreeNodeView> result = service.getSubtree(60L);
+
+            assertThat(result).containsExactly(new TreeNodeView(leaf, "root/rep"));
+        }
+
+        @Test
+        void emptyFolderRootReturnsRootAlone() {
+            CachedNode empty = folder(61L, 1L, "Empty");
+            when(cache.getById(61L)).thenReturn(Optional.of(empty));
+            when(cache.getChildren(61L)).thenReturn(List.of());
+            when(pathResolver.pathsOf(List.of(61L))).thenReturn(Map.of(61L, "root/Empty"));
+
+            List<TreeNodeView> result = service.getSubtree(61L);
+
+            assertThat(result).containsExactly(new TreeNodeView(empty, "root/Empty"));
+        }
+
+        @Test
+        void throwsNotFoundForUnknownRoot() {
+            when(cache.getById(999L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getSubtree(999L))
+                    .isInstanceOf(NotFoundException.class)
+                    .satisfies(t -> assertThat(((NotFoundException) t).errorCode())
+                            .isEqualTo(com.myxcomp.ice.xtree.service.exception.ErrorCode.ITEM_NOT_FOUND))
+                    .hasMessageContaining("999");
+        }
     }
 }

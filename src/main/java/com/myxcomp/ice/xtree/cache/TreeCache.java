@@ -11,7 +11,11 @@ public interface TreeCache {
     // ── Reads ─────────────────────────────────────────────────────────────
     Optional<CachedNode> getById(long id);
     List<CachedNode>     getChildren(long parentId);
-    List<CachedNode>     getSubtreeFlat(long rootId);
+    /**
+     * Returns root + all descendants of the given node, in BFS order, as a defensive-copy flat list.
+     * Returns an empty list if {@code rootId} is not in the cache.
+     */
+    List<CachedNode>     getSubtreeFlatFull(long rootId);
 
     /**
      * Returns the trimmed tree view for the given home folder.

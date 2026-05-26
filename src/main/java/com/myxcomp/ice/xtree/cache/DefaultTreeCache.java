@@ -70,7 +70,7 @@ public class DefaultTreeCache implements TreeCache {
     }
 
     @Override
-    public List<CachedNode> getSubtreeFlat(long rootId) {
+    public List<CachedNode> getSubtreeFlatFull(long rootId) {
         lock.readLock().lock();
         try {
             if (!byId.containsKey(rootId)) {
