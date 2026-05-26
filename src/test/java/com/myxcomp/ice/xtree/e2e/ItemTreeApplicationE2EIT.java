@@ -6,6 +6,8 @@ import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener;
 import com.myxcomp.ice.xtree.service.ItemService;
+import com.myxcomp.ice.xtree.service.TreeNodeView;
+import com.myxcomp.ice.xtree.service.TreeService;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -407,5 +409,28 @@ class ItemTreeApplicationE2EIT {
                 .extracting(CachedNode::parentId)
                 .as("copied child's parent should be the new parent")
                 .isEqualTo(newParentId);
+    }
+
+    @Test
+    void getSubtreeReturnsLevel1OnlyWhileSubtreeFullReturnsAllDescendants() {
+        TreeService treeService = pair.a().getBean(TreeService.class);
+
+        // Level-1 on Users (id=2) — should contain exactly Users + {testuser1, testuser2, deepuser}.
+        List<TreeNodeView> level1 = treeService.getSubtree(2L);
+        assertThat(level1).extracting(v -> v.node().itemTreeId())
+                .containsExactlyInAnyOrder(2L, 10L, 11L, 12L);
+
+        // Level-1 on deepuser (id=12) — should contain only deepuser + L2 (id=20),
+        // NOT L3 (21) or any further descendants in the depth-7 chain.
+        List<TreeNodeView> level1Deep = treeService.getSubtree(12L);
+        assertThat(level1Deep).extracting(v -> v.node().itemTreeId())
+                .containsExactlyInAnyOrder(12L, 20L);
+        assertThat(level1Deep).extracting(v -> v.node().itemTreeId())
+                .doesNotContain(21L);
+
+        // Full recursive on deepuser — must still include the deeper chain (sanity for the rename).
+        List<TreeNodeView> full = treeService.getSubtreeFull(12L);
+        assertThat(full).extracting(v -> v.node().itemTreeId())
+                .contains(12L, 20L, 21L);
     }
 }
