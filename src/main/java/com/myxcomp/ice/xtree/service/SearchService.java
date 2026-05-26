@@ -18,13 +18,36 @@ public class SearchService {
         this.cache = cache;
     }
 
-    public Optional<CachedNode> searchById(long id) {
-        return cache.searchById(id);
+    /**
+     * Numeric-or-name search. If {@code q} parses as a Long and an item with
+     * that id is cached, returns that single item. Otherwise (parse fails or
+     * id not present) returns a case-insensitive substring match on name.
+     * Blank / null {@code q} returns an empty list without touching the cache.
+     */
+    public List<CachedNode> search(String q, OptionalInt limit) {
+        Objects.requireNonNull(limit, "limit");
+        if (q == null) {
+            return List.of();
+        }
+        String trimmed = q.trim();
+        if (trimmed.isEmpty()) {
+            return List.of();
+        }
+        Long parsed = tryParseLong(trimmed);
+        if (parsed != null) {
+            Optional<CachedNode> byId = cache.searchById(parsed);
+            if (byId.isPresent()) {
+                return List.of(byId.get());
+            }
+        }
+        return cache.searchByName(trimmed, limit);
     }
 
-    public List<CachedNode> searchByName(String needle, OptionalInt limit) {
-        Objects.requireNonNull(needle, "needle");
-        Objects.requireNonNull(limit, "limit");
-        return cache.searchByName(needle, limit);
+    private static Long tryParseLong(String s) {
+        try {
+            return Long.parseLong(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
