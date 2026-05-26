@@ -45,7 +45,7 @@ The service exposes REST endpoints for operations on a typed item tree persisted
 - Update item (full JSON replace)
 - Get items (by id list, returns payload)
 - Get tree (trimmed view per user)
-- Get subtree
+- Get subtree (level-1 default; full-recursive variant available)
 - Search (by id or name)
 - Get home folder for user
 

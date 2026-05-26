@@ -417,7 +417,7 @@ components:
         path:
           type: string
           nullable: true
-          description: "Root-anchored slash-separated path, e.g. root/Folder1/IceReport; populated only on /tree and /subtree responses"
+          description: "Root-anchored slash-separated path, e.g. root/Folder1/IceReport; populated only on /tree, /subtree, and /subtree-full responses"
         lastUpdate:
           type: string
           format: date-time
