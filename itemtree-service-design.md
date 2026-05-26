@@ -46,7 +46,7 @@ The service exposes REST endpoints for operations on a typed item tree persisted
 - Get items (by id list, returns payload)
 - Get tree (trimmed view per user)
 - Get subtree (level-1 default; full-recursive variant available)
-- Search (by id or name)
+- Search (single query string — numeric resolves to id, otherwise name)
 - Get home folder for user
 
 ### Deployment shape
@@ -144,7 +144,7 @@ Base path: `/api/v1/itemtree`.
 | GET    | `/tree`                             | Trimmed tree view per user               |
 | GET    | `/tree/{rootId}/subtree`            | Root + immediate children (flat)         |
 | GET    | `/tree/{rootId}/subtree-full`       | Full recursive subtree (flat)            |
-| GET    | `/search`                           | Search by id or name                     |
+| GET    | `/search`                           | Search by `q` (numeric → id, else name)  |
 | GET    | `/users/{userName}/home-folder`     | Resolve home folder for given user       |
 
 ### Schema summary
@@ -158,7 +158,7 @@ Base path: `/api/v1/itemtree`.
 ### Response shapes
 
 - **`/tree`, `/tree/{rootId}/subtree`, and `/tree/{rootId}/subtree-full`** — flat list of `ItemNode`, each with `path` (root-anchored, slash-separated, e.g. `root/Folder1/IceReport`). `/subtree` returns root + immediate children only; `/subtree-full` returns root + every descendant in BFS order. `/tree` shape may be revisited later to switch to nested; flat is the contract for all three for now.
-- **`/search`** — flat list of `SearchHit`. Optional `limit` query parameter; no default cap.
+- **`/search`** — flat list of `SearchHit`. Required `q` query parameter (string). If `q` parses as `Long` and an item with that id exists, the response contains that single item; otherwise (parse fails or id missing) the server returns a case-insensitive substring match on `name`. Optional `limit` applies to the name-search branch only; no default cap. Blank `q` returns `[]` with status 200.
 - **`/items/get`** — list of `ItemNodeWithData`. Folder nodes include `children` (one level deep, including each child's `dataJson` / `dataXml` where applicable). Non-folder nodes include `dataJson` or `dataXml` (at most one populated). **Missing ids are silently omitted** from the response.
 - **`/users/{userName}/home-folder`** — single `ItemNode`. 404 with `errorCode = HOME_FOLDER_NOT_FOUND` if not found.
 

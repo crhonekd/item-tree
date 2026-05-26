@@ -674,6 +674,47 @@ Full design in `docs/superpowers/specs/2026-05-26-subtree-level1-design.md`; imp
 
 ---
 
+## Phase 19 — Search simplification (single `q` param) ✅ COMPLETE (2026-05-26)
+
+**Goal:** Collapse the two-parameter `/search?id=…|name=…` API into a single `?q=…` parameter. Server tries `Long.parseLong(q)`; on success and a cache hit by id returns the single matching node, otherwise falls back to name search.
+
+Full plan in `docs/superpowers/plans/2026-05-26-phase19-search-simplification.md`.
+
+**Implementable end-to-end in Phase A.** No Phase B blockers.
+
+### Surface
+
+- **OpenAPI:** `/api/v1/itemtree/search` parameters changed — `id` and `name` removed, required `q` added; `limit` unchanged.
+- **`SearchService`:** previous `searchById(long)` / `searchByName(String, OptionalInt)` removed; replaced with a single `search(String q, OptionalInt limit) -> List<CachedNode>` that handles parse-then-fallback. Trims input; blank/null returns empty list.
+- **`SearchController`:** matches the regenerated `SearchApi` signature (`String xIceUser, String q, String xImpersonatedUser, Integer limit`); only validation kept is `limit > 0` (errors with `INVALID_SEARCH_PARAMS`).
+- **`TreeCache`:** unchanged — both `searchById` and `searchByName` remain as primitives, both called by the new service method.
+- **Static UI:** radio buttons removed from `index.html`; `search.js` sends a single `q`; `api.js#search` signature is `({ q, limit })`.
+
+### Tests
+
+- `SearchServiceTest` rewritten as a `@Nested Search` group covering: blank/whitespace/null → empty list; numeric → id hit; trimmed input; id miss → name fallback; non-numeric → name only; > Long.MAX_VALUE → name fallback; limit propagation; limit ignored on id hit.
+- `SearchControllerTest` rewritten for new contract; removes the now-obsolete "exactly one of id or name" tests; keeps the `limit <= 0` parameterised case.
+- `ApiContractTest` — no change required; 11 operations preserved.
+
+### Deviations from plan
+
+- Generated `SearchApi` parameter order is `(xIceUser, q, xImpersonatedUser, limit)` — `q` precedes `xImpersonatedUser`, contrary to the plan's assumption of `(xIceUser, xImpersonatedUser, q, limit)`. Controller signature mirrors the generated order exactly.
+- `GlobalExceptionHandler` lacked a `MissingServletRequestParameterException` handler (plan assumed it already existed). Added `handleMissingParam` → HTTP 400 so `missingQueryParamReturns400FromGenerator` passes. The handler was a genuine gap; the fix is correct and not backward-compat regression.
+
+### Done when
+
+- All tests green (expected count: 673 baseline minus 5 removed `SearchServiceTest` tests + 10 new = 678; minus 7 old `SearchControllerTest` tests + 7 new = 678).
+- `./gradlew clean build` → BUILD SUCCESSFUL.
+- Manual smoke against the dev profile per Task 4 Step 4.
+- `itemtree-service-design.md` updated (§1, §3).
+- Memory note added: `project-phase19-search-simplification-done.md`.
+
+### Actual done state
+
+678 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
