@@ -7,6 +7,8 @@ import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -14,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -154,28 +157,23 @@ class TreeServiceTest {
             );
         }
 
-        @Test
-        void leafRootReturnsRootAlone() {
-            CachedNode leaf = new CachedNode(60L, 1L, "rep", "Report", T, "sys");
-            when(cache.getById(60L)).thenReturn(Optional.of(leaf));
-            when(cache.getChildren(60L)).thenReturn(List.of());
-            when(pathResolver.pathsOf(List.of(60L))).thenReturn(Map.of(60L, "root/rep"));
+        @ParameterizedTest
+        @MethodSource("singleNodeRoots")
+        void singleNodeRootReturnsRootAlone(CachedNode root) {
+            when(cache.getById(root.itemTreeId())).thenReturn(Optional.of(root));
+            when(cache.getChildren(root.itemTreeId())).thenReturn(List.of());
+            when(pathResolver.pathsOf(List.of(root.itemTreeId()))).thenReturn(Map.of(root.itemTreeId(), "root/" + root.name()));
 
-            List<TreeNodeView> result = service.getSubtree(60L);
+            List<TreeNodeView> result = service.getSubtree(root.itemTreeId());
 
-            assertThat(result).containsExactly(new TreeNodeView(leaf, "root/rep"));
+            assertThat(result).containsExactly(new TreeNodeView(root, "root/" + root.name()));
         }
 
-        @Test
-        void emptyFolderRootReturnsRootAlone() {
-            CachedNode empty = folder(61L, 1L, "Empty");
-            when(cache.getById(61L)).thenReturn(Optional.of(empty));
-            when(cache.getChildren(61L)).thenReturn(List.of());
-            when(pathResolver.pathsOf(List.of(61L))).thenReturn(Map.of(61L, "root/Empty"));
-
-            List<TreeNodeView> result = service.getSubtree(61L);
-
-            assertThat(result).containsExactly(new TreeNodeView(empty, "root/Empty"));
+        static Stream<CachedNode> singleNodeRoots() {
+            return Stream.of(
+                    new CachedNode(60L, 1L, "rep", "Report", T, "sys"),  // leaf non-folder
+                    folder(61L, 1L, "Empty")                              // empty folder
+            );
         }
 
         @Test

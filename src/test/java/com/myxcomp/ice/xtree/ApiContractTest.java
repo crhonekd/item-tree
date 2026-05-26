@@ -32,7 +32,7 @@ class ApiContractTest {
     }
 
     @Test
-    void apiDocsContainsAllTenOperations() throws Exception {
+    void apiDocsContainsAllElevenOperations() throws Exception {
         String body = mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -45,6 +45,7 @@ class ApiContractTest {
         assertThat(body).contains("\"getItems\"");
         assertThat(body).contains("\"getTree\"");
         assertThat(body).contains("\"getSubtree\"");
+        assertThat(body).contains("\"getSubtreeFull\"");
         assertThat(body).contains("\"search\"");
         assertThat(body).contains("\"getHomeFolder\"");
     }
