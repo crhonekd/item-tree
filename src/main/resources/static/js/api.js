@@ -57,6 +57,8 @@ export const api = {
     request('GET', '/api/v1/itemtree/tree', undefined, { retryOn503: true }),
   getSubtree: (rootId) =>
     request('GET', `/api/v1/itemtree/tree/${rootId}/subtree`),
+  getSubtreeFull: (rootId) =>
+    request('GET', `/api/v1/itemtree/tree/${rootId}/subtree-full`),
   getItems: (ids) =>
     request('POST', '/api/v1/itemtree/items/get', { ids }),
   createItem: (body) =>

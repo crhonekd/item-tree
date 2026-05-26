@@ -101,7 +101,17 @@ async function onChevronClick(id) {
   renderTree();
 }
 
+// Mark only the queried root as loaded — used after a level-1 fetch.
+// Do NOT mark child folders as loaded: their children are not in the payload,
+// so marking them would suppress later lazy-load fetches when expanded.
 export function ingestSubtreeResult(rootId, nodes) {
+  ingestNodes(nodes);
+  state.tree.loadedSubtreeOf.add(rootId);
+}
+
+// Mark the queried root AND every folder in the payload as loaded — used after
+// a recursive subtree-full fetch, where every folder's children are in the payload.
+export function ingestSubtreeFullResult(rootId, nodes) {
   ingestNodes(nodes);
   state.tree.loadedSubtreeOf.add(rootId);
   for (const n of nodes) {

@@ -1,7 +1,7 @@
 import { state, savePersisted, resetTreeState, ingestNodes } from './state.js';
 import { api, ProblemError } from './api.js';
 import { toastError } from './toast.js';
-import { renderTree, ingestSubtreeResult } from './tree.js';
+import { renderTree, ingestSubtreeFullResult } from './tree.js';
 import { runSearch } from './search.js';
 import { runRefresh, runProbe } from './refresh.js';
 
@@ -62,8 +62,8 @@ async function doLogin() {
       cur = state.tree.nodesById.get(cur.parentId);
     }
 
-    const subtree = await api.getSubtree(home.itemTreeId);
-    ingestSubtreeResult(home.itemTreeId, subtree);
+    const subtree = await api.getSubtreeFull(home.itemTreeId);
+    ingestSubtreeFullResult(home.itemTreeId, subtree);
 
     // expand the home folder itself and any folders directly within its loaded subtree
     state.tree.expanded.add(home.itemTreeId);
