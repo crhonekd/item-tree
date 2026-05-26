@@ -633,7 +633,48 @@ All 12 service endpoints plus the `/actuator/itemtree-refresh/{type}` actuator: 
 
 ---
 
-## Phase 17 — Work PC wiring (Phase B, user-managed)
+## Phase 17 — Level-1 default for getSubtree; recursive becomes getSubtreeFull ✅ COMPLETE (2026-05-26)
+
+**Goal:** Split the single recursive `/tree/{rootId}/subtree` endpoint into two — a fast level-1 default (`/subtree` = root + immediate children) and the preserved recursive `/subtree-full` (= root + all descendants). The test UI uses `/subtree-full` for the at-login pre-load of the user's home folder and `/subtree` for chevron-expand, post-mutation refresh, and search navigation.
+
+Full design in `docs/superpowers/specs/2026-05-26-subtree-level1-design.md`; implementation plan in `docs/superpowers/plans/2026-05-26-phase17-subtree-level1.md`.
+
+**Implementable end-to-end in Phase A.** No Phase B blockers.
+
+### Surface
+
+- **OpenAPI:** existing `operationId: getSubtree` renamed to `getSubtreeFull` (new path `/tree/{rootId}/subtree-full`); new `operationId: getSubtree` added at `/tree/{rootId}/subtree`. Same `ItemNode` response schema for both.
+- **`TreeCache`:** `getSubtreeFlat(long)` renamed `getSubtreeFlatFull(long)`. No behavioural change.
+- **`TreeService`:** existing `getSubtree(long)` renamed `getSubtreeFull(long)`; new `getSubtree(long)` composes `getById` + `getChildren`.
+- **`TreeController`:** two methods, one per generated interface method.
+- **Static UI:** `api.js` gains `getSubtreeFull`; `tree.js` splits `ingestSubtreeResult` into a level-1 variant (marks only the queried root as loaded) and a new `ingestSubtreeFullResult` (marks every folder in payload); `app.js` login flow uses `getSubtreeFull` + `ingestSubtreeFullResult`.
+
+### Tests
+
+- 7 new test executions: 4 in `TreeServiceTest.GetSubtree`, 3 in `TreeControllerTest.GetSubtree`.
+- 1 new E2E test in `ItemTreeApplicationE2EIT`.
+- 4 existing `DefaultTreeCacheTest` tests renamed to `getSubtreeFlatFull…`; 3 existing `TreeServiceTest` and 3 existing `TreeControllerTest` tests renamed/retargeted to `getSubtreeFull` and `/subtree-full`. 2 tests in `TreeServiceSubtreeNotFoundTest` retargeted.
+- `ApiContractTest` updated to assert 11 operations and verify `getSubtreeFull` presence.
+- 2 leaf/empty-folder tests in `TreeServiceTest.GetSubtree` collapsed into `@ParameterizedTest`.
+
+### Deviations from plan
+
+- None.
+
+### Done when
+
+- 673 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+- Manual smoke against the dev profile: at login the network tab shows one `GET /tree` and one `GET /tree/{homeId}/subtree-full`; subsequent chevron expansions hit `/tree/{id}/subtree`.
+- `itemtree-service-design.md` updated; old Phase 17 (Work PC wiring) renumbered to Phase 18.
+- Memory note added: `project-phase17-subtree-level1-done.md`.
+
+### Actual done state
+
+673 tests green; `./gradlew clean build` → BUILD SUCCESSFUL.
+
+---
+
+## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
 

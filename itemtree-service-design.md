@@ -142,7 +142,8 @@ Base path: `/api/v1/itemtree`.
 | PUT    | `/items/{id}/data`                  | Full JSON replace                        |
 | POST   | `/items/get`                        | Bulk get by id list (POST to avoid URL-length issues) |
 | GET    | `/tree`                             | Trimmed tree view per user               |
-| GET    | `/tree/{rootId}/subtree`            | Subtree (flat)                           |
+| GET    | `/tree/{rootId}/subtree`            | Root + immediate children (flat)         |
+| GET    | `/tree/{rootId}/subtree-full`       | Full recursive subtree (flat)            |
 | GET    | `/search`                           | Search by id or name                     |
 | GET    | `/users/{userName}/home-folder`     | Resolve home folder for given user       |
 
@@ -156,7 +157,7 @@ Base path: `/api/v1/itemtree`.
 
 ### Response shapes
 
-- **`/tree` and `/tree/{rootId}/subtree`** — flat list of `ItemNode`, each with `path` (root-anchored, slash-separated, e.g. `root/Folder1/IceReport`). `/tree` shape may be revisited later to switch to nested; flat is the contract for now.
+- **`/tree`, `/tree/{rootId}/subtree`, and `/tree/{rootId}/subtree-full`** — flat list of `ItemNode`, each with `path` (root-anchored, slash-separated, e.g. `root/Folder1/IceReport`). `/subtree` returns root + immediate children only; `/subtree-full` returns root + every descendant in BFS order. `/tree` shape may be revisited later to switch to nested; flat is the contract for all three for now.
 - **`/search`** — flat list of `SearchHit`. Optional `limit` query parameter; no default cap.
 - **`/items/get`** — list of `ItemNodeWithData`. Folder nodes include `children` (one level deep, including each child's `dataJson` / `dataXml` where applicable). Non-folder nodes include `dataJson` or `dataXml` (at most one populated). **Missing ids are silently omitted** from the response.
 - **`/users/{userName}/home-folder`** — single `ItemNode`. 404 with `errorCode = HOME_FOLDER_NOT_FOUND` if not found.
@@ -187,7 +188,7 @@ RFC 7807 `application/problem+json` for all error responses. Standard fields (`t
 
 ### Goal
 
-Serve all read endpoints (`/tree`, `/tree/{rootId}/subtree`, `/search`, `/users/{userName}/home-folder`) entirely from memory. Only `/items/get` and write endpoints touch the DB.
+Serve all read endpoints (`/tree`, `/tree/{rootId}/subtree`, `/tree/{rootId}/subtree-full`, `/search`, `/users/{userName}/home-folder`) entirely from memory. Only `/items/get` and write endpoints touch the DB.
 
 ### Cached state
 
@@ -254,7 +255,7 @@ public interface TreeCache {
     // ── Reads ────────────────────────────────────────────────
     Optional<CachedNode> getById(long id);
     List<CachedNode>     getChildren(long parentId);
-    List<CachedNode>     getSubtreeFlat(long rootId);
+    List<CachedNode>     getSubtreeFlatFull(long rootId);
     List<CachedNode>     getTreeView(long homeFolderId);
     Optional<CachedNode> findHomeFolder(String userName);
     Optional<CachedNode> searchById(long id);
@@ -621,7 +622,7 @@ LinkedHashSet insertion order: skeleton first, then chain (root → home), then 
 
 ### Approach
 
-**Lazy compute at response time** for `/tree` and `/tree/{rootId}/subtree`. Not stored on `CachedNode`.
+**Lazy compute at response time** for `/tree`, `/tree/{rootId}/subtree`, and `/tree/{rootId}/subtree-full`. Not stored on `CachedNode`.
 
 ### Rationale
 
@@ -650,6 +651,7 @@ Called by `TreeService` after `TreeCache` returns the node list. Path format: `"
 |---|---|
 | `/tree` | Yes |
 | `/tree/{rootId}/subtree` | Yes |
+| `/tree/{rootId}/subtree-full` | Yes |
 | `/items/get` | No |
 | `/search` | No |
 | Create / update / move / rename / delete responses | No |
