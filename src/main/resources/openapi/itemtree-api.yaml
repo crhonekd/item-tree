@@ -312,19 +312,13 @@ paths:
     get:
       tags: [search]
       operationId: search
-      summary: Search by id or name; supply exactly one of id or name
+      summary: Search items by query string (numeric → tries id then name; otherwise name)
       parameters:
         - $ref: '#/components/parameters/XIceUser'
         - $ref: '#/components/parameters/XImpersonatedUser'
-        - name: id
+        - name: q
           in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-        - name: name
-          in: query
-          required: false
+          required: true
           schema:
             type: string
         - name: limit
