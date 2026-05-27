@@ -1,9 +1,9 @@
 package com.myxcomp.ice.xtree.api.controller;
 
 import com.myxcomp.ice.xtree.api.mapper.SearchHitMapper;
-import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.generated.api.SearchApi;
 import com.myxcomp.ice.xtree.generated.model.SearchHit;
+import com.myxcomp.ice.xtree.service.SearchHitView;
 import com.myxcomp.ice.xtree.service.SearchService;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.ValidationException;
@@ -32,7 +32,7 @@ public class SearchController implements SearchApi {
                     "limit must be a positive integer");
         }
         OptionalInt limitOpt = limit != null ? OptionalInt.of(limit) : OptionalInt.empty();
-        List<CachedNode> hits = searchService.search(q, limitOpt);
+        List<SearchHitView> hits = searchService.search(q, limitOpt);
         return ResponseEntity.ok(searchHitMapper.toDtos(hits));
     }
 }

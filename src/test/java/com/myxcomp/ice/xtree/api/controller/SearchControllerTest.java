@@ -6,6 +6,7 @@ import com.myxcomp.ice.xtree.api.mapper.SearchHitMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.config.SecurityProperties;
+import com.myxcomp.ice.xtree.service.SearchHitView;
 import com.myxcomp.ice.xtree.service.SearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,20 +53,23 @@ class SearchControllerTest {
     @Test
     void numericQueryReturnsServiceResult() throws Exception {
         when(searchService.search(eq("42"), any(OptionalInt.class)))
-                .thenReturn(List.of(node(42L, "Report-1", "Report")));
+                .thenReturn(List.of(new SearchHitView(node(42L, "Report-1", "Report"), "/root/Users/alice")));
 
         mvc.perform(get("/api/v1/itemtree/search?q=42")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].itemTreeId").value(42));
+                .andExpect(jsonPath("$[0].itemTreeId").value(42))
+                .andExpect(jsonPath("$[0].name").value("Report-1"))
+                .andExpect(jsonPath("$[0].path").value("/root/Users/alice"));
     }
 
     @Test
     void nameQueryReturnsServiceResult() throws Exception {
         when(searchService.search(eq("Repo"), any(OptionalInt.class)))
-                .thenReturn(List.of(node(42L, "Report-1", "Report"),
-                                    node(43L, "Report-2", "Report")));
+                .thenReturn(List.of(
+                        new SearchHitView(node(42L, "Report-1", "Report"), "/root/a"),
+                        new SearchHitView(node(43L, "Report-2", "Report"), "/root/b")));
 
         mvc.perform(get("/api/v1/itemtree/search?q=Repo")
                         .header("X-Ice-User", "alice"))

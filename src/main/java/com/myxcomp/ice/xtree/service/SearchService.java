@@ -4,7 +4,9 @@ import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.cache.TreeCache;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -13,9 +15,11 @@ import java.util.OptionalInt;
 public class SearchService {
 
     private final TreeCache cache;
+    private final PathResolver pathResolver;
 
-    public SearchService(TreeCache cache) {
+    public SearchService(TreeCache cache, PathResolver pathResolver) {
         this.cache = cache;
+        this.pathResolver = pathResolver;
     }
 
     /**
@@ -23,8 +27,10 @@ public class SearchService {
      * that id is cached, returns that single item. Otherwise (parse fails or
      * id not present) returns a case-insensitive substring match on name.
      * Blank / null {@code q} returns an empty list without touching the cache.
+     * Each hit is paired with its lazily-resolved path via a single
+     * memoised {@link PathResolver#pathsOf} call.
      */
-    public List<CachedNode> search(String q, OptionalInt limit) {
+    public List<SearchHitView> search(String q, OptionalInt limit) {
         Objects.requireNonNull(limit, "limit");
         if (q == null) {
             return List.of();
@@ -33,14 +39,28 @@ public class SearchService {
         if (trimmed.isEmpty()) {
             return List.of();
         }
+
+        List<CachedNode> hits;
         Long parsed = tryParseLong(trimmed);
         if (parsed != null) {
             Optional<CachedNode> byId = cache.searchById(parsed);
             if (byId.isPresent()) {
-                return List.of(byId.get());
+                hits = List.of(byId.get());
+            } else {
+                hits = cache.searchByName(trimmed, limit);
             }
+        } else {
+            hits = cache.searchByName(trimmed, limit);
         }
-        return cache.searchByName(trimmed, limit);
+
+        if (hits.isEmpty()) return List.of();
+        List<Long> ids = hits.stream().map(CachedNode::itemTreeId).toList();
+        Map<Long, String> paths = pathResolver.pathsOf(ids);
+        List<SearchHitView> out = new ArrayList<>(hits.size());
+        for (CachedNode n : hits) {
+            out.add(new SearchHitView(n, paths.getOrDefault(n.itemTreeId(), "")));
+        }
+        return List.copyOf(out);
     }
 
     private static Long tryParseLong(String s) {

@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 
@@ -27,11 +28,12 @@ import static org.mockito.Mockito.when;
 class SearchServiceTest {
 
     @Mock TreeCache cache;
+    @Mock PathResolver pathResolver;
     SearchService service;
 
     @BeforeEach
     void setUp() {
-        service = new SearchService(cache);
+        service = new SearchService(cache, pathResolver);
     }
 
     private CachedNode node(long id, String name) {
@@ -60,8 +62,10 @@ class SearchServiceTest {
         void numericQueryHittingByIdReturnsSingleNode() {
             CachedNode hit = node(42L, "Report-42");
             when(cache.searchById(42L)).thenReturn(Optional.of(hit));
+            when(pathResolver.pathsOf(List.of(42L))).thenReturn(Map.of(42L, "/root/Report-42"));
 
-            assertThat(service.search("42", OptionalInt.empty())).containsExactly(hit);
+            assertThat(service.search("42", OptionalInt.empty()))
+                    .map(SearchHitView::node).containsExactly(hit);
             verify(cache, never()).searchByName(any(), any());
         }
 
@@ -69,8 +73,10 @@ class SearchServiceTest {
         void numericQueryWithSurroundingWhitespaceIsTrimmedBeforeParsing() {
             CachedNode hit = node(7L, "Lucky");
             when(cache.searchById(7L)).thenReturn(Optional.of(hit));
+            when(pathResolver.pathsOf(List.of(7L))).thenReturn(Map.of(7L, "/root/Lucky"));
 
-            assertThat(service.search("  7  ", OptionalInt.empty())).containsExactly(hit);
+            assertThat(service.search("  7  ", OptionalInt.empty()))
+                    .map(SearchHitView::node).containsExactly(hit);
         }
 
         @Test
@@ -78,16 +84,20 @@ class SearchServiceTest {
             when(cache.searchById(999L)).thenReturn(Optional.empty());
             CachedNode nameHit = node(101L, "999-Report");
             when(cache.searchByName("999", OptionalInt.empty())).thenReturn(List.of(nameHit));
+            when(pathResolver.pathsOf(List.of(101L))).thenReturn(Map.of(101L, "/root/999-Report"));
 
-            assertThat(service.search("999", OptionalInt.empty())).containsExactly(nameHit);
+            assertThat(service.search("999", OptionalInt.empty()))
+                    .map(SearchHitView::node).containsExactly(nameHit);
         }
 
         @Test
         void nonNumericQueryGoesStraightToNameSearch() {
             CachedNode hit = node(8L, "MyReport");
             when(cache.searchByName("repo", OptionalInt.empty())).thenReturn(List.of(hit));
+            when(pathResolver.pathsOf(List.of(8L))).thenReturn(Map.of(8L, "/root/MyReport"));
 
-            assertThat(service.search("repo", OptionalInt.empty())).containsExactly(hit);
+            assertThat(service.search("repo", OptionalInt.empty()))
+                    .map(SearchHitView::node).containsExactly(hit);
             verify(cache, never()).searchById(anyLong());
         }
 
@@ -114,9 +124,34 @@ class SearchServiceTest {
         void limitIsNotConsultedWhenIdHits() {
             CachedNode hit = node(3L, "Three");
             when(cache.searchById(3L)).thenReturn(Optional.of(hit));
+            when(pathResolver.pathsOf(List.of(3L))).thenReturn(Map.of(3L, "/root/Three"));
 
-            assertThat(service.search("3", OptionalInt.of(1))).containsExactly(hit);
+            assertThat(service.search("3", OptionalInt.of(1)))
+                    .map(SearchHitView::node).containsExactly(hit);
             verify(cache, never()).searchByName(any(), any());
+        }
+
+        @Test
+        void searchByNamePopulatesPathOnEachHit() {
+            CachedNode bob = node(11L, "bobReport");
+            when(cache.searchByName("b", OptionalInt.empty())).thenReturn(List.of(bob));
+            when(pathResolver.pathsOf(List.of(11L)))
+                    .thenReturn(Map.of(11L, "/root/Users/bob/bobReport"));
+
+            List<SearchHitView> hits = service.search("b", OptionalInt.empty());
+
+            assertThat(hits).containsExactly(new SearchHitView(bob, "/root/Users/bob/bobReport"));
+        }
+
+        @Test
+        void searchByIdPopulatesPath() {
+            CachedNode node = node(42L, "thing");
+            when(cache.searchById(42L)).thenReturn(Optional.of(node));
+            when(pathResolver.pathsOf(List.of(42L))).thenReturn(Map.of(42L, "/root/thing"));
+
+            List<SearchHitView> hits = service.search("42", OptionalInt.empty());
+
+            assertThat(hits).containsExactly(new SearchHitView(node, "/root/thing"));
         }
     }
 }
