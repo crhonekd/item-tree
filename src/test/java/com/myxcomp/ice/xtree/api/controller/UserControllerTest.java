@@ -8,6 +8,7 @@ import com.myxcomp.ice.xtree.config.SecurityProperties;
 import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.service.HomeFolderService;
+import com.myxcomp.ice.xtree.service.PathResolver;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ class UserControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean HomeFolderService homeFolderService;
+    @MockitoBean PathResolver pathResolver;
     @MockitoBean CacheReadinessGate cacheReadinessGate;
     @MockitoBean SecurityProperties securityProperties;
 
@@ -44,13 +46,29 @@ class UserControllerTest {
         when(homeFolderService.findHomeFolder("alice"))
                 .thenReturn(new CachedNode(
                         42L, 2L, "alice", "Folder", Instant.parse("2026-05-16T12:00:00Z"), "sys"));
+        when(pathResolver.pathOf(42L)).thenReturn("/root/Users/alice");
 
         mvc.perform(get("/api/v1/itemtree/users/alice/home-folder")
                         .header("X-Ice-User", "caller"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.itemTreeId").value(42))
                 .andExpect(jsonPath("$.name").value("alice"))
-                .andExpect(jsonPath("$.type").value("Folder"));
+                .andExpect(jsonPath("$.type").value("Folder"))
+                .andExpect(jsonPath("$.path").value("/root/Users/alice"));
+    }
+
+    @Test
+    void getHomeFolderReturnsItemNodeWithPath() throws Exception {
+        CachedNode folder = new CachedNode(20L, 2L, "alice", "Folder", Instant.parse("2026-05-16T12:00:00Z"), "sys");
+        when(homeFolderService.findHomeFolder("alice")).thenReturn(folder);
+        when(pathResolver.pathOf(20L)).thenReturn("/root/Users/alice");
+
+        mvc.perform(get("/api/v1/itemtree/users/alice/home-folder")
+                        .header("X-Ice-User", "tester"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.itemTreeId").value(20))
+                .andExpect(jsonPath("$.name").value("alice"))
+                .andExpect(jsonPath("$.path").value("/root/Users/alice"));
     }
 
     @Test
