@@ -86,3 +86,9 @@ html, body { margin: 0; padding: 0; font: 13px/1.4 -apple-system, "Segoe UI", sa
 .toast .toast-close { float: right; cursor: pointer; margin-left: 8px; }
 .toast details { margin-top: 4px; }
 .toast pre { background: rgba(0,0,0,0.2); color: inherit; border: none; padding: 4px; max-height: 200px; overflow: auto; font-size: 11px; }
+
+.context-menu li.context-menu-separator {
+  border-bottom: 1px solid #d0d0d0;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+}

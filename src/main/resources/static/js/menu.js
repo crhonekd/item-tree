@@ -24,25 +24,32 @@ document.addEventListener('keydown', (e) => {
 export function openContextMenu(id, clientX, clientY) {
   closeMenu();
   const node = state.tree.nodesById.get(id);
-  if (!node || id === ROOT_ID) return;
+  if (!node) return;
+  const isRoot = id === ROOT_ID;
   const isFolder = node.type === FOLDER;
   const hasData = !isFolder && !node.type.startsWith('Shortcut');
 
   const items = [];
-  if (isFolder) {
-    items.push({ label: 'Refresh subtree', action: () => refreshSubtree(id) });
-    items.push({ label: 'Create child', action: () => openCreateModal(id) });
-  }
-  if (hasData) {
-    items.push({ label: 'Edit data', action: () => openEditDataModal(id, null) });
-  }
-  items.push({ label: 'Rename', action: () => openRenameModal(id, node.name) });
-  items.push({ label: 'Delete', action: () => openDeleteConfirm(id, node) });
-  items.push({ label: 'Cut', action: () => { state.clipboard = { op: 'cut', sourceId: id, sourceName: node.name }; renderTree(); } });
-  items.push({ label: 'Copy', action: () => { state.clipboard = { op: 'copy', sourceId: id, sourceName: node.name }; renderTree(); } });
-  if (isFolder && state.clipboard) {
-    items.push({ label: `Paste here (${state.clipboard.op} ${state.clipboard.sourceName})`,
-                 action: () => pasteInto(id) });
+  // Phase 20: Copy ID and Show-and-copy path apply to every node, root included.
+  items.push({ label: `Copy ID (${id})`, action: () => copyId(id) });
+  items.push({ label: 'Show and copy full path', action: () => showAndCopyPath(node), separatorAfter: !isRoot });
+
+  if (!isRoot) {
+    if (isFolder) {
+      items.push({ label: 'Refresh subtree', action: () => refreshSubtree(id) });
+      items.push({ label: 'Create child', action: () => openCreateModal(id) });
+    }
+    if (hasData) {
+      items.push({ label: 'Edit data', action: () => openEditDataModal(id, null) });
+    }
+    items.push({ label: 'Rename', action: () => openRenameModal(id, node.name) });
+    items.push({ label: 'Delete', action: () => openDeleteConfirm(id, node) });
+    items.push({ label: 'Cut', action: () => { state.clipboard = { op: 'cut', sourceId: id, sourceName: node.name }; renderTree(); } });
+    items.push({ label: 'Copy', action: () => { state.clipboard = { op: 'copy', sourceId: id, sourceName: node.name }; renderTree(); } });
+    if (isFolder && state.clipboard) {
+      items.push({ label: `Paste here (${state.clipboard.op} ${state.clipboard.sourceName})`,
+                   action: () => pasteInto(id) });
+    }
   }
 
   const ul = document.createElement('ul');
@@ -52,6 +59,7 @@ export function openContextMenu(id, clientX, clientY) {
   for (const item of items) {
     const li = document.createElement('li');
     li.textContent = item.label;
+    if (item.separatorAfter) li.classList.add('context-menu-separator');
     li.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(); item.action(); });
     ul.appendChild(li);
   }
@@ -83,4 +91,29 @@ async function pasteInto(targetId) {
       toastError(String(e));
     }
   }
+}
+
+async function copyId(id) {
+  const text = String(id);
+  try {
+    await navigator.clipboard.writeText(text);
+    toastSuccess(`Copied id ${text}`);
+  } catch (e) {
+    toastError(`Clipboard write failed: ${text}`);
+  }
+}
+
+async function showAndCopyPath(node) {
+  const path = node.path ?? '';
+  if (!path) {
+    alert('Path is not available for this node (no path was returned by the server).');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(path);
+  } catch (e) {
+    toastError(`Clipboard write failed; path is: ${path}`);
+    return;
+  }
+  alert('Path copied:\n' + path);
 }
