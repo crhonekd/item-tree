@@ -411,7 +411,7 @@ components:
         path:
           type: string
           nullable: true
-          description: "Root-anchored slash-separated path, e.g. root/Folder1/IceReport; populated only on /tree, /subtree, and /subtree-full responses"
+          description: "Root-anchored slash-separated path starting with a leading slash, e.g. /root/Folder1/IceReport. Populated on all read endpoints; absent on mutation response bodies."
         lastUpdate:
           type: string
           format: date-time
@@ -437,6 +437,10 @@ components:
           format: date-time
         lastUpdateUser:
           type: string
+        path:
+          type: string
+          nullable: true
+          description: "Root-anchored slash-separated path starting with a leading slash, e.g. /root/Folder1/IceReport. Populated on /items/get responses (including expanded children)."
         dataJson:
           type: object
           nullable: true
@@ -463,6 +467,10 @@ components:
           type: string
         type:
           type: string
+        path:
+          type: string
+          nullable: true
+          description: "Root-anchored slash-separated path starting with a leading slash, e.g. /root/Folder1/IceReport."
 
     CreateItemRequest:
       type: object
