@@ -33,6 +33,7 @@ public class ItemNodeWithDataMapper {
                 src.type(),
                 timeMapper.toOffsetDateTime(src.lastUpdate()),
                 src.lastUpdateUser());
+        dto.setPath(src.path());
 
         if (src.dataJson() != null) {
             dto.setDataJson(parseJson(src.dataJson(), src.itemTreeId()));

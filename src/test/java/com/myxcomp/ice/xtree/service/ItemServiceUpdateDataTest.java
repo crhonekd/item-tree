@@ -60,6 +60,7 @@ class ItemServiceUpdateDataTest {
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
     @Mock OwnershipChecker ownershipChecker;
+    @Mock PathResolver pathResolver;
 
     ItemService service;
     static final Instant NOW = Instant.parse("2026-05-16T12:00:00Z");
@@ -73,7 +74,7 @@ class ItemServiceUpdateDataTest {
         lenient().when(ownershipChecker.requireHomeFolderExists(anyString())).thenReturn(anyHome);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
-                new SimpleMeterRegistry(), copyProperties, ownershipChecker);
+                new SimpleMeterRegistry(), copyProperties, ownershipChecker, pathResolver);
     }
 
     @Test

@@ -70,6 +70,7 @@ public class ItemService {
     private final MeterRegistry meterRegistry;
     private final CopyProperties copyProperties;
     private final OwnershipChecker ownershipChecker;
+    private final PathResolver pathResolver;
 
     public ItemService(TreeCache cache,
                        ItemTreeRepository repository,
@@ -82,7 +83,8 @@ public class ItemService {
                        @Qualifier("backfillExecutor") TaskExecutor backfillExecutor,
                        MeterRegistry meterRegistry,
                        CopyProperties copyProperties,
-                       OwnershipChecker ownershipChecker) {
+                       OwnershipChecker ownershipChecker,
+                       PathResolver pathResolver) {
         this.cache = cache;
         this.repository = repository;
         this.policy = policy;
@@ -95,6 +97,7 @@ public class ItemService {
         this.meterRegistry = Objects.requireNonNull(meterRegistry, "meterRegistry");
         this.copyProperties = Objects.requireNonNull(copyProperties, "copyProperties");
         this.ownershipChecker = Objects.requireNonNull(ownershipChecker, "ownershipChecker");
+        this.pathResolver = Objects.requireNonNull(pathResolver, "pathResolver");
     }
 
     /**
@@ -398,17 +401,31 @@ public class ItemService {
             }
         }
 
+        // Phase 20: pre-compute paths for top-level items + expanded folder children.
+        java.util.LinkedHashSet<Long> pathIds = new java.util.LinkedHashSet<>();
+        for (CachedNode n : requested) {
+            pathIds.add(n.itemTreeId());
+            if (Types.isFolder(n.type())) {
+                for (CachedNode c : folderChildren.get(n.itemTreeId())) {
+                    pathIds.add(c.itemTreeId());
+                }
+            }
+        }
+        Map<Long, String> pathById = pathResolver.pathsOf(pathIds);
+
         List<JsonBackfillRow> backfillBatch = new ArrayList<>();
         List<ItemWithData> out = new ArrayList<>(requested.size());
         for (CachedNode n : requested) {
+            String path = pathById.getOrDefault(n.itemTreeId(), "");
             if (Types.isFolder(n.type())) {
                 List<ItemWithData> shapedChildren = new ArrayList<>();
                 for (CachedNode c : folderChildren.get(n.itemTreeId())) {
-                    shapedChildren.add(shape(c, payloadById, backfillBatch, null));
+                    String childPath = pathById.getOrDefault(c.itemTreeId(), "");
+                    shapedChildren.add(shape(c, payloadById, backfillBatch, null, childPath));
                 }
-                out.add(shape(n, payloadById, backfillBatch, List.copyOf(shapedChildren)));
+                out.add(shape(n, payloadById, backfillBatch, List.copyOf(shapedChildren), path));
             } else {
-                out.add(shape(n, payloadById, backfillBatch, null));
+                out.add(shape(n, payloadById, backfillBatch, null, path));
             }
         }
 
@@ -433,10 +450,11 @@ public class ItemService {
     private ItemWithData shape(CachedNode n,
                                Map<Long, PayloadRow> payloadById,
                                List<JsonBackfillRow> backfillBatch,
-                               List<ItemWithData> children) {
+                               List<ItemWithData> children,
+                               String path) {
         if (Types.isFolder(n.type()) || !policy.hasData(n.type())) {
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
-                    n.lastUpdate(), n.lastUpdateUser(), null, null, children);
+                    n.lastUpdate(), n.lastUpdateUser(), null, null, children, path);
         }
 
         PayloadRow row = payloadById.get(n.itemTreeId());
@@ -459,12 +477,12 @@ public class ItemService {
                 shippedXml = null;
             }
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
-                    n.lastUpdate(), n.lastUpdateUser(), null, shippedXml, children);
+                    n.lastUpdate(), n.lastUpdateUser(), null, shippedXml, children, path);
         }
 
         if (json != null) {
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
-                    n.lastUpdate(), n.lastUpdateUser(), json, null, children);
+                    n.lastUpdate(), n.lastUpdateUser(), json, null, children, path);
         }
         if (xml != null) {
             String convertedJson;
@@ -477,10 +495,10 @@ public class ItemService {
             }
             backfillBatch.add(new JsonBackfillRow(n.itemTreeId(), convertedJson));
             return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
-                    n.lastUpdate(), n.lastUpdateUser(), convertedJson, null, children);
+                    n.lastUpdate(), n.lastUpdateUser(), convertedJson, null, children, path);
         }
         return new ItemWithData(n.itemTreeId(), n.parentId(), n.name(), n.type(),
-                n.lastUpdate(), n.lastUpdateUser(), null, null, children);
+                n.lastUpdate(), n.lastUpdateUser(), null, null, children, path);
     }
 
     /**

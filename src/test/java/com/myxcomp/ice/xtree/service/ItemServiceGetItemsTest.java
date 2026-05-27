@@ -27,12 +27,15 @@ import org.springframework.core.task.TaskRejectedException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -50,6 +53,7 @@ class ItemServiceGetItemsTest {
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
     @Mock OwnershipChecker ownershipChecker;
+    @Mock PathResolver pathResolver;
 
     ItemService service;
     static final Instant T = Instant.EPOCH;
@@ -57,9 +61,10 @@ class ItemServiceGetItemsTest {
     @BeforeEach
     void setUp() {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
+        lenient().when(pathResolver.pathsOf(any())).thenReturn(Map.of());
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator, new SyncTaskExecutor(),
-                new SimpleMeterRegistry(), copyProperties, ownershipChecker);
+                new SimpleMeterRegistry(), copyProperties, ownershipChecker, pathResolver);
     }
 
     private CachedNode folder(long id, long parentId, String name) {
@@ -284,7 +289,7 @@ class ItemServiceGetItemsTest {
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
                 task -> { throw new TaskRejectedException("queue full"); },
-                new SimpleMeterRegistry(), copyProperties, ownershipChecker);
+                new SimpleMeterRegistry(), copyProperties, ownershipChecker, pathResolver);
 
         List<ItemWithData> result = saturatingService.getItemsWithData(List.of(7L));
 
@@ -314,5 +319,59 @@ class ItemServiceGetItemsTest {
         assertThat(result.get(0).dataJson()).isEqualTo("{\"a\":1}");
         assertThat(result.get(0).dataXml()).isNull();
         verify(repository).backfillJsonWhereNull(anyCollection());
+    }
+
+    @Test
+    void getItemsWithDataPopulatesPathOnTopLevelItem() {
+        CachedNode node = leaf(7L, 1L, "Doc", "Report");
+        when(cache.getById(7L)).thenReturn(Optional.of(node));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(7L, "{\"a\":1}", null)));
+        when(pathResolver.pathsOf(any())).thenReturn(Map.of(7L, "/root/Users/alice"));
+
+        List<ItemWithData> result = service.getItemsWithData(List.of(7L));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).path()).isEqualTo("/root/Users/alice");
+    }
+
+    @Test
+    void getItemsWithDataPopulatesPathOnEachExpandedChild() {
+        CachedNode parent = folder(2L, 1L, "Box");
+        CachedNode child = leaf(3L, 2L, "Doc", "Report");
+        when(cache.getById(2L)).thenReturn(Optional.of(parent));
+        when(cache.getChildren(2L)).thenReturn(List.of(child));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(3L, "{\"k\":1}", null)));
+        when(pathResolver.pathsOf(any())).thenReturn(
+                Map.of(2L, "/root/Box", 3L, "/root/Box/Doc"));
+
+        List<ItemWithData> result = service.getItemsWithData(List.of(2L));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).path()).isEqualTo("/root/Box");
+        assertThat(result.get(0).children()).hasSize(1);
+        assertThat(result.get(0).children().get(0).path()).isEqualTo("/root/Box/Doc");
+    }
+
+    @Test
+    void getItemsWithDataCallsPathsOfAtMostOnce() {
+        CachedNode parent = folder(2L, 1L, "Box");
+        CachedNode child = leaf(3L, 2L, "Doc", "Report");
+        when(cache.getById(2L)).thenReturn(Optional.of(parent));
+        when(cache.getChildren(2L)).thenReturn(List.of(child));
+        when(policy.hasData("Report")).thenReturn(true);
+        when(policy.isSentAsXmlToUi("Report")).thenReturn(false);
+        when(repository.findPayloadByIds(anyCollection()))
+                .thenReturn(List.of(new PayloadRow(3L, "{\"k\":1}", null)));
+        when(pathResolver.pathsOf(any())).thenReturn(Map.of(2L, "/root/Box", 3L, "/root/Box/Doc"));
+
+        service.getItemsWithData(List.of(2L));
+
+        verify(pathResolver, times(1)).pathsOf(any());
     }
 }

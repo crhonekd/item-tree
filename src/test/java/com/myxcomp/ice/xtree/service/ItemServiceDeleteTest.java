@@ -61,6 +61,7 @@ class ItemServiceDeleteTest {
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
     @Mock OwnershipChecker ownershipChecker;
+    @Mock PathResolver pathResolver;
 
     ItemService service;
     static final UserContext CTX = new UserContext("alice", null);
@@ -71,7 +72,8 @@ class ItemServiceDeleteTest {
         service = new ItemService(
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
-                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker);
+                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker,
+                pathResolver);
     }
 
     private static final CachedNode NODE_50 = new CachedNode(50L, 10L, "Report", "Report",

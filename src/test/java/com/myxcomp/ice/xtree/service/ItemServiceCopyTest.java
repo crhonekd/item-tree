@@ -62,6 +62,7 @@ class ItemServiceCopyTest {
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
     @Mock OwnershipChecker ownershipChecker;
+    @Mock PathResolver pathResolver;
 
     ItemService service;
 
@@ -70,7 +71,8 @@ class ItemServiceCopyTest {
         lenient().when(copyProperties.maxNodes()).thenReturn(100);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
-                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker);
+                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker,
+                pathResolver);
     }
 
     @Nested

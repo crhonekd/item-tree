@@ -61,6 +61,7 @@ class ItemServiceCreateTest {
     @Mock SequenceGenerator sequenceGenerator;
     @Mock CopyProperties copyProperties;
     @Mock OwnershipChecker ownershipChecker;
+    @Mock PathResolver pathResolver;
 
     ItemService service;
 
@@ -76,7 +77,8 @@ class ItemServiceCreateTest {
         service = new ItemService(
                 cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, sequenceGenerator,
-                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker);
+                new SyncTaskExecutor(), new SimpleMeterRegistry(), copyProperties, ownershipChecker,
+                pathResolver);
     }
 
     private CachedNode folder(long id, long parentId, String name) {

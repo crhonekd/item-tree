@@ -27,7 +27,7 @@ class ItemNodeWithDataMapperTest {
         // Non-folder node: children == null
         ItemWithData input = new ItemWithData(
                 42L, 7L, "Report-1", "Report", T, "alice",
-                "{\"foo\":\"bar\",\"n\":1}", null, null);
+                "{\"foo\":\"bar\",\"n\":1}", null, null, "");
 
         ItemNodeWithData dto = mapper.toDto(input);
 
@@ -47,7 +47,7 @@ class ItemNodeWithDataMapperTest {
         // Non-folder node: children == null
         ItemWithData input = new ItemWithData(
                 42L, 7L, "Bucket-1", "Bucket.Collection", T, "alice",
-                null, "<bucket/>", null);
+                null, "<bucket/>", null, "");
 
         ItemNodeWithData dto = mapper.toDto(input);
 
@@ -60,7 +60,7 @@ class ItemNodeWithDataMapperTest {
     void nonFolderNodeProducesNullChildren() {
         // Non-folder with no data payload: children == null marks it as non-folder
         ItemWithData input = new ItemWithData(
-                42L, 7L, "Shortcut-1", "Shortcut", T, "alice", null, null, null);
+                42L, 7L, "Shortcut-1", "Shortcut", T, "alice", null, null, null, "");
 
         ItemNodeWithData dto = mapper.toDto(input);
 
@@ -73,7 +73,7 @@ class ItemNodeWithDataMapperTest {
     void emptyFolderProducesEmptyChildrenList() {
         // Folder with no children: children == List.of() (non-null empty list)
         ItemWithData input = new ItemWithData(
-                42L, 7L, "MyFolder", "Folder", T, "alice", null, null, List.of());
+                42L, 7L, "MyFolder", "Folder", T, "alice", null, null, List.of(), "");
 
         ItemNodeWithData dto = mapper.toDto(input);
 
@@ -87,11 +87,11 @@ class ItemNodeWithDataMapperTest {
         // Child nodes are non-folders: children == null
         ItemWithData childA = new ItemWithData(
                 10L, 1L, "child-A", "Report", T, "alice",
-                "{\"k\":\"v\"}", null, null);
+                "{\"k\":\"v\"}", null, null, "");
         ItemWithData childB = new ItemWithData(
-                11L, 1L, "child-B", "Folder", T, "alice", null, null, List.of());
+                11L, 1L, "child-B", "Folder", T, "alice", null, null, List.of(), "");
         ItemWithData folder = new ItemWithData(
-                1L, 0L, "myFolder", "Folder", T, "alice", null, null, List.of(childA, childB));
+                1L, 0L, "myFolder", "Folder", T, "alice", null, null, List.of(childA, childB), "");
 
         ItemNodeWithData dto = mapper.toDto(folder);
 
@@ -105,8 +105,8 @@ class ItemNodeWithDataMapperTest {
 
     @Test
     void listMappingPreservesOrder() {
-        ItemWithData a = new ItemWithData(1L, 0L, "a", "Folder", T, "sys", null, null, List.of());
-        ItemWithData b = new ItemWithData(2L, 0L, "b", "Folder", T, "sys", null, null, List.of());
+        ItemWithData a = new ItemWithData(1L, 0L, "a", "Folder", T, "sys", null, null, List.of(), "");
+        ItemWithData b = new ItemWithData(2L, 0L, "b", "Folder", T, "sys", null, null, List.of(), "");
 
         List<ItemNodeWithData> dtos = mapper.toDtos(List.of(a, b));
 
@@ -117,10 +117,41 @@ class ItemNodeWithDataMapperTest {
     void malformedJsonProducesIllegalStateException() {
         ItemWithData input = new ItemWithData(
                 42L, 7L, "Report-1", "Report", T, "alice",
-                "{not-json", null, null);
+                "{not-json", null, null, "");
 
         assertThatThrownBy(() -> mapper.toDto(input))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("42");
+    }
+
+    @Test
+    void toDtoCopiesPath() {
+        ItemWithData src = new ItemWithData(
+                42L, 1L, "thing", "IceReport",
+                Instant.parse("2026-05-27T10:00:00Z"), "tester",
+                "{\"k\":1}", null, null,
+                "/root/Folder1/thing");
+
+        ItemNodeWithData dto = mapper.toDto(src);
+
+        assertThat(dto.getPath()).isEqualTo("/root/Folder1/thing");
+    }
+
+    @Test
+    void toDtoCopiesPathOnFolderChildrenRecursively() {
+        ItemWithData child = new ItemWithData(
+                10L, 2L, "alice", "Folder",
+                Instant.parse("2026-05-27T10:00:00Z"), "tester",
+                null, null, List.of(), "/root/Users/alice");
+        ItemWithData folder = new ItemWithData(
+                2L, 1L, "Users", "Folder",
+                Instant.parse("2026-05-27T10:00:00Z"), "tester",
+                null, null, List.of(child), "/root/Users");
+
+        ItemNodeWithData dto = mapper.toDto(folder);
+
+        assertThat(dto.getPath()).isEqualTo("/root/Users");
+        assertThat(dto.getChildren()).hasSize(1);
+        assertThat(dto.getChildren().get(0).getPath()).isEqualTo("/root/Users/alice");
     }
 }

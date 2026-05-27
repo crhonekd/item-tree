@@ -431,7 +431,7 @@ class ItemControllerTest {
     void getItemsReturns200AndListWithJsonInflatedAsMap() throws Exception {
         ItemWithData item = new ItemWithData(
                 42L, 2L, "Report-1", "Report", T, "alice",
-                "{\"foo\":\"bar\"}", null, null);
+                "{\"foo\":\"bar\"}", null, null, "/root/Folder1/Report-1");
         when(itemService.getItemsWithData(List.of(42L))).thenReturn(List.of(item));
 
         mvc.perform(post("/api/v1/itemtree/items/get")
@@ -442,7 +442,8 @@ class ItemControllerTest {
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$[0].itemTreeId").value(42))
                 .andExpect(jsonPath("$[0].dataJson.foo").value("bar"))
-                .andExpect(jsonPath("$[0].children").value(org.hamcrest.Matchers.nullValue()));
+                .andExpect(jsonPath("$[0].children").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$[0].path").value("/root/Folder1/Report-1"));
     }
 
     @Test

@@ -12,6 +12,10 @@ import java.util.List;
  * populated, and {@code children} is {@code null} (never an empty list).
  * Callers must use {@code children() == null} to distinguish non-folder nodes from
  * empty-folder nodes.
+ *
+ * <p>{@code path} is the root-anchored, slash-prefixed path of this node (e.g.
+ * {@code "/root/Users/alice/MyReport"}). It is populated by
+ * {@link ItemService#getItemsWithData(java.util.List)} via the {@link PathResolver}.
  */
 public record ItemWithData(
         long itemTreeId,
@@ -22,5 +26,6 @@ public record ItemWithData(
         String lastUpdateUser,
         String dataJson,
         String dataXml,
-        List<ItemWithData> children
+        List<ItemWithData> children,
+        String path
 ) {}

@@ -70,9 +70,10 @@ class ItemServiceMetricsTest {
         CopyProperties copyProperties = mock(CopyProperties.class);
         when(copyProperties.maxNodes()).thenReturn(100);
         ownershipChecker = mock(OwnershipChecker.class);
+        PathResolver pathResolver = mock(PathResolver.class);
         service = new ItemService(cache, repository, policy, converter, publisher,
                 timeMapper, instanceIdProvider, seq, new SyncTaskExecutor(), meterRegistry,
-                copyProperties, ownershipChecker);
+                copyProperties, ownershipChecker, pathResolver);
     }
 
     @Test
