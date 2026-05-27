@@ -715,6 +715,19 @@ Full plan in `docs/superpowers/plans/2026-05-26-phase19-search-simplification.md
 
 ---
 
+## Phase 20 — `path` on all read endpoints + leading-slash format + UI ID/path copy (2026-05-27)
+
+`PathResolver` now plumbed into `/items/get`, `/search`, `/users/{u}/home-folder` (the tree endpoints had it since Phase 6). Path format standardised on a leading slash: `/root/Users/alice`. Stored-on-cache vs lazy-compute decision (§9) re-affirmed in favour of lazy compute. Mutation response bodies unchanged.
+
+Test UI context menu adds `Copy ID (<id>)` and `Show and copy full path` to every node (root included); both write to `navigator.clipboard` and use `alert()` for the path display (with a toast fallback).
+
+Spec: `docs/superpowers/specs/2026-05-27-phase20-path-on-all-read-endpoints-design.md`.
+Plan: `docs/superpowers/plans/2026-05-27-phase20-path-on-all-read-endpoints.md`.
+
+Phase 21 (or renumbered Phase 18 work-PC wiring) is the next user-managed step.
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:

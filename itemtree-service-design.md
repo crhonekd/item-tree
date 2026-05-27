@@ -149,15 +149,15 @@ Base path: `/api/v1/itemtree`.
 
 ### Schema summary
 
-- **`ItemNode`** — structural: `itemTreeId`, `parentId`, `name`, `type`, `path` (tree endpoints only), `lastUpdate`, `lastUpdateUser`.
-- **`ItemNodeWithData`** — extends `ItemNode` with `dataJson` (object, nullable), `dataXml` (string, nullable), `children` (array of `ItemNodeWithData`, populated only when node is a folder).
-- **`SearchHit`** — `itemTreeId`, `name`, `type`.
+- **`ItemNode`** — structural: `itemTreeId`, `parentId`, `name`, `type`, `path` (root-anchored, leading-slash, e.g. `/root/Folder1/IceReport`; populated on all read endpoints; absent on mutation responses), `lastUpdate`, `lastUpdateUser`.
+- **`ItemNodeWithData`** — extends `ItemNode` with `path` (same shape as on `ItemNode`), `dataJson` (object, nullable), `dataXml` (string, nullable), `children` (array of `ItemNodeWithData`, populated only when node is a folder).
+- **`SearchHit`** — `itemTreeId`, `name`, `type`, `path`.
 - **`CreateItemRequest`** — `parentId`, `name`, `type`, optional `data`.
 - **`Problem`** — RFC 7807 with extensions `errorCode` and `traceId`.
 
 ### Response shapes
 
-- **`/tree`, `/tree/{rootId}/subtree`, and `/tree/{rootId}/subtree-full`** — flat list of `ItemNode`, each with `path` (root-anchored, slash-separated, e.g. `root/Folder1/IceReport`). `/subtree` returns root + immediate children only; `/subtree-full` returns root + every descendant in BFS order. `/tree` shape may be revisited later to switch to nested; flat is the contract for all three for now.
+- **`/tree`, `/tree/{rootId}/subtree`, and `/tree/{rootId}/subtree-full`** — flat list of `ItemNode`, each with `path` (root-anchored, slash-separated, e.g. `/root/Folder1/IceReport`). `/subtree` returns root + immediate children only; `/subtree-full` returns root + every descendant in BFS order. `/tree` shape may be revisited later to switch to nested; flat is the contract for all three for now.
 - **`/search`** — flat list of `SearchHit`. Required `q` query parameter (string). If `q` parses as `Long` and an item with that id exists, the response contains that single item; otherwise (parse fails or id missing) the server returns a case-insensitive substring match on `name`. Optional `limit` applies to the name-search branch only; no default cap. Blank `q` returns `[]` with status 200.
 - **`/items/get`** — list of `ItemNodeWithData`. Folder nodes include `children` (one level deep, including each child's `dataJson` / `dataXml` where applicable). Non-folder nodes include `dataJson` or `dataXml` (at most one populated). **Missing ids are silently omitted** from the response.
 - **`/users/{userName}/home-folder`** — single `ItemNode`. 404 with `errorCode = HOME_FOLDER_NOT_FOUND` if not found.
@@ -643,7 +643,7 @@ public interface PathResolver {
 }
 ```
 
-Called by `TreeService` after `TreeCache` returns the node list. Path format: `"root/Folder1/IceReport"`.
+Called by `TreeService` after `TreeCache` returns the node list. Path format: leading-slash root-anchored, e.g. `"/root/Folder1/IceReport"`. Walks that do not reach the root (missing ancestor, cap reached) return their partial chain slash-less; an unknown id returns the empty string.
 
 ### Where path appears
 
@@ -652,9 +652,11 @@ Called by `TreeService` after `TreeCache` returns the node list. Path format: `"
 | `/tree` | Yes |
 | `/tree/{rootId}/subtree` | Yes |
 | `/tree/{rootId}/subtree-full` | Yes |
-| `/items/get` | No |
-| `/search` | No |
-| Create / update / move / rename / delete responses | No |
+| `/items/get` (incl. expanded children) | Yes |
+| `/search` | Yes |
+| `/users/{userName}/home-folder` | Yes |
+| Create / update / move / rename / copy responses | No |
+| Delete (204 No Content) | n/a |
 
 ---
 
