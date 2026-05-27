@@ -30,9 +30,6 @@ export function openContextMenu(id, clientX, clientY) {
   const hasData = !isFolder && !node.type.startsWith('Shortcut');
 
   const items = [];
-  // Phase 20: Copy ID and Show-and-copy path apply to every node, root included.
-  items.push({ label: `Copy ID (${id})`, action: () => copyId(id) });
-  items.push({ label: 'Show and copy full path', action: () => showAndCopyPath(node), separatorAfter: !isRoot });
 
   if (!isRoot) {
     if (isFolder) {
@@ -52,6 +49,10 @@ export function openContextMenu(id, clientX, clientY) {
     }
   }
 
+  // Phase 20: Copy ID and Show-and-copy path apply to every node, root included.
+  items.push({ label: `Copy ID (${id})`, action: () => copyId(id), separatorBefore: !isRoot });
+  items.push({ label: 'Show and copy full path', action: () => showAndCopyPath(node) });
+
   const ul = document.createElement('ul');
   ul.className = 'context-menu';
   ul.style.left = `${clientX}px`;
@@ -60,6 +61,7 @@ export function openContextMenu(id, clientX, clientY) {
     const li = document.createElement('li');
     li.textContent = item.label;
     if (item.separatorAfter) li.classList.add('context-menu-separator');
+    if (item.separatorBefore) li.classList.add('context-menu-separator-before');
     li.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(); item.action(); });
     ul.appendChild(li);
   }
