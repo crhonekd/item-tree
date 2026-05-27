@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Lazily computes root-anchored, slash-separated paths for cache nodes (e.g. {@code "root/Users/testuser1"}).
+ * Lazily computes root-anchored, slash-separated paths for cache nodes (e.g. {@code "/root/Users/testuser1"}).
  *
  * <p>Per design §9, paths are not stored on {@link com.myxcomp.ice.xtree.cache.CachedNode} — they are
  * recomputed from the parent chain at response-time on the {@code /tree} and {@code /tree/{rootId}/subtree}

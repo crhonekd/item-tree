@@ -37,12 +37,12 @@ class ItemNodeMapperTest {
     @Test
     void treeNodeViewMapsToItemNodeWithPath() {
         CachedNode node = new CachedNode(42L, 7L, "Report-1", "Report", T, "alice");
-        TreeNodeView view = new TreeNodeView(node, "root/Users/alice/Report-1");
+        TreeNodeView view = new TreeNodeView(node, "/root/Users/alice/Report-1");
 
         ItemNode dto = mapper.toDto(view);
 
         assertThat(dto.getItemTreeId()).isEqualTo(42L);
-        assertThat(dto.getPath()).isEqualTo("root/Users/alice/Report-1");
+        assertThat(dto.getPath()).isEqualTo("/root/Users/alice/Report-1");
     }
 
     @Test
@@ -50,12 +50,12 @@ class ItemNodeMapperTest {
         CachedNode a = new CachedNode(1L, 0L, "root",  "Folder", T, "sys");
         CachedNode b = new CachedNode(2L, 1L, "Users", "Folder", T, "sys");
         List<TreeNodeView> views = List.of(
-                new TreeNodeView(a, "root"),
-                new TreeNodeView(b, "root/Users"));
+                new TreeNodeView(a, "/root"),
+                new TreeNodeView(b, "/root/Users"));
 
         List<ItemNode> dtos = mapper.toDtos(views);
 
         assertThat(dtos).extracting(ItemNode::getItemTreeId).containsExactly(1L, 2L);
-        assertThat(dtos).extracting(ItemNode::getPath).containsExactly("root", "root/Users");
+        assertThat(dtos).extracting(ItemNode::getPath).containsExactly("/root", "/root/Users");
     }
 }

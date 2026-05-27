@@ -56,16 +56,16 @@ class TreeControllerTest {
     @Test
     void getTreeReturns200WithListOfItemNodes() throws Exception {
         when(treeService.getTree(any(UserContext.class))).thenReturn(List.of(
-                view(1L, 0L, "root",  "Folder", "root"),
-                view(2L, 1L, "Users", "Folder", "root/Users")));
+                view(1L, 0L, "root",  "Folder", "/root"),
+                view(2L, 1L, "Users", "Folder", "/root/Users")));
 
         mvc.perform(get("/api/v1/itemtree/tree")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].itemTreeId").value(1))
-                .andExpect(jsonPath("$[0].path").value("root"))
-                .andExpect(jsonPath("$[1].path").value("root/Users"));
+                .andExpect(jsonPath("$[0].path").value("/root"))
+                .andExpect(jsonPath("$[1].path").value("/root/Users"));
     }
 
     @Test
@@ -98,14 +98,14 @@ class TreeControllerTest {
     @Test
     void getSubtreeFullReturns200WithPaths() throws Exception {
         when(treeService.getSubtreeFull(7L)).thenReturn(List.of(
-                view(7L, 0L, "root",  "Folder", "root"),
-                view(8L, 7L, "child", "Folder", "root/child")));
+                view(7L, 0L, "root",  "Folder", "/root"),
+                view(8L, 7L, "child", "Folder", "/root/child")));
 
         mvc.perform(get("/api/v1/itemtree/tree/7/subtree-full")
                         .header("X-Ice-User", "alice"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[1].path").value("root/child"));
+                .andExpect(jsonPath("$[1].path").value("/root/child"));
     }
 
     @Test
@@ -132,17 +132,17 @@ class TreeControllerTest {
         @Test
         void returns200WithRootAndChildren() throws Exception {
             when(treeService.getSubtree(5L)).thenReturn(List.of(
-                    view(5L, 1L, "Group",  "Folder", "root/Group"),
-                    view(6L, 5L, "ChildA", "Folder", "root/Group/ChildA"),
-                    view(7L, 5L, "ChildB", "Report", "root/Group/ChildB")));
+                    view(5L, 1L, "Group",  "Folder", "/root/Group"),
+                    view(6L, 5L, "ChildA", "Folder", "/root/Group/ChildA"),
+                    view(7L, 5L, "ChildB", "Report", "/root/Group/ChildB")));
 
             mvc.perform(get("/api/v1/itemtree/tree/5/subtree")
                             .header("X-Ice-User", "alice"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.length()").value(3))
                     .andExpect(jsonPath("$[0].itemTreeId").value(5))
-                    .andExpect(jsonPath("$[0].path").value("root/Group"))
-                    .andExpect(jsonPath("$[1].path").value("root/Group/ChildA"));
+                    .andExpect(jsonPath("$[0].path").value("/root/Group"))
+                    .andExpect(jsonPath("$[1].path").value("/root/Group/ChildA"));
         }
 
         @Test

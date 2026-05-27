@@ -66,11 +66,13 @@ public class DefaultPathResolver implements PathResolver {
 
         List<CachedNode> chainLeafFirst = new ArrayList<>();
         String anchorPath = null;
+        boolean reachedRoot = false;
         CachedNode cursor = startOpt.get();
         int steps = 0;
         while (cursor != null) {
             chainLeafFirst.add(cursor);
             if (cursor.parentId() == TreeConstants.ROOT_PARENT_ID) {
+                reachedRoot = true;
                 break;
             }
             String memoForParent = memo.get(cursor.parentId());
@@ -92,9 +94,15 @@ public class DefaultPathResolver implements PathResolver {
         }
 
         StringBuilder accum = new StringBuilder(anchorPath == null ? "" : anchorPath);
+        boolean rootPrefixPending = reachedRoot && anchorPath == null;
         for (int i = chainLeafFirst.size() - 1; i >= 0; i--) {
             CachedNode node = chainLeafFirst.get(i);
-            if (accum.length() > 0) accum.append(SEPARATOR);
+            if (rootPrefixPending) {
+                accum.append(SEPARATOR);
+                rootPrefixPending = false;
+            } else if (accum.length() > 0) {
+                accum.append(SEPARATOR);
+            }
             accum.append(node.name());
             memo.put(node.itemTreeId(), accum.toString());
         }

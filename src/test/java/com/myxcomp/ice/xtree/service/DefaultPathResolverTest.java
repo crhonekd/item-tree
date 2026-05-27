@@ -54,10 +54,10 @@ class DefaultPathResolverTest {
 
         static Stream<Arguments> happyPathCases() {
             return Stream.of(
-                    Arguments.of(1L,   "root"),
-                    Arguments.of(2L,   "root/Users"),
-                    Arguments.of(10L,  "root/Users/testuser1"),
-                    Arguments.of(210L, "root/Users/deepuser/L2/L3/L4/DeepReport")
+                    Arguments.of(1L,   "/root"),
+                    Arguments.of(2L,   "/root/Users"),
+                    Arguments.of(10L,  "/root/Users/testuser1"),
+                    Arguments.of(210L, "/root/Users/deepuser/L2/L3/L4/DeepReport")
             );
         }
 
@@ -113,7 +113,7 @@ class DefaultPathResolverTest {
         void singleIdReturnsSingletonMap() {
             loadFixture(cache);
             Map<Long, String> result = resolver.pathsOf(List.of(10L));
-            assertThat(result).containsExactly(Map.entry(10L, "root/Users/testuser1"));
+            assertThat(result).containsExactly(Map.entry(10L, "/root/Users/testuser1"));
         }
 
         @Test
@@ -123,18 +123,18 @@ class DefaultPathResolverTest {
             Map<Long, String> result = resolver.pathsOf(List.of(1L, 2L, 10L, 110L, 210L));
 
             assertThat(result).containsOnly(
-                    Map.entry(1L,   "root"),
-                    Map.entry(2L,   "root/Users"),
-                    Map.entry(10L,  "root/Users/testuser1"),
-                    Map.entry(110L, "root/Users/testuser1/MyReport"),
-                    Map.entry(210L, "root/Users/deepuser/L2/L3/L4/DeepReport"));
+                    Map.entry(1L,   "/root"),
+                    Map.entry(2L,   "/root/Users"),
+                    Map.entry(10L,  "/root/Users/testuser1"),
+                    Map.entry(110L, "/root/Users/testuser1/MyReport"),
+                    Map.entry(210L, "/root/Users/deepuser/L2/L3/L4/DeepReport"));
         }
 
         @Test
         void duplicateIdsCollapseToSingleEntry() {
             loadFixture(cache);
             Map<Long, String> result = resolver.pathsOf(List.of(10L, 10L, 10L));
-            assertThat(result).containsExactly(Map.entry(10L, "root/Users/testuser1"));
+            assertThat(result).containsExactly(Map.entry(10L, "/root/Users/testuser1"));
         }
 
         @Test
@@ -142,7 +142,7 @@ class DefaultPathResolverTest {
             loadFixture(cache);
             Map<Long, String> result = resolver.pathsOf(List.of(10L, 999L));
             assertThat(result).containsOnly(
-                    Map.entry(10L,  "root/Users/testuser1"),
+                    Map.entry(10L,  "/root/Users/testuser1"),
                     Map.entry(999L, ""));
         }
 
@@ -192,14 +192,19 @@ class DefaultPathResolverTest {
             Map<Long, String> paths = memoResolver.pathsOf(leafIds);
 
             assertThat(paths).hasSize(50);
-            assertThat(paths.get(100L)).isEqualTo("root/A/B/C/D/leaf100");
-            assertThat(paths.get(149L)).isEqualTo("root/A/B/C/D/leaf149");
+            assertThat(paths.get(100L)).isEqualTo("/root/A/B/C/D/leaf100");
+            assertThat(paths.get(149L)).isEqualTo("/root/A/B/C/D/leaf149");
             // Upper bound: 50 leaf lookups + ~4 ancestor lookups on the first walk.
             // Allow slack of 10 for any incidental calls.
             assertThat(counting.getByIdCount())
                     .as("getById call count must be ~O(N + chain), not O(N * chain)")
                     .isLessThanOrEqualTo(60);
         }
+    }
+
+    @Test
+    void emptyStringForUnknownIdHasNoSlash() {
+        assertThat(resolver.pathOf(999_999L)).isEmpty();
     }
 
     static class CountingTreeCache implements com.myxcomp.ice.xtree.cache.TreeCache {
