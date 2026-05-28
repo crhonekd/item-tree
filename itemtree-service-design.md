@@ -151,7 +151,7 @@ Base path: `/api/v1/itemtree`.
 
 - **`ItemNode`** — structural: `itemTreeId`, `parentId`, `name`, `type`, `path` (root-anchored, leading-slash, e.g. `/root/Folder1/IceReport`; populated on all read endpoints; absent on mutation responses), `lastUpdate`, `lastUpdateUser`.
 - **`ItemNodeWithData`** — extends `ItemNode` with `path` (same shape as on `ItemNode`), `dataJson` (object, nullable), `dataXml` (string, nullable), `children` (array of `ItemNodeWithData`, populated only when node is a folder).
-- **`SearchHit`** — `itemTreeId`, `name`, `type`, `path`.
+- **`SearchHit`** — `itemTreeId`, `name`, `type`, `path`, `parentId` (int64, required; `0` for root's parent), `ancestors` (array of `ItemNode`, required, may be empty; chain from root→hit's parent, exclusive of the hit, ordered root-first, `path` null on each entry). Enables the UI to embed the hit in the tree without extra round-trips.
 - **`CreateItemRequest`** — `parentId`, `name`, `type`, optional `data`.
 - **`Problem`** — RFC 7807 with extensions `errorCode` and `traceId`.
 
@@ -643,7 +643,7 @@ public interface PathResolver {
 }
 ```
 
-Called by `TreeService` after `TreeCache` returns the node list. Path format: leading-slash root-anchored, e.g. `"/root/Folder1/IceReport"`. Walks that do not reach the root (missing ancestor, cap reached) return their partial chain slash-less; an unknown id returns the empty string.
+Called by `TreeService` after `TreeCache` returns the node list. Path format: leading-slash root-anchored, e.g. `"/root/Folder1/IceReport"`. Walks that do not reach the root (missing ancestor, cap reached) return their partial chain slash-less; an unknown id returns the empty string. `PathResolver.ancestorsOf(ids)` shares the same bounded-walk / cycle / missing-ancestor semantics as `pathsOf`, returning the ancestor node chain (root→parent, exclusive of the node itself) instead of a path string.
 
 ### Where path appears
 
