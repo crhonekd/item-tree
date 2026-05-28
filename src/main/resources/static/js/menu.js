@@ -95,10 +95,30 @@ async function pasteInto(targetId) {
   }
 }
 
+// navigator.clipboard requires a secure context (HTTPS or localhost).
+// Fall back to execCommand for plain HTTP on remote hosts.
+async function writeToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try {
+    if (!document.execCommand('copy')) throw new Error('execCommand copy returned false');
+  } finally {
+    document.body.removeChild(el);
+  }
+}
+
 async function copyId(id) {
   const text = String(id);
   try {
-    await navigator.clipboard.writeText(text);
+    await writeToClipboard(text);
     toastSuccess(`Copied id ${text}`);
   } catch (e) {
     toastError(`Clipboard write failed: ${text}`);
@@ -112,7 +132,7 @@ async function showAndCopyPath(node) {
     return;
   }
   try {
-    await navigator.clipboard.writeText(path);
+    await writeToClipboard(path);
   } catch (e) {
     toastError(`Clipboard write failed; path is: ${path}`);
     return;
