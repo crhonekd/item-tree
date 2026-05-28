@@ -27,13 +27,17 @@ function renderNode(id, depth) {
   const isHome = state.homeFolderId === id;
   const isSelected = state.tree.selectedId === id;
   const isCut = state.clipboard?.op === 'cut' && state.clipboard.sourceId === id;
+  const isMatch = state.search.matchIds.has(id);
 
   const li = document.createElement('li');
   li.className = 'tree-node';
   li.dataset.id = String(id);
 
   const row = document.createElement('div');
-  row.className = 'tree-row' + (isSelected ? ' selected' : '') + (isCut ? ' cut' : '');
+  row.className = 'tree-row'
+    + (isSelected ? ' selected' : '')
+    + (isMatch ? ' search-match' : '')
+    + (isCut ? ' cut' : '');
   row.style.paddingLeft = `${depth * 14}px`;
 
   const lead = document.createElement('span');
@@ -51,7 +55,7 @@ function renderNode(id, depth) {
   label.className = 'tree-label';
   label.textContent = node.name + (isHome ? ' ★' : '');
   label.title = `${node.type} (id ${id})`;
-  label.addEventListener('click', () => onNameClick(id));
+  label.addEventListener('click', () => selectAndLoad(id));
   row.appendChild(label);
 
   row.addEventListener('contextmenu', (e) => {
@@ -119,7 +123,7 @@ export function ingestSubtreeFullResult(rootId, nodes) {
   }
 }
 
-async function onNameClick(id) {
+export async function selectAndLoad(id) {
   state.tree.selectedId = id;
   renderTree();
   try {
@@ -150,4 +154,9 @@ export async function refreshSubtree(id) {
   } catch (e) {
     if (e instanceof ProblemError) toastError(e.problem); else toastError(String(e));
   }
+}
+
+export function scrollToNode(id) {
+  const row = document.querySelector(`.tree-node[data-id="${id}"] .tree-row`);
+  row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
