@@ -6,6 +6,8 @@ import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.common.UserContext;
 import com.myxcomp.ice.xtree.messaging.dev.StubConnectionExceptionListener;
 import com.myxcomp.ice.xtree.service.ItemService;
+import com.myxcomp.ice.xtree.service.SearchHitView;
+import com.myxcomp.ice.xtree.service.SearchService;
 import com.myxcomp.ice.xtree.service.TreeNodeView;
 import com.myxcomp.ice.xtree.service.TreeService;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
@@ -25,6 +27,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -432,5 +435,21 @@ class ItemTreeApplicationE2EIT {
         List<TreeNodeView> full = treeService.getSubtreeFull(12L);
         assertThat(full).extracting(v -> v.node().itemTreeId())
                 .contains(12L, 20L, 21L);
+    }
+
+    @Test
+    void searchCarriesRootToParentAncestorsForDeepHit() {
+        SearchService searchService = pair.a().getBean(SearchService.class);
+
+        List<SearchHitView> hits = searchService.search("leafItem", OptionalInt.empty());
+
+        assertThat(hits).hasSize(1);
+        SearchHitView hit = hits.get(0);
+        assertThat(hit.node().itemTreeId()).isEqualTo(25L);
+        assertThat(hit.node().parentId()).isEqualTo(24L);
+        assertThat(hit.ancestors()).extracting(CachedNode::itemTreeId)
+                .containsExactly(1L, 2L, 12L, 20L, 21L, 22L, 23L, 24L);
+        assertThat(hit.ancestors()).extracting(CachedNode::name)
+                .containsExactly("root", "Users", "deepuser", "L2", "L3", "L4", "L5", "L6");
     }
 }
