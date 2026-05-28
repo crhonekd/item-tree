@@ -9,6 +9,8 @@ export const state = {
   iceUser: persisted.iceUser ?? '',
   impersonatedUser: persisted.impersonatedUser ?? '',
   backendBaseUrl: persisted.backendBaseUrl ?? '',
+  embedInTree: persisted.embedInTree ?? false,
+  search: { matchIds: new Set() },
   homeFolderId: null,
   tree: {
     nodesById: new Map(),
@@ -27,6 +29,7 @@ export function savePersisted() {
     iceUser: state.iceUser,
     impersonatedUser: state.impersonatedUser,
     backendBaseUrl: state.backendBaseUrl,
+    embedInTree: state.embedInTree,
   }));
 }
 
@@ -39,6 +42,7 @@ export function resetTreeState() {
   state.tree.selectedId = null;
   state.clipboard = null;
   state.lastDetail = null;
+  state.search.matchIds.clear();
 }
 
 export function ingestNodes(nodes) {
