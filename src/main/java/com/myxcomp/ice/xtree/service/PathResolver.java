@@ -1,7 +1,10 @@
 package com.myxcomp.ice.xtree.service;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+
+import com.myxcomp.ice.xtree.cache.CachedNode;
 
 /**
  * Lazily computes root-anchored, slash-separated paths for cache nodes (e.g. {@code "/root/Users/testuser1"}).
@@ -37,4 +40,13 @@ public interface PathResolver {
      * share it. Each input id appears as a key in the returned map; duplicate ids are collapsed.
      */
     Map<Long, String> pathsOf(Collection<Long> ids);
+
+    /**
+     * Returns the ancestor chain root&rarr;parent (exclusive of the id itself) for each id,
+     * ordered root-first. Memoised within a single call so a shared ancestor chain is walked
+     * once. Unknown id &rarr; empty list. On a missing ancestor or a suspected cycle the walk
+     * stops and the partial chain (without the true root prefix) is returned, mirroring
+     * {@link #pathsOf}.
+     */
+    Map<Long, List<CachedNode>> ancestorsOf(Collection<Long> ids);
 }

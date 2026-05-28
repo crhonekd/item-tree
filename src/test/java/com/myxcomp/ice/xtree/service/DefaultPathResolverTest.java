@@ -207,6 +207,92 @@ class DefaultPathResolverTest {
         assertThat(resolver.pathOf(999_999L)).isEmpty();
     }
 
+    @Nested
+    class AncestorsOf {
+
+        @Test
+        void deepNodeReturnsRootToParentExclusiveInOrder() {
+            loadFixture(cache);
+            // 210 = DeepReport under root(1)/Users(2)/deepuser(12)/L2(20)/L3(21)/L4(22)
+            List<CachedNode> ancestors = resolver.ancestorsOf(List.of(210L)).get(210L);
+
+            assertThat(ancestors).extracting(CachedNode::itemTreeId)
+                    .containsExactly(1L, 2L, 12L, 20L, 21L, 22L);
+            assertThat(ancestors).extracting(CachedNode::name)
+                    .containsExactly("root", "Users", "deepuser", "L2", "L3", "L4");
+        }
+
+        @Test
+        void rootHasNoAncestors() {
+            loadFixture(cache);
+            assertThat(resolver.ancestorsOf(List.of(1L)).get(1L)).isEmpty();
+        }
+
+        @Test
+        void directChildOfRootHasOnlyRoot() {
+            loadFixture(cache);
+            assertThat(resolver.ancestorsOf(List.of(2L)).get(2L))
+                    .extracting(CachedNode::itemTreeId).containsExactly(1L);
+        }
+
+        @Test
+        void unknownIdMapsToEmptyList() {
+            loadFixture(cache);
+            assertThat(resolver.ancestorsOf(List.of(999L)).get(999L)).isEmpty();
+        }
+
+        @Test
+        void orphanParentMidChainYieldsEmptyAncestors() {
+            // 50's parent (999) is missing — the walk cannot resolve any ancestor.
+            cache.applyCreate(folder(50L, 999L, "OrphanA"));
+            assertThat(resolver.ancestorsOf(List.of(50L)).get(50L)).isEmpty();
+        }
+
+        @Test
+        void cycleTerminatesWithoutThrowing() {
+            cache.applyCreate(folder(100L, 200L, "A"));
+            cache.applyCreate(folder(200L, 100L, "B"));
+            Map<Long, List<CachedNode>> result = resolver.ancestorsOf(List.of(100L, 200L));
+            assertThat(result).containsOnlyKeys(100L, 200L);
+        }
+
+        @Test
+        void emptyInputReturnsEmptyMap() {
+            assertThat(resolver.ancestorsOf(List.of())).isEmpty();
+        }
+
+        @Test
+        void nullInputReturnsEmptyMap() {
+            assertThat(resolver.ancestorsOf(null)).isEmpty();
+        }
+
+        @Test
+        void memoisationLimitsGetByIdCallsForSharedAncestorChain() {
+            DefaultTreeCache realCache = new DefaultTreeCache();
+            realCache.applyCreate(folder(1L, 0L, "root"));
+            realCache.applyCreate(folder(2L, 1L, "A"));
+            realCache.applyCreate(folder(3L, 2L, "B"));
+            realCache.applyCreate(folder(4L, 3L, "C"));
+            realCache.applyCreate(folder(5L, 4L, "D"));
+            List<Long> leafIds = new java.util.ArrayList<>();
+            for (long i = 100; i < 150; i++) {
+                realCache.applyCreate(leaf(i, 5L, "leaf" + i));
+                leafIds.add(i);
+            }
+            CountingTreeCache counting = new CountingTreeCache(realCache);
+            DefaultPathResolver memoResolver = new DefaultPathResolver(counting);
+
+            Map<Long, List<CachedNode>> result = memoResolver.ancestorsOf(leafIds);
+
+            assertThat(result).hasSize(50);
+            assertThat(result.get(100L)).extracting(CachedNode::name)
+                    .containsExactly("root", "A", "B", "C", "D");
+            assertThat(counting.getByIdCount())
+                    .as("getById must be ~O(N + chain), not O(N * chain)")
+                    .isLessThanOrEqualTo(60);
+        }
+    }
+
     static class CountingTreeCache implements com.myxcomp.ice.xtree.cache.TreeCache {
         private final com.myxcomp.ice.xtree.cache.TreeCache delegate;
         private int getByIdCount = 0;
