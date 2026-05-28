@@ -128,14 +128,13 @@ async function copyId(id) {
 async function showAndCopyPath(node) {
   const path = node.path ?? '';
   if (!path) {
-    alert('Path is not available for this node (no path was returned by the server).');
+    toastError({ title: 'Path unavailable', detail: 'No path was returned by the server for this node.' });
     return;
   }
   try {
     await writeToClipboard(path);
+    toastSuccess(`Copied path ${path}`);
   } catch (e) {
-    toastError(`Clipboard write failed; path is: ${path}`);
-    return;
+    toastError(`Clipboard write failed: ${path}`);
   }
-  alert('Path copied:\n' + path);
 }
