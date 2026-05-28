@@ -120,4 +120,24 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$.detail").value(
                         org.hamcrest.Matchers.containsString("positive integer")));
     }
+
+    @Test
+    void responseCarriesParentIdAndAncestors() throws Exception {
+        CachedNode root = new CachedNode(1L, 0L, "root", "Folder", Instant.EPOCH, "sys");
+        CachedNode users = new CachedNode(2L, 1L, "Users", "Folder", Instant.EPOCH, "sys");
+        CachedNode hit = new CachedNode(42L, 2L, "Report-1", "Report", Instant.EPOCH, "alice");
+        when(searchService.search(eq("Report-1"), any(OptionalInt.class)))
+                .thenReturn(List.of(new SearchHitView(hit, "/root/Users/Report-1",
+                        List.of(root, users))));
+
+        mvc.perform(get("/api/v1/itemtree/search?q=Report-1")
+                        .header("X-Ice-User", "alice"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].itemTreeId").value(42))
+                .andExpect(jsonPath("$[0].parentId").value(2))
+                .andExpect(jsonPath("$[0].ancestors.length()").value(2))
+                .andExpect(jsonPath("$[0].ancestors[0].itemTreeId").value(1))
+                .andExpect(jsonPath("$[0].ancestors[0].name").value("root"))
+                .andExpect(jsonPath("$[0].ancestors[1].itemTreeId").value(2));
+    }
 }
