@@ -2,7 +2,9 @@ package com.myxcomp.ice.xtree.api.controller;
 
 import com.myxcomp.ice.xtree.api.advice.GlobalExceptionHandler;
 import com.myxcomp.ice.xtree.api.advice.ProblemFactory;
+import com.myxcomp.ice.xtree.api.mapper.ItemNodeMapper;
 import com.myxcomp.ice.xtree.api.mapper.SearchHitMapper;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.cache.CacheReadinessGate;
 import com.myxcomp.ice.xtree.cache.CachedNode;
 import com.myxcomp.ice.xtree.config.SecurityProperties;
@@ -33,7 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SearchController.class)
-@Import({GlobalExceptionHandler.class, ProblemFactory.class, SearchHitMapper.class})
+@Import({GlobalExceptionHandler.class, ProblemFactory.class,
+         SearchHitMapper.class, ItemNodeMapper.class, TimeMapper.class})
 class SearchControllerTest {
 
     @Autowired MockMvc mvc;

@@ -1,6 +1,7 @@
 package com.myxcomp.ice.xtree.api.mapper;
 
 import com.myxcomp.ice.xtree.cache.CachedNode;
+import com.myxcomp.ice.xtree.common.TimeMapper;
 import com.myxcomp.ice.xtree.generated.model.SearchHit;
 import com.myxcomp.ice.xtree.service.SearchHitView;
 import org.junit.jupiter.api.Test;
@@ -12,44 +13,51 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SearchHitMapperTest {
 
-    private final SearchHitMapper mapper = new SearchHitMapper();
+    private final SearchHitMapper mapper = new SearchHitMapper(new ItemNodeMapper(new TimeMapper()));
+
+    private static CachedNode folder(long id, long parentId, String name) {
+        return new CachedNode(id, parentId, name, "Folder", Instant.EPOCH, "sys");
+    }
 
     @Test
-    void mapsIdNameTypeAndPath() {
+    void mapsIdParentNameTypeAndPath() {
         CachedNode node = new CachedNode(42L, 7L, "Report-1", "Report", Instant.EPOCH, "alice");
-        SearchHitView view = new SearchHitView(node, "/root/thing", List.of());
-
-        SearchHit hit = mapper.toDto(view);
+        SearchHit hit = mapper.toDto(new SearchHitView(node, "/root/thing", List.of()));
 
         assertThat(hit.getItemTreeId()).isEqualTo(42L);
+        assertThat(hit.getParentId()).isEqualTo(7L);
         assertThat(hit.getName()).isEqualTo("Report-1");
         assertThat(hit.getType()).isEqualTo("Report");
         assertThat(hit.getPath()).isEqualTo("/root/thing");
     }
 
     @Test
-    void mapsListInOrder() {
-        CachedNode a = new CachedNode(1L, 0L, "root",  "Folder", Instant.EPOCH, "sys");
-        CachedNode b = new CachedNode(2L, 1L, "Users", "Folder", Instant.EPOCH, "sys");
+    void mapsAncestorsInRootFirstOrderWithNullPath() {
+        CachedNode root = folder(1L, 0L, "root");
+        CachedNode users = folder(2L, 1L, "Users");
+        CachedNode hit = new CachedNode(42L, 2L, "Report-1", "Report", Instant.EPOCH, "alice");
 
-        List<SearchHit> hits = mapper.toDtos(List.of(
-                new SearchHitView(a, "/root", List.of()),
-                new SearchHitView(b, "/root/Users", List.of())));
+        SearchHit dto = mapper.toDto(new SearchHitView(hit, "/root/Users/Report-1", List.of(root, users)));
 
-        assertThat(hits).extracting(SearchHit::getItemTreeId).containsExactly(1L, 2L);
+        assertThat(dto.getAncestors()).extracting("itemTreeId").containsExactly(1L, 2L);
+        assertThat(dto.getAncestors()).extracting("name").containsExactly("root", "Users");
+        assertThat(dto.getAncestors().get(0).getPath()).isNull();
     }
 
     @Test
-    void toDtosMapsEachViewWithCorrectPath() {
-        CachedNode a = new CachedNode(1L, 0L, "root",  "Folder", Instant.EPOCH, "sys");
-        CachedNode b = new CachedNode(2L, 1L, "Users", "Folder", Instant.EPOCH, "sys");
-        SearchHitView viewA = new SearchHitView(a, "/root", List.of());
-        SearchHitView viewB = new SearchHitView(b, "/root/child", List.of());
+    void emptyAncestorsMapToEmptyList() {
+        CachedNode root = folder(1L, 0L, "root");
+        SearchHit dto = mapper.toDto(new SearchHitView(root, "/root", List.of()));
+        assertThat(dto.getAncestors()).isEmpty();
+    }
 
-        List<SearchHit> out = mapper.toDtos(List.of(viewA, viewB));
-
-        assertThat(out).hasSize(2);
-        assertThat(out.get(0).getPath()).isEqualTo("/root");
-        assertThat(out.get(1).getPath()).isEqualTo("/root/child");
+    @Test
+    void mapsListInOrder() {
+        CachedNode a = folder(1L, 0L, "root");
+        CachedNode b = folder(2L, 1L, "Users");
+        List<SearchHit> hits = mapper.toDtos(List.of(
+                new SearchHitView(a, "/root", List.of()),
+                new SearchHitView(b, "/root/Users", List.of(a))));
+        assertThat(hits).extracting(SearchHit::getItemTreeId).containsExactly(1L, 2L);
     }
 }

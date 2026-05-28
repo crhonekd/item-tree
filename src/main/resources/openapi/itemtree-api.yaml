@@ -458,11 +458,15 @@ components:
 
     SearchHit:
       type: object
-      required: [itemTreeId, name, type]
+      required: [itemTreeId, parentId, name, type, ancestors]
       properties:
         itemTreeId:
           type: integer
           format: int64
+        parentId:
+          type: integer
+          format: int64
+          description: "Hit's parent id; 0 for the root's parent."
         name:
           type: string
         type:
@@ -471,6 +475,11 @@ components:
           type: string
           nullable: true
           description: "Root-anchored slash-separated path starting with a leading slash, e.g. /root/Folder1/IceReport."
+        ancestors:
+          type: array
+          description: "Ancestor chain from root to this hit's parent (exclusive of the hit), ordered root-first; empty when the hit is the root. Each entry is a structural ItemNode (path left null). Lets the UI embed the hit in the tree without extra round-trips."
+          items:
+            $ref: '#/components/schemas/ItemNode'
 
     CreateItemRequest:
       type: object
