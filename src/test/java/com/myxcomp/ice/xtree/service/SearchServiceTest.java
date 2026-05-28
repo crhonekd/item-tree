@@ -140,7 +140,7 @@ class SearchServiceTest {
 
             List<SearchHitView> hits = service.search("b", OptionalInt.empty());
 
-            assertThat(hits).containsExactly(new SearchHitView(bob, "/root/Users/bob/bobReport"));
+            assertThat(hits).containsExactly(new SearchHitView(bob, "/root/Users/bob/bobReport", List.of()));
         }
 
         @Test
@@ -151,7 +151,34 @@ class SearchServiceTest {
 
             List<SearchHitView> hits = service.search("42", OptionalInt.empty());
 
-            assertThat(hits).containsExactly(new SearchHitView(node, "/root/thing"));
+            assertThat(hits).containsExactly(new SearchHitView(node, "/root/thing", List.of()));
+        }
+
+        @Test
+        void attachesAncestorsFromResolverToEachHit() {
+            CachedNode hit = node(11L, "bobReport");
+            CachedNode root = new CachedNode(1L, 0L, "root", "Folder", Instant.EPOCH, "sys");
+            CachedNode users = new CachedNode(2L, 1L, "Users", "Folder", Instant.EPOCH, "sys");
+            when(cache.searchByName("b", OptionalInt.empty())).thenReturn(List.of(hit));
+            when(pathResolver.pathsOf(List.of(11L)))
+                    .thenReturn(Map.of(11L, "/root/Users/bobReport"));
+            when(pathResolver.ancestorsOf(List.of(11L)))
+                    .thenReturn(Map.of(11L, List.of(root, users)));
+
+            List<SearchHitView> hits = service.search("b", OptionalInt.empty());
+
+            assertThat(hits).hasSize(1);
+            assertThat(hits.get(0).ancestors()).containsExactly(root, users);
+        }
+
+        @Test
+        void missingAncestorsEntryYieldsEmptyList() {
+            CachedNode hit = node(5L, "thing");
+            when(cache.searchById(5L)).thenReturn(Optional.of(hit));
+            when(pathResolver.pathsOf(List.of(5L))).thenReturn(Map.of(5L, "/root/thing"));
+            when(pathResolver.ancestorsOf(List.of(5L))).thenReturn(Map.of());
+
+            assertThat(service.search("5", OptionalInt.empty()).get(0).ancestors()).isEmpty();
         }
     }
 }

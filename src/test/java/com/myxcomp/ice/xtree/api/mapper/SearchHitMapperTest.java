@@ -17,7 +17,7 @@ class SearchHitMapperTest {
     @Test
     void mapsIdNameTypeAndPath() {
         CachedNode node = new CachedNode(42L, 7L, "Report-1", "Report", Instant.EPOCH, "alice");
-        SearchHitView view = new SearchHitView(node, "/root/thing");
+        SearchHitView view = new SearchHitView(node, "/root/thing", List.of());
 
         SearchHit hit = mapper.toDto(view);
 
@@ -33,8 +33,8 @@ class SearchHitMapperTest {
         CachedNode b = new CachedNode(2L, 1L, "Users", "Folder", Instant.EPOCH, "sys");
 
         List<SearchHit> hits = mapper.toDtos(List.of(
-                new SearchHitView(a, "/root"),
-                new SearchHitView(b, "/root/Users")));
+                new SearchHitView(a, "/root", List.of()),
+                new SearchHitView(b, "/root/Users", List.of())));
 
         assertThat(hits).extracting(SearchHit::getItemTreeId).containsExactly(1L, 2L);
     }
@@ -43,8 +43,8 @@ class SearchHitMapperTest {
     void toDtosMapsEachViewWithCorrectPath() {
         CachedNode a = new CachedNode(1L, 0L, "root",  "Folder", Instant.EPOCH, "sys");
         CachedNode b = new CachedNode(2L, 1L, "Users", "Folder", Instant.EPOCH, "sys");
-        SearchHitView viewA = new SearchHitView(a, "/root");
-        SearchHitView viewB = new SearchHitView(b, "/root/child");
+        SearchHitView viewA = new SearchHitView(a, "/root", List.of());
+        SearchHitView viewB = new SearchHitView(b, "/root/child", List.of());
 
         List<SearchHit> out = mapper.toDtos(List.of(viewA, viewB));
 

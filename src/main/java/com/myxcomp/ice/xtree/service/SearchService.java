@@ -56,9 +56,13 @@ public class SearchService {
         if (hits.isEmpty()) return List.of();
         List<Long> ids = hits.stream().map(CachedNode::itemTreeId).toList();
         Map<Long, String> paths = pathResolver.pathsOf(ids);
+        Map<Long, List<CachedNode>> ancestors = pathResolver.ancestorsOf(ids);
         List<SearchHitView> out = new ArrayList<>(hits.size());
         for (CachedNode n : hits) {
-            out.add(new SearchHitView(n, paths.getOrDefault(n.itemTreeId(), "")));
+            out.add(new SearchHitView(
+                    n,
+                    paths.getOrDefault(n.itemTreeId(), ""),
+                    ancestors.getOrDefault(n.itemTreeId(), List.of())));
         }
         return List.copyOf(out);
     }

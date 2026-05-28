@@ -53,7 +53,7 @@ class SearchControllerTest {
     @Test
     void numericQueryReturnsServiceResult() throws Exception {
         when(searchService.search(eq("42"), any(OptionalInt.class)))
-                .thenReturn(List.of(new SearchHitView(node(42L, "Report-1", "Report"), "/root/Users/alice")));
+                .thenReturn(List.of(new SearchHitView(node(42L, "Report-1", "Report"), "/root/Users/alice", List.of())));
 
         mvc.perform(get("/api/v1/itemtree/search?q=42")
                         .header("X-Ice-User", "alice"))
@@ -68,8 +68,8 @@ class SearchControllerTest {
     void nameQueryReturnsServiceResult() throws Exception {
         when(searchService.search(eq("Repo"), any(OptionalInt.class)))
                 .thenReturn(List.of(
-                        new SearchHitView(node(42L, "Report-1", "Report"), "/root/a"),
-                        new SearchHitView(node(43L, "Report-2", "Report"), "/root/b")));
+                        new SearchHitView(node(42L, "Report-1", "Report"), "/root/a", List.of()),
+                        new SearchHitView(node(43L, "Report-2", "Report"), "/root/b", List.of())));
 
         mvc.perform(get("/api/v1/itemtree/search?q=Repo")
                         .header("X-Ice-User", "alice"))
