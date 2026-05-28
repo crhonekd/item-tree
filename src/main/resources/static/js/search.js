@@ -1,48 +1,84 @@
 import { state, ingestNodes } from './state.js';
 import { api, ProblemError } from './api.js';
 import { toastError } from './toast.js';
-import { renderTree, ingestSubtreeResult } from './tree.js';
+import { renderTree, selectAndLoad, scrollToNode } from './tree.js';
+
+const $ = (id) => document.getElementById(id);
+
+function hitNode(hit) {
+  return { itemTreeId: hit.itemTreeId, parentId: hit.parentId, name: hit.name, type: hit.type };
+}
+
+// Materialize a hit's location in the tree from the ancestors carried on the hit
+// itself (no extra backend call): ingest root→hit and expand the ancestor chain.
+function ingestHit(hit) {
+  const ancestors = hit.ancestors || [];
+  ingestNodes([...ancestors, hitNode(hit)]);
+  for (const a of ancestors) state.tree.expanded.add(a.itemTreeId);
+}
+
+function setClearVisible(visible) {
+  const btn = $('search-clear-btn');
+  if (btn) btn.hidden = !visible;
+}
 
 export async function runSearch() {
-  const q = document.getElementById('search-input').value.trim();
-  const limit = document.getElementById('search-limit').value.trim() || undefined;
-  const results = document.getElementById('search-results');
+  const q = $('search-input').value.trim();
+  const limit = $('search-limit').value.trim() || undefined;
+  const results = $('search-results');
+  const status = $('search-status');
+  const embed = $('embed-in-tree').checked;
+
   results.innerHTML = '';
-  if (!q) return;
+  state.search.matchIds.clear();
+  status.textContent = '';
+  setClearVisible(false);
+  if (!q) { renderTree(); return; }
+
+  let hits;
   try {
-    const hits = await api.search({ q, limit });
-    if (!hits || hits.length === 0) {
-      results.innerHTML = '<li>(no results)</li>';
-      return;
+    hits = await api.search({ q, limit });
+  } catch (e) {
+    if (e instanceof ProblemError) toastError(e.problem); else toastError(String(e));
+    return;
+  }
+
+  if (!hits || hits.length === 0) {
+    if (embed) { status.textContent = '(no results)'; renderTree(); }
+    else { results.innerHTML = '<li>(no results)</li>'; }
+    return;
+  }
+
+  if (embed) {
+    for (const hit of hits) {
+      ingestHit(hit);
+      state.search.matchIds.add(hit.itemTreeId);
     }
+    status.textContent = `${hits.length} match${hits.length === 1 ? '' : 'es'}`;
+    setClearVisible(true);
+    renderTree();
+    scrollToNode(hits[0].itemTreeId);
+  } else {
     for (const hit of hits) {
       const li = document.createElement('li');
       li.textContent = `${hit.itemTreeId}  ${hit.type}  ${hit.name}`;
-      li.addEventListener('click', () => navigateTo(hit.itemTreeId));
+      li.addEventListener('click', () => revealHit(hit));
       results.appendChild(li);
     }
-  } catch (e) {
-    if (e instanceof ProblemError) toastError(e.problem); else toastError(String(e));
   }
 }
 
-async function navigateTo(id) {
-  if (!state.tree.nodesById.has(id)) {
-    try {
-      const subtree = await api.getSubtree(id);
-      ingestSubtreeResult(id, subtree);
-    } catch (e) {
-      if (e instanceof ProblemError) toastError(e.problem); else toastError(String(e));
-      return;
-    }
-  }
-  let cur = state.tree.nodesById.get(id);
-  while (cur && cur.parentId && cur.parentId !== 0) {
-    state.tree.expanded.add(cur.parentId);
-    cur = state.tree.nodesById.get(cur.parentId);
-  }
-  state.tree.selectedId = id;
+// List-mode click: reveal exactly this hit in the tree, select it, load its
+// detail from the backend, and scroll to it.
+async function revealHit(hit) {
+  ingestHit(hit);
+  await selectAndLoad(hit.itemTreeId);
+  scrollToNode(hit.itemTreeId);
+}
+
+export function clearSearchHighlight() {
+  state.search.matchIds.clear();
+  $('search-status').textContent = '';
+  setClearVisible(false);
   renderTree();
-  const row = document.querySelector(`.tree-node[data-id="${id}"] .tree-row`);
-  row?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
