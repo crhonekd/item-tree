@@ -2,7 +2,7 @@ import { state, savePersisted, resetTreeState, ingestNodes } from './state.js';
 import { api, ProblemError } from './api.js';
 import { toastError } from './toast.js';
 import { renderTree, ingestSubtreeFullResult } from './tree.js';
-import { runSearch } from './search.js';
+import { runSearch, clearSearchHighlight } from './search.js';
 import { runRefresh, runProbe } from './refresh.js';
 
 function $(id) { return document.getElementById(id); }
@@ -31,6 +31,12 @@ function bindHeader() {
 function bindSearch() {
   $('search-btn').addEventListener('click', runSearch);
   $('search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+  const embed = $('embed-in-tree');
+  embed.checked = state.embedInTree;
+  embed.addEventListener('change', (e) => { state.embedInTree = e.target.checked; savePersisted(); });
+
+  $('search-clear-btn').addEventListener('click', clearSearchHighlight);
 }
 
 function bindRefresh() {
