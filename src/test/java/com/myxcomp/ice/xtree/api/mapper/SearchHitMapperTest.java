@@ -29,6 +29,7 @@ class SearchHitMapperTest {
         assertThat(hit.getName()).isEqualTo("Report-1");
         assertThat(hit.getType()).isEqualTo("Report");
         assertThat(hit.getPath()).isEqualTo("/root/thing");
+        assertThat(hit.getAncestors()).isEmpty();
     }
 
     @Test
@@ -41,7 +42,7 @@ class SearchHitMapperTest {
 
         assertThat(dto.getAncestors()).extracting("itemTreeId").containsExactly(1L, 2L);
         assertThat(dto.getAncestors()).extracting("name").containsExactly("root", "Users");
-        assertThat(dto.getAncestors().get(0).getPath()).isNull();
+        assertThat(dto.getAncestors()).allSatisfy(a -> assertThat(a.getPath()).isNull());
     }
 
     @Test
