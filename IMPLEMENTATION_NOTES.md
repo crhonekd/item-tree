@@ -728,6 +728,31 @@ Phase 21 (or renumbered Phase 18 work-PC wiring) is the next user-managed step.
 
 ---
 
+## Phase 21 — Embed search results in tree + test-UI restyle
+
+**Goal:** Enrich `/search` to return each hit's `parentId` + root→parent `ancestors[]` so the test UI can embed any hit in the tree with no extra round-trips, add an "Embed results in tree" checkbox, make list-mode clicks reveal a single hit, and restyle the UI (warm-neutral & teal) without slowing tree rendering.
+
+**Backend changes:**
+- `PathResolver.ancestorsOf(Collection<Long> ids)` — returns root→parent chain (exclusive of the node itself) for each id, memoised within a single call. Implemented via private `chainFor` in `DefaultPathResolver` with the same bounded-walk / cycle / missing-ancestor semantics as `pathsOf`.
+- `SearchHitView` record gains `ancestors` field; `SearchService.search` calls `ancestorsOf` alongside `pathsOf`.
+- OpenAPI `SearchHit` schema adds `parentId` (required int64) and `ancestors` (required array of `ItemNode`, root-first, `path` null on each entry).
+- `SearchHitMapper` injects `ItemNodeMapper`; maps `parentId` + `ancestors` using the new 5-arg generated constructor.
+
+**Frontend changes:**
+- `state.js` — `embedInTree` persisted to localStorage; `state.search.matchIds` (Set) cleared on tree reset.
+- `tree.js` — `onNameClick` renamed to exported `selectAndLoad`; new exported `scrollToNode`; `search-match` CSS class toggled on tree rows.
+- `search.js` — full rewrite: embed mode ingests all hits via `ingestHit` (uses ancestors from the hit, no extra backend call), renders with amber highlights; list mode gets `revealHit` (single-hit reveal via `selectAndLoad` + `scrollToNode`); `clearSearchHighlight` clears the state and re-renders.
+- `index.html` — embed checkbox, hidden clear button, status span added to `.search-bar`.
+- `app.js` — `bindSearch` wires checkbox (persisted) and clear button.
+- `styles.css` — full restyle: warm-neutral palette (cream `#fffefb`, tan `#f5f3ee`, muted-brown text) + teal accent (`#0d9488`) + amber match highlight (`#fef3c7` / `#f59e0b`). Tree rows use `background-color` only (no `box-shadow`, `transition`, or `filter`) to preserve render performance.
+
+**Test delta:** 705 tests (up from 690 at Phase 20 end). New: `DefaultPathResolverTest.AncestorsOf` (10 tests), `SearchServiceTest` ancestors tests (2 new), `SearchHitMapperTest` rewritten (4 tests), `SearchControllerTest` ancestor JSON assertion (1 new), `ItemTreeApplicationE2EIT` deep-hit ancestor roundtrip (1 new). No automated UI tests (consistent with Phase 15 precedent).
+
+**Spec:** `docs/superpowers/specs/2026-05-28-phase21-embed-search-and-restyle-design.md`
+**Plan:** `docs/superpowers/plans/2026-05-28-phase21-embed-search-and-restyle.md`
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
