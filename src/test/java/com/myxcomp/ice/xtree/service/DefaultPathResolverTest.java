@@ -242,10 +242,21 @@ class DefaultPathResolverTest {
         }
 
         @Test
-        void orphanParentMidChainYieldsEmptyAncestors() {
-            // 50's parent (999) is missing — the walk cannot resolve any ancestor.
+        void singleLevelOrphanYieldsEmptyAncestors() {
+            // node 50's parent (999) is missing; walk collects only node 50 → chain size 1 → empty ancestors
             cache.applyCreate(folder(50L, 999L, "OrphanA"));
             assertThat(resolver.ancestorsOf(List.of(50L)).get(50L)).isEmpty();
+        }
+
+        @Test
+        void midChainOrphanYieldsPartialAncestors() {
+            // node 51's parent (999) is missing; node 50's parent is 51 (present)
+            // walk from 50: collects 50, then 51, then 51's parent (999) is missing → chain=[51,50]
+            // strip last (50) → ancestors=[51]
+            cache.applyCreate(folder(51L, 999L, "MissingParent"));
+            cache.applyCreate(folder(50L, 51L, "OrphanA"));
+            List<CachedNode> result = resolver.ancestorsOf(List.of(50L)).get(50L);
+            assertThat(result).extracting(CachedNode::itemTreeId).containsExactly(51L);
         }
 
         @Test
@@ -254,6 +265,8 @@ class DefaultPathResolverTest {
             cache.applyCreate(folder(200L, 100L, "B"));
             Map<Long, List<CachedNode>> result = resolver.ancestorsOf(List.of(100L, 200L));
             assertThat(result).containsOnlyKeys(100L, 200L);
+            assertThat(result.get(100L)).isNotNull();
+            assertThat(result.get(200L)).isNotNull();
         }
 
         @Test
