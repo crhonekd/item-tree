@@ -753,6 +753,53 @@ Phase 21 (or renumbered Phase 18 work-PC wiring) is the next user-managed step.
 
 ---
 
+## Phase 22 — Cucumber acceptance suite (black-box REST API tests)
+
+**Goal:** A standalone `:acceptance` Gradle subproject of generic Cucumber scenarios that exercise every ITEMTREE REST endpoint over HTTP against a running instance, sandboxed in a self-cleaning test folder under `crhonekd`'s home folder.
+
+**How to run:**
+```
+./gradlew :acceptance:cucumber -Ditemtree.baseUrl=http://localhost:8080
+```
+The app must already be running before invoking this task. The task is **not** part of `./gradlew test`.
+
+**Configuration knobs** (sysprop → env var → default):
+
+| Setting | Sysprop | Env var | Default |
+|---|---|---|---|
+| Base URL | `itemtree.baseUrl` | `ITEMTREE_BASE_URL` | `http://localhost:8080` |
+| User | `itemtree.user` | `ITEMTREE_USER` | `crhonekd` |
+| Readiness timeout | `itemtree.readinessTimeoutSeconds` | `ITEMTREE_READINESS_TIMEOUT_SECONDS` | `60` |
+
+**Sandbox lifecycle:** A static `Sandbox` holder runs once per suite (`@BeforeAll`/`@AfterAll`): it polls `GET {baseUrl}/actuator/health/readiness` until `UP`, resolves the configured user's home folder via `GET /users/{user}/home-folder`, creates a unique `acceptance-{epochMillis}` folder inside it, and cascade-deletes it at suite end. A per-scenario `@After` hook also deletes any ids registered in `World.created`, making each scenario independently failure-safe.
+
+**Generic step vocabulary:** Steps are parameterised so one step definition backs many item types:
+- `Given a folder named {string}` — creates a Folder in the sandbox root
+- `When I create a {word} named {string}` — POST `/items`; auto-retries with `{"_acc":true}` data if the type requires data (DATA_REQUIRED)
+- `When I create a {word} named {string} with data:` — explicit data docstring
+- `When I create a {word} named {string} in folder {int}` — targets a specific parent (used by error scenarios)
+- `When I rename/move/copy/delete it` / `When I replace its data with:` — mutation steps
+- `When I fetch it` / `When I search for {string}` / `When I get the tree` / etc. — read steps
+- `Then the response status is {int}` / `Then the error code is {string}` — assertion steps
+
+**Feature files (5):**
+- `smoke.feature` — instance reachable (1 scenario)
+- `item-lifecycle.feature` — `Scenario Outline` covering Report/Filter/View/Shortcut via create→rename→move→copy→delete, plus data-update (5 + 1 scenarios)
+- `tree-reads.feature` — subtree, subtree-full, getItems with path, home-folder resolution, tree skeleton (5 scenarios)
+- `search.feature` — find by name (path + ancestors), find by id (2 scenarios)
+- `errors.feature` — 404 ITEM_NOT_FOUND, 403 NOT_IN_USER_FOLDER, 400 TYPE_CANNOT_HAVE_DATA, 400 validation (4 scenarios)
+
+**Total: 17 scenarios; all idempotent (suite can be re-run without residue).**
+
+**H2 seed change (local only):** One row added to `src/main/resources/db/data.sql` — `crhonekd` home folder (id 13, parent 2). The real instance already provisions this user. Three existing repository-IT and one E2E test that hard-coded row counts were updated from 33→34 and the `getSubtree(Users)` assertion was updated to include id 13.
+
+**Tech stack:** Java 21, Gradle `java` plugin (no Spring), Cucumber-JVM 7.20.1, RestAssured 5.5.0, AssertJ 3.27.3, Jackson 2.18.2, junit-platform-suite 1.11.4.
+
+**Spec:** `docs/superpowers/specs/2026-05-29-phase22-cucumber-acceptance-design.md`
+**Plan:** `docs/superpowers/plans/2026-05-29-phase22-cucumber-acceptance.md`
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
