@@ -337,4 +337,74 @@ class ItemServiceCreateTest {
             verifyNoInteractions(ownershipChecker);
         }
     }
+
+    @Nested
+    class UdfRepo {
+
+        @Test
+        void happyPathForcesNameToUserAndPersists() {
+            // parent IS the home folder (id 10)
+            when(cache.getById(10L)).thenReturn(Optional.of(folder(10L, 2L, "alice-home")));
+            when(cache.getChildren(10L)).thenReturn(java.util.List.of());
+            when(policy.hasData("UDFRepo")).thenReturn(true);
+            when(policy.isAlsoPersistedAsXmlOnWrite("UDFRepo")).thenReturn(false);
+            when(timeMapper.now()).thenReturn(NOW);
+            when(repository.insert(eq(10L), eq("alice"), eq("UDFRepo"),
+                    eq("{\"k\":1}"), eq(null), eq(NOW), eq("alice"))).thenReturn(900L);
+            when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+            when(sequenceGenerator.next()).thenReturn(1L);
+
+            // client sends a bogus name; server must override it to "alice"
+            CachedNode created = service.createItem(10L, "ignored-name", "UDFRepo", "{\"k\":1}", CTX_DIRECT);
+
+            assertThat(created.name()).isEqualTo("alice");
+            assertThat(created.type()).isEqualTo("UDFRepo");
+            assertThat(created.parentId()).isEqualTo(10L);
+            verify(repository).insert(10L, "alice", "UDFRepo", "{\"k\":1}", null, NOW, "alice");
+        }
+
+        @Test
+        void rejectsSecondUdfRepoForSameUser() {
+            when(cache.getById(10L)).thenReturn(Optional.of(folder(10L, 2L, "alice-home")));
+            when(cache.getChildren(10L)).thenReturn(java.util.List.of(
+                    new CachedNode(901L, 10L, "alice", "UDFRepo", NOW, "alice")));
+
+            assertThatThrownBy(() ->
+                    service.createItem(10L, "alice", "UDFRepo", "{\"k\":1}", CTX_DIRECT))
+                    .isInstanceOf(ValidationException.class)
+                    .extracting(e -> ((ValidationException) e).errorCode())
+                    .isEqualTo(ErrorCode.UDF_REPO_ALREADY_EXISTS);
+
+            verify(repository, never()).insert(anyLong(), anyString(), anyString(),
+                    any(), any(), any(), anyString());
+        }
+
+        @Test
+        void rejectsUdfRepoNotDirectlyUnderHomeFolder() {
+            // parent 20 is owned by the user (a sub-folder) but is not the home folder itself.
+            when(cache.getById(20L)).thenReturn(Optional.of(folder(20L, 10L, "sub")));
+
+            assertThatThrownBy(() ->
+                    service.createItem(20L, "alice", "UDFRepo", "{\"k\":1}", CTX_DIRECT))
+                    .isInstanceOf(ValidationException.class)
+                    .extracting(e -> ((ValidationException) e).errorCode())
+                    .isEqualTo(ErrorCode.UDF_REPO_INVALID_PARENT);
+
+            verify(repository, never()).insert(anyLong(), anyString(), anyString(),
+                    any(), any(), any(), anyString());
+        }
+
+        @Test
+        void rejectsUdfRepoWithoutData() {
+            when(cache.getById(10L)).thenReturn(Optional.of(folder(10L, 2L, "alice-home")));
+            when(cache.getChildren(10L)).thenReturn(java.util.List.of());
+            when(policy.hasData("UDFRepo")).thenReturn(true);
+
+            assertThatThrownBy(() ->
+                    service.createItem(10L, "alice", "UDFRepo", null, CTX_DIRECT))
+                    .isInstanceOf(ValidationException.class)
+                    .extracting(e -> ((ValidationException) e).errorCode())
+                    .isEqualTo(ErrorCode.DATA_REQUIRED);
+        }
+    }
 }

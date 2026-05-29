@@ -124,6 +124,20 @@ public class ItemService {
         CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
         ownershipChecker.requireOwned(parentId, homeFolder, effectiveUser, "Parent");
 
+        if (Types.isUdfRepo(type)) {
+            if (parentId != homeFolder.itemTreeId()) {
+                throw new ValidationException(ErrorCode.UDF_REPO_INVALID_PARENT,
+                        "A UDFRepo must be created directly under the user's home folder");
+            }
+            for (CachedNode child : cache.getChildren(homeFolder.itemTreeId())) {
+                if (Types.isUdfRepo(child.type())) {
+                    throw new ValidationException(ErrorCode.UDF_REPO_ALREADY_EXISTS,
+                            "A UDFRepo already exists for user '" + effectiveUser + "'");
+                }
+            }
+            name = effectiveUser;
+        }
+
         boolean hasData = policy.hasData(type);
         if (!policy.isKnown(type)) {
             meterRegistry.counter("itemtree.policy.unknown_type", "type", type).increment();
