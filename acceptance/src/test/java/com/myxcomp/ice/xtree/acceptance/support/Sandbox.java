@@ -11,6 +11,8 @@ import java.util.Map;
  */
 public final class Sandbox {
 
+    private static final String FIELD_ITEM_TREE_ID = "itemTreeId";
+
     private static ApiClient api;
     private static long rootId;
     private static boolean ready;
@@ -72,7 +74,7 @@ public final class Sandbox {
                     "Could not resolve home folder for '" + TestConfig.user()
                             + "' (status " + r.statusCode() + "): " + r.getBody().asString());
         }
-        return r.jsonPath().getLong("itemTreeId");
+        return r.jsonPath().getLong(FIELD_ITEM_TREE_ID);
     }
 
     private static long createSandboxFolder(long homeId) {
@@ -84,7 +86,7 @@ public final class Sandbox {
                     "Could not create sandbox folder (status " + r.statusCode() + "): "
                             + r.getBody().asString());
         }
-        return r.jsonPath().getLong("itemTreeId");
+        return r.jsonPath().getLong(FIELD_ITEM_TREE_ID);
     }
 
     private static void sleep() {

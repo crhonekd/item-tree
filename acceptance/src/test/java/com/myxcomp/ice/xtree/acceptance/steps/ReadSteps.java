@@ -11,6 +11,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class ReadSteps {
 
+    private static final String FIELD_ITEM_TREE_ID = "itemTreeId";
+    private static final String FIELD_PARENT_ID    = "parentId";
+    private static final String FIELD_NAME         = "name";
+    private static final String FIELD_PATH         = "path";
+    private static final String FIELD_ANCESTORS    = "ancestors";
+    private static final String FIELD_IDS          = "ids";
+    private static final String PARAM_Q            = "q";
+
     private final World world;
 
     public ReadSteps(World world) {
@@ -36,7 +44,7 @@ public class ReadSteps {
 
     @When("I fetch it")
     public void iFetchIt() {
-        world.lastResponse = world.api.post("/items/get", Map.of("ids", List.of(world.currentItemId)));
+        world.lastResponse = world.api.post("/items/get", Map.of(FIELD_IDS, List.of(world.currentItemId)));
     }
 
     @When("I resolve the home folder for {string}")
@@ -46,19 +54,19 @@ public class ReadSteps {
 
     @When("I search for {string}")
     public void iSearchFor(String q) {
-        world.lastResponse = world.api.getQuery("/search", Map.of("q", q));
+        world.lastResponse = world.api.getQuery("/search", Map.of(PARAM_Q, q));
     }
 
     @When("I search for it by id")
     public void iSearchForItById() {
-        world.lastResponse = world.api.getQuery("/search", Map.of("q", String.valueOf(world.currentItemId)));
+        world.lastResponse = world.api.getQuery("/search", Map.of(PARAM_Q, String.valueOf(world.currentItemId)));
     }
 
     // ── Single-node assertions (works on object body or array of nodes) ─
 
     @Then("the item's name is {string}")
     public void theItemsNameIs(String expected) {
-        assertThat(node().get("name")).isEqualTo(expected);
+        assertThat(node().get(FIELD_NAME)).isEqualTo(expected);
     }
 
     @Then("the item's type is {string}")
@@ -68,54 +76,55 @@ public class ReadSteps {
 
     @Then("the item's parent is {string}")
     public void theItemsParentIs(String folderName) {
-        long expected = world.named.get(folderName);
-        assertThat(((Number) node().get("parentId")).longValue()).isEqualTo(expected);
+        Long expected = world.named.get(folderName);
+        assertThat(expected).as("no folder named '%s' registered in scenario", folderName).isNotNull();
+        assertThat(((Number) node().get(FIELD_PARENT_ID)).longValue()).isEqualTo(expected);
     }
 
     @Then("the item's path starts with {string}")
     public void theItemsPathStartsWith(String prefix) {
-        assertThat((String) node().get("path")).startsWith(prefix);
+        assertThat((String) node().get(FIELD_PATH)).startsWith(prefix);
     }
 
     // ── Collection assertions (array body) ──────────────────────────────
 
     @Then("the subtree includes an item named {string}")
     public void theSubtreeIncludesAnItemNamed(String name) {
-        assertThat(world.lastResponse.jsonPath().getList("name", String.class)).contains(name);
+        assertThat(world.lastResponse.jsonPath().getList(FIELD_NAME, String.class)).contains(name);
     }
 
     @Then("the results include {string}")
     public void theResultsInclude(String name) {
-        assertThat(world.lastResponse.jsonPath().getList("name", String.class)).contains(name);
+        assertThat(world.lastResponse.jsonPath().getList(FIELD_NAME, String.class)).contains(name);
     }
 
     @Then("every item path starts with {string}")
     public void everyItemPathStartsWith(String prefix) {
-        List<String> paths = world.lastResponse.jsonPath().getList("path", String.class);
+        List<String> paths = world.lastResponse.jsonPath().getList(FIELD_PATH, String.class);
         assertThat(paths).isNotEmpty().allMatch(p -> p != null && p.startsWith(prefix));
     }
 
     @Then("the hit {string} has a path")
     public void theHitHasAPath(String name) {
-        assertThat((String) hitByName(name).get("path")).startsWith("/");
+        assertThat((String) hitByName(name).get(FIELD_PATH)).startsWith("/");
     }
 
     @Then("the hit {string} has a non-empty ancestor chain")
     public void theHitHasANonEmptyAncestorChain(String name) {
-        assertThat((List<?>) hitByName(name).get("ancestors")).isNotEmpty();
+        assertThat((List<?>) hitByName(name).get(FIELD_ANCESTORS)).isNotEmpty();
     }
 
     // ── Delete verification ─────────────────────────────────────────────
 
     @Then("it no longer exists")
     public void itNoLongerExists() {
-        var got = world.api.post("/items/get", Map.of("ids", List.of(world.currentItemId)));
+        var got = world.api.post("/items/get", Map.of(FIELD_IDS, List.of(world.currentItemId)));
         assertThat(got.jsonPath().getList("$"))
                 .as("getItems should omit deleted id %s", world.currentItemId)
                 .isEmpty();
 
         var sub = world.api.get("/tree/" + world.sandboxRootId + "/subtree-full");
-        assertThat(sub.jsonPath().getList("itemTreeId", Long.class)).doesNotContain(world.currentItemId);
+        assertThat(sub.jsonPath().getList(FIELD_ITEM_TREE_ID, Long.class)).doesNotContain(world.currentItemId);
 
         world.created.removeIf(id -> id.equals(world.currentItemId)); // already gone; skip in cleanup
     }
@@ -125,22 +134,23 @@ public class ReadSteps {
     /** Returns the node under test: the object body, or the matching element of an array body. */
     @SuppressWarnings("unchecked")
     private Map<String, Object> node() {
-        Object root = world.lastResponse.jsonPath().get("$");
+        var jp = world.lastResponse.jsonPath();
+        Object root = jp.get("$");
         if (root instanceof List<?> list) {
             return list.stream()
                     .map(o -> (Map<String, Object>) o)
-                    .filter(n -> ((Number) n.get("itemTreeId")).longValue() == world.currentItemId)
+                    .filter(n -> ((Number) n.get(FIELD_ITEM_TREE_ID)).longValue() == world.currentItemId)
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("current item not in response: " + world.currentItemId));
         }
-        return world.lastResponse.jsonPath().getMap("$");
+        return jp.getMap("$");
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> hitByName(String name) {
         List<Map<String, Object>> hits = world.lastResponse.jsonPath().getList("$");
         return hits.stream()
-                .filter(h -> name.equals(h.get("name")))
+                .filter(h -> name.equals(h.get(FIELD_NAME)))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("no search hit named: " + name));
     }

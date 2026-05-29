@@ -41,6 +41,10 @@ public class ApiClient {
         return req().queryParams(queryParams).get(path);
     }
 
+    public Response put(String path, Object body) {
+        return req().body(body).put(path);
+    }
+
     public Response delete(String path) {
         return req().delete(path);
     }

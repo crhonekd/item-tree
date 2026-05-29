@@ -4,7 +4,7 @@
 -- Hand-allocated ids 1..99; sequence starts at 100000 so live inserts won't
 -- collide. All LASTUPDATE values are UTC. Tree shape covers:
 --   * root + first-level skeleton
---   * Users / home folders (testuser1, testuser2, deepuser)
+--   * Users / home folders (testuser1, testuser2, deepuser, crhonekd)
 --   * depth-7 chain under deepuser (ancestor-walk testing)
 --   * one row of every §10 type
 --   * one JSON-null + XML-not-null row (backfill candidate)
