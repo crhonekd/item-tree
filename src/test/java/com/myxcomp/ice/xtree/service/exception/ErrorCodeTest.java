@@ -30,7 +30,10 @@ class ErrorCodeTest {
             "DESTINATION_NOT_FOLDER",
             "COPY_INTO_DESCENDANT",
             "COPY_TOO_LARGE",
-            "NOT_IN_USER_FOLDER"
+            "NOT_IN_USER_FOLDER",
+            "UDF_REPO_ALREADY_EXISTS",
+            "UDF_REPO_INVALID_PARENT",
+            "UDF_REPO_PROTECTED"
     );
 
     @Test
