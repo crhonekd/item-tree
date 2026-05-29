@@ -20,4 +20,20 @@ class TypesTest {
     void isFolder_should_returnFalse_when_typeIsNotExactlyFolder(String type) {
         assertThat(Types.isFolder(type)).isFalse();
     }
+
+    @Test
+    void udfRepoConstantIsExactLiteral() {
+        assertThat(Types.UDF_REPO).isEqualTo("UDFRepo");
+    }
+
+    @Test
+    void isUdfRepoTrueForExactLiteral() {
+        assertThat(Types.isUdfRepo("UDFRepo")).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"udfrepo", "UDFREPO", "UDF.Repo", "Folder", "Report", ""})
+    void isUdfRepoFalseForAnythingElse(String type) {
+        assertThat(Types.isUdfRepo(type)).isFalse();
+    }
 }
