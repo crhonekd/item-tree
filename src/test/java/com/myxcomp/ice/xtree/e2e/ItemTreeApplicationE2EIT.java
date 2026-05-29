@@ -418,10 +418,10 @@ class ItemTreeApplicationE2EIT {
     void getSubtreeReturnsLevel1OnlyWhileSubtreeFullReturnsAllDescendants() {
         TreeService treeService = pair.a().getBean(TreeService.class);
 
-        // Level-1 on Users (id=2) — should contain exactly Users + {testuser1, testuser2, deepuser}.
+        // Level-1 on Users (id=2) — should contain exactly Users + {testuser1, testuser2, deepuser, crhonekd}.
         List<TreeNodeView> level1 = treeService.getSubtree(2L);
         assertThat(level1).extracting(v -> v.node().itemTreeId())
-                .containsExactlyInAnyOrder(2L, 10L, 11L, 12L);
+                .containsExactlyInAnyOrder(2L, 10L, 11L, 12L, 13L);
 
         // Level-1 on deepuser (id=12) — should contain only deepuser + L2 (id=20),
         // NOT L3 (21) or any further descendants in the depth-7 chain.
