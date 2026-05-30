@@ -16,6 +16,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new RequestTimingInterceptor())
+                .addPathPatterns("/api/v1/itemtree/**");
         registry.addInterceptor(new UserContextInterceptor())
                 .addPathPatterns("/api/v1/itemtree/**");
     }

@@ -1,0 +1,40 @@
+package com.myxcomp.ice.xtree.api.filter;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Logs one INFO line per request with the HTTP method, URI, response status, and
+ * end-to-end duration in milliseconds. Registered outermost in {@link WebMvcConfig}
+ * so the measured span wraps the whole handler chain. Uses {@link System#nanoTime()}
+ * (a monotonic duration source, not a wall-clock API) so the TimeMapper UTC-clock
+ * rule does not apply.
+ */
+public class RequestTimingInterceptor implements HandlerInterceptor {
+
+    private static final Logger log = LoggerFactory.getLogger(RequestTimingInterceptor.class);
+    static final String START_NS = RequestTimingInterceptor.class.getName() + ".START_NS";
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        request.setAttribute(START_NS, System.nanoTime());
+        return true;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
+                                Object handler, Exception ex) {
+        Object start = request.getAttribute(START_NS);
+        if (!(start instanceof Long startNs)) {
+            return;
+        }
+        long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
+        log.info("{} {} -> {} ({} ms)",
+                request.getMethod(), request.getRequestURI(), response.getStatus(), ms);
+    }
+}
