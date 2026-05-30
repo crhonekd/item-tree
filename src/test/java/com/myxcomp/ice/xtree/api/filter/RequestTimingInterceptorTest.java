@@ -11,8 +11,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 class RequestTimingInterceptorTest {
 
-    private static final String START_NS = "com.myxcomp.ice.xtree.api.filter.RequestTimingInterceptor.START_NS";
-
     private final RequestTimingInterceptor interceptor = new RequestTimingInterceptor();
 
     @Test
@@ -23,7 +21,7 @@ class RequestTimingInterceptorTest {
         boolean proceed = interceptor.preHandle(request, response, new Object());
 
         assertThat(proceed).isTrue();
-        assertThat(request.getAttribute(START_NS)).isInstanceOf(Long.class);
+        assertThat(request.getAttribute(RequestTimingInterceptor.START_NS)).isInstanceOf(Long.class);
     }
 
     @Test
