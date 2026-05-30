@@ -403,4 +403,66 @@ class ItemServiceCopyTest {
             verify(repository, never()).insertBatch(any());
         }
     }
+
+    @Nested
+    class UdfRepoCopy {
+
+        private final Instant T = Instant.parse("2026-05-29T10:00:00Z");
+        private final UserContext ctx = new UserContext("alice", null);
+
+        @BeforeEach
+        void setup() {
+            lenient().when(timeMapper.now()).thenReturn(T);
+            lenient().when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+            lenient().when(sequenceGenerator.next()).thenReturn(1L);
+        }
+
+        @Test
+        void rejectsDirectCopyOfUdfRepo() {
+            long sourceId = 901L;
+            long destId = 20L;
+            CachedNode source = new CachedNode(sourceId, 10L, "alice", "UDFRepo", T, "alice");
+            when(cache.getById(sourceId)).thenReturn(Optional.of(source));
+
+            assertThatThrownBy(() -> service.copyItem(sourceId, destId, ctx))
+                    .isInstanceOf(ValidationException.class)
+                    .extracting(e -> ((ValidationException) e).errorCode())
+                    .isEqualTo(ErrorCode.UDF_REPO_PROTECTED);
+
+            verify(repository, never()).insertBatch(any());
+        }
+
+        @Test
+        void skipsUdfRepoNodesWhenCopyingASubtree() {
+            long sourceId = 70L;   // a folder
+            long destId = 20L;
+            CachedNode sourceFolder = new CachedNode(sourceId, 10L, "MixedFolder", "Folder", T, "alice");
+            CachedNode dest = new CachedNode(destId, 10L, "sub", "Folder", T, "alice");
+            when(cache.getById(sourceId)).thenReturn(Optional.of(sourceFolder));
+            when(cache.getById(destId)).thenReturn(Optional.of(dest));
+            when(ownershipChecker.requireHomeFolderExists("alice"))
+                    .thenReturn(new CachedNode(10L, 2L, "alice", "Folder", T, "alice"));
+            when(cache.isAncestor(sourceId, destId)).thenReturn(false);
+            when(cache.getChildren(destId)).thenReturn(java.util.List.of());
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(java.util.List.of(sourceFolder));
+            // DB snapshot: folder + a normal child + a UDFRepo child (which must be skipped)
+            when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(java.util.List.of(
+                    new ItemTreeFullRow(sourceId, 10L, "MixedFolder", "Folder", null, null, T, "alice"),
+                    new ItemTreeFullRow(72L, sourceId, "MixedLeaf", "View", "{\"a\":1}", null, T, "alice"),
+                    new ItemTreeFullRow(901L, sourceId, "alice", "UDFRepo", "{\"k\":1}", null, T, "alice")));
+            when(repository.allocateIds(2)).thenReturn(java.util.List.of(801L, 802L));
+
+            List<CachedNode> result = service.copyItem(sourceId, destId, ctx);
+
+            // UDFRepo excluded: 2 nodes copied, none of type UDFRepo
+            assertThat(result).hasSize(2);
+            assertThat(result).noneMatch(n -> "UDFRepo".equals(n.type()));
+
+            ArgumentCaptor<List<ItemTreeFullRow>> captor = ArgumentCaptor.captor();
+            verify(repository).insertBatch(captor.capture());
+            assertThat(captor.getValue())
+                    .hasSize(2)
+                    .noneMatch(r -> "UDFRepo".equals(r.type()));
+        }
+    }
 }

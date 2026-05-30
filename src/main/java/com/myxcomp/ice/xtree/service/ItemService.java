@@ -557,6 +557,13 @@ public class ItemService {
                     "Cannot copy the root folder");
         }
 
+        // 2b. UDF_REPO_PROTECTED — a UDFRepo may never be copied directly
+        if (Types.isUdfRepo(source.type())) {
+            recordCopyRejection(ErrorCode.UDF_REPO_PROTECTED);
+            throw new ValidationException(ErrorCode.UDF_REPO_PROTECTED,
+                    "UDFRepo " + sourceId + " cannot be copied");
+        }
+
         // 3. DESTINATION_NOT_FOUND
         CachedNode destination = cache.getById(destinationFolderId).orElseThrow(() -> {
             recordCopyRejection(ErrorCode.DESTINATION_NOT_FOUND);
@@ -619,6 +626,13 @@ public class ItemService {
             throw new CopyTooLargeException(
                     "Source subtree has more than " + cap + " nodes (DB)");
         }
+
+        // Phase 23: a UDFRepo is a per-user singleton and is never duplicated by copy.
+        // It is always a leaf, so dropping it can never orphan a child. The subtree
+        // root is guaranteed not to be a UDFRepo (rejected at step 2b above).
+        sourceRows = sourceRows.stream()
+                .filter(r -> !Types.isUdfRepo(r.type()))
+                .toList();
 
         // Allocate ids and build oldId→newId map
         List<Long> newIds = repository.allocateIds(sourceRows.size());
