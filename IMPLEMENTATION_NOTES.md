@@ -824,6 +824,33 @@ instance seeded for the configured user.
 
 ---
 
+## Phase 24 — Test-UI cleanup, search-path fix, controller timing logs ✅ COMPLETE (2026-05-30)
+
+**Goal:** Tidy the static test UI, fix "copy full path" on search results, and add
+per-request timing logs to the REST API.
+
+- **Backend textbox removed** (`index.html`, `app.js`, `state.js`, `api.js`): the
+  `#backend-url` input and `backendBaseUrl` state were dead code — the UI runs
+  same-origin only. `url()` in `api.js` now returns `path` directly.
+- **Probe-home button removed** (`index.html`, `app.js`, `refresh.js`, `styles.css`):
+  `runProbe` and its CSS rules deleted; `runRefresh` and all remaining imports intact.
+- **UDFRepo Name field hidden** (`modal.js`): `openCreateModal` now hides the Name
+  label and input when the effective type is `UDFRepo`, and sends the type name as a
+  placeholder (backend forces the name to the username anyway). No new validation path
+  — the existing `UDF_REPO_ALREADY_EXISTS` error confirms a round-trip.
+- **Search-result path carried through** (`search.js`): `hitNode()` was dropping the
+  `path` field from `SearchHit` before node ingest; adding `path: hit.path` fixes
+  "copy full path" on search results. Backend path population was already correct and
+  covered by `SearchServiceTest`.
+- **`RequestTimingInterceptor`** (`api/filter/`): new `HandlerInterceptor` stashes
+  `System.nanoTime()` in `preHandle` and logs `METHOD URI -> STATUS (N ms)` in
+  `afterCompletion`. Registered outermost (before `UserContextInterceptor`) in
+  `WebMvcConfig` so the measured span wraps the whole handler chain. Uses
+  `System.nanoTime()` — a monotonic duration source, not a wall-clock API — so the
+  `TimeMapper` UTC rule does not apply. Three unit tests; full suite: 726 tests green.
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
