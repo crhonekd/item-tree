@@ -50,9 +50,6 @@ input[type=text]:focus, input[type=number]:focus {
 .app-header .brand { font-weight: 700; font-size: 15px; color: var(--accent); letter-spacing: .2px; }
 .header-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .header-controls label { color: var(--muted); }
-.probe-result { margin-left: 8px; font-family: monospace; }
-.probe-result.ok { color: var(--accent); }
-.probe-result.err { color: #b00020; }
 
 .search-bar {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;

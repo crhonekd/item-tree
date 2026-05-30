@@ -3,7 +3,7 @@ import { api, ProblemError } from './api.js';
 import { toastError } from './toast.js';
 import { renderTree, ingestSubtreeFullResult } from './tree.js';
 import { runSearch, clearSearchHighlight } from './search.js';
-import { runRefresh, runProbe } from './refresh.js';
+import { runRefresh } from './refresh.js';
 
 function $(id) { return document.getElementById(id); }
 
@@ -13,7 +13,6 @@ function bindHeader() {
 
   $('ice-user').addEventListener('input', (e) => { state.iceUser = e.target.value.trim(); savePersisted(); });
   $('impersonated-user').addEventListener('input', (e) => { state.impersonatedUser = e.target.value.trim(); savePersisted(); });
-  $('probe-btn').addEventListener('click', runProbe);
   $('login-btn').addEventListener('click', doLogin);
 }
 

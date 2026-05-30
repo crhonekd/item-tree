@@ -15,24 +15,3 @@ export async function runRefresh(type) {
     status.textContent = `last: ${type} FAILED`;
   }
 }
-
-export async function runProbe() {
-  const target = document.getElementById('probe-result');
-  target.className = 'probe-result';
-  target.textContent = '';
-  if (!state.iceUser) {
-    target.className = 'probe-result err';
-    target.textContent = '(set X-Ice-User first)';
-    return;
-  }
-  try {
-    const home = await api.getHomeFolder(state.iceUser);
-    target.className = 'probe-result ok';
-    target.textContent = `home: id=${home.itemTreeId} name="${home.name}" type=${home.type}`;
-  } catch (e) {
-    target.className = 'probe-result err';
-    target.textContent = e instanceof ProblemError
-      ? `${e.problem.status ?? '?'} ${e.problem.errorCode ?? e.problem.title}: ${e.problem.detail ?? ''}`
-      : String(e);
-  }
-}
