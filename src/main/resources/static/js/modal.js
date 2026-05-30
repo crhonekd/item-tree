@@ -7,7 +7,7 @@ const KNOWN_TYPES = [
   'Folder', 'Shortcut', 'Shortcut.Report', 'Shortcut.Filter', 'Shortcut.Filter.Nested',
   'DrillDown.Set', 'Report', 'Filter',
   'Details.Column.Collection', 'Numeric.Bucket.Collection', 'Discrete.Bucket.Collection',
-  'Bucket.Collection', 'View', 'UDF.Context', 'Eval',
+  'Bucket.Collection', 'View', 'UDF.Context', 'Eval', 'UDFRepo',
 ];
 
 const TYPES_WITHOUT_DATA = new Set([
