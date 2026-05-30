@@ -224,3 +224,23 @@ When the design doc is the source of truth:
 | Module layout | §16 |
 | Configuration | §17 |
 | Metrics | §18 |
+
+---
+
+## Lessons learned (tooling)
+
+Recurring session pitfalls. Read before relying on shell output for anything load-bearing.
+
+1. **Don't trust the RTK-proxied shell for exact output.** `git`, `grep`, `ls`, `tail`,
+   etc. are transparently rewritten to `rtk <cmd>`, which **summarizes and truncates**
+   and has, in practice, returned stale or fabricated lines (e.g. phantom duplicate
+   sections, wrong line numbers, inconsistent grep counts). When the *exact* content or
+   state matters, use one of: the **Read tool** (for files), `rtk proxy <cmd>` (raw
+   passthrough), or an absolute path like `/usr/bin/git`. Verify, don't assume.
+2. **The Edit tool requires a prior *Read-tool* read of the file.** Viewing a file with
+   Bash (`cat`/`tail`/`sed`) does **not** satisfy it — the Edit will silently fail with
+   "File has not been read yet" and your change won't land. Always `Read` before `Edit`.
+3. **Don't batch many independent tool calls in one turn here.** Parallel calls have
+   interfered with and cancelled each other (one errored call cancelled the whole batch,
+   including a dispatched subagent). When a result is load-bearing, issue **one call and
+   wait** for it before the next.
