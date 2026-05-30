@@ -14,6 +14,8 @@ const TYPES_WITHOUT_DATA = new Set([
   'Folder', 'Shortcut', 'Shortcut.Report', 'Shortcut.Filter', 'Shortcut.Filter.Nested',
 ]);
 
+const UDF_REPO = 'UDFRepo';
+
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -37,7 +39,7 @@ export function openCreateModal(parentId) {
   const typeOptions = KNOWN_TYPES.map((t) => `<option value="${t}">${t}</option>`).join('');
   openModal(`
     <h3>Create child of "${escapeHtml(parent?.name ?? '?')}" (id ${parentId})</h3>
-    <label>Name</label>
+    <label id="cm-name-label">Name</label>
     <input id="cm-name" type="text" maxlength="70">
     <label>Type</label>
     <select id="cm-type">${typeOptions}</select>
@@ -54,21 +56,28 @@ export function openCreateModal(parentId) {
     const typeSel = root.querySelector('#cm-type');
     const customType = root.querySelector('#cm-custom-type');
     const dataArea = root.querySelector('#cm-data');
+    const nameInput = root.querySelector('#cm-name');
+    const nameLabel = root.querySelector('#cm-name-label');
     const err = root.querySelector('#cm-error');
     const recompute = () => {
       const effective = customType.value.trim() || typeSel.value;
       const noData = TYPES_WITHOUT_DATA.has(effective);
       dataArea.disabled = noData;
       if (noData) dataArea.value = '';
+      const isUdfRepo = effective === UDF_REPO;
+      nameLabel.hidden = isUdfRepo;
+      nameInput.hidden = isUdfRepo;
+      if (isUdfRepo) nameInput.value = '';
     };
     typeSel.addEventListener('change', recompute);
     customType.addEventListener('input', recompute);
     recompute();
     root.querySelector('#cm-cancel').addEventListener('click', closeModal);
     root.querySelector('#cm-create').addEventListener('click', async () => {
-      const name = root.querySelector('#cm-name').value.trim();
       const type = customType.value.trim() || typeSel.value;
-      if (!name) { err.textContent = 'Name required'; return; }
+      const isUdfRepo = type === UDF_REPO;
+      const name = isUdfRepo ? UDF_REPO : nameInput.value.trim();
+      if (!isUdfRepo && !name) { err.textContent = 'Name required'; return; }
       let data = null;
       if (!dataArea.disabled && dataArea.value.trim()) {
         try { data = JSON.parse(dataArea.value); }
