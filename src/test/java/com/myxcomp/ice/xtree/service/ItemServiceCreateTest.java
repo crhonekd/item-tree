@@ -31,6 +31,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.core.task.SyncTaskExecutor;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -345,7 +346,7 @@ class ItemServiceCreateTest {
         void happyPathForcesNameToUserAndPersists() {
             // parent IS the home folder (id 10)
             when(cache.getById(10L)).thenReturn(Optional.of(folder(10L, 2L, "alice-home")));
-            when(cache.getChildren(10L)).thenReturn(java.util.List.of());
+            when(cache.getChildren(10L)).thenReturn(List.of());
             when(policy.hasData("UDFRepo")).thenReturn(true);
             when(policy.isAlsoPersistedAsXmlOnWrite("UDFRepo")).thenReturn(false);
             when(timeMapper.now()).thenReturn(NOW);
@@ -366,7 +367,7 @@ class ItemServiceCreateTest {
         @Test
         void rejectsSecondUdfRepoForSameUser() {
             when(cache.getById(10L)).thenReturn(Optional.of(folder(10L, 2L, "alice-home")));
-            when(cache.getChildren(10L)).thenReturn(java.util.List.of(
+            when(cache.getChildren(10L)).thenReturn(List.of(
                     new CachedNode(901L, 10L, "alice", "UDFRepo", NOW, "alice")));
 
             assertThatThrownBy(() ->
@@ -397,7 +398,7 @@ class ItemServiceCreateTest {
         @Test
         void rejectsUdfRepoWithoutData() {
             when(cache.getById(10L)).thenReturn(Optional.of(folder(10L, 2L, "alice-home")));
-            when(cache.getChildren(10L)).thenReturn(java.util.List.of());
+            when(cache.getChildren(10L)).thenReturn(List.of());
             when(policy.hasData("UDFRepo")).thenReturn(true);
 
             assertThatThrownBy(() ->

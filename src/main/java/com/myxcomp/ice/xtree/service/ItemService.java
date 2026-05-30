@@ -104,7 +104,7 @@ public class ItemService {
      * Creates a new node under {@code parentId}. Order: validate → DB → cache → event.
      *
      * @throws NotFoundException   {@code PARENT_NOT_FOUND} when {@code parentId} is unknown to the cache
-     * @throws ValidationException {@code PARENT_NOT_FOLDER} / {@code TYPE_CANNOT_HAVE_DATA} / {@code DATA_REQUIRED}
+     * @throws ValidationException {@code PARENT_NOT_FOLDER} / {@code TYPE_CANNOT_HAVE_DATA} / {@code DATA_REQUIRED} / {@code UDF_REPO_INVALID_PARENT} / {@code UDF_REPO_ALREADY_EXISTS}
      */
     @Transactional
     public CachedNode createItem(long parentId, String name, String type, String dataJson,
@@ -535,9 +535,9 @@ public class ItemService {
 
     /**
      * Copies the subtree rooted at {@code sourceId} under {@code destinationFolderId}.
-     * Validation order: ITEM_NOT_FOUND, CANNOT_COPY_ROOT, DESTINATION_NOT_FOUND,
-     * DESTINATION_NOT_FOLDER, HOME_FOLDER_NOT_FOUND, NOT_IN_USER_FOLDER,
-     * COPY_INTO_DESCENDANT, COPY_TOO_LARGE. Write order: DB → cache → event.
+     * Validation order: ITEM_NOT_FOUND, CANNOT_COPY_ROOT, UDF_REPO_PROTECTED,
+     * DESTINATION_NOT_FOUND, DESTINATION_NOT_FOLDER, HOME_FOLDER_NOT_FOUND,
+     * NOT_IN_USER_FOLDER, COPY_INTO_DESCENDANT, COPY_TOO_LARGE. Write order: DB → cache → event.
      */
     @Transactional
     public List<CachedNode> copyItem(long sourceId, long destinationFolderId, UserContext userContext) {

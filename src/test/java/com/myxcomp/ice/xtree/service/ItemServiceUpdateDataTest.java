@@ -106,6 +106,34 @@ class ItemServiceUpdateDataTest {
     }
 
     @Test
+    void allowsDataUpdateOnUdfRepo() {
+        CachedNode before = new CachedNode(7L, 1L, "alice", "UDFRepo", Instant.EPOCH, "u");
+        CachedNode after  = new CachedNode(7L, 1L, "alice", "UDFRepo", NOW, "alice");
+        when(cache.getById(7L)).thenReturn(Optional.of(before), Optional.of(after));
+        when(policy.hasData("UDFRepo")).thenReturn(true);
+        when(policy.isAlsoPersistedAsXmlOnWrite("UDFRepo")).thenReturn(false);
+        when(timeMapper.now()).thenReturn(NOW);
+        when(instanceIdProvider.getInstanceId()).thenReturn("inst-1");
+        when(sequenceGenerator.next()).thenReturn(3L);
+
+        CachedNode result = service.updateItemData(7L, "{\"udf\":1}", CTX);
+
+        assertThat(result).isEqualTo(after);
+        InOrder order = inOrder(repository, cache, publisher);
+        order.verify(repository).updateJson(7L, "{\"udf\":1}", null, NOW, "alice");
+        order.verify(cache).applyMetadataUpdate(7L, NOW, "alice");
+
+        ArgumentCaptor<TreeMutationEvent> cap = ArgumentCaptor.forClass(TreeMutationEvent.class);
+        order.verify(publisher).publish(cap.capture());
+        assertThat(cap.getValue().getOperationType()).isEqualTo(OperationType.UPDATE);
+        UpdatePayload payload = (UpdatePayload) cap.getValue().getPayload();
+        assertThat(payload.itemTreeId()).isEqualTo(7L);
+        assertThat(payload.lastUpdate()).isEqualTo(NOW);
+        assertThat(payload.lastUpdateUser()).isEqualTo("alice");
+        verifyNoInteractions(converter);
+    }
+
+    @Test
     void updateWithXmlFanOutConvertsAndPersistsBoth() {
         CachedNode before = new CachedNode(7L, 1L, "Doc", "Report", Instant.EPOCH, "u");
         when(cache.getById(7L)).thenReturn(Optional.of(before), Optional.of(before));

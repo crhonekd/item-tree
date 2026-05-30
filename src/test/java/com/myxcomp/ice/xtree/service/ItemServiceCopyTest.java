@@ -443,14 +443,14 @@ class ItemServiceCopyTest {
             when(ownershipChecker.requireHomeFolderExists("alice"))
                     .thenReturn(new CachedNode(10L, 2L, "alice", "Folder", T, "alice"));
             when(cache.isAncestor(sourceId, destId)).thenReturn(false);
-            when(cache.getChildren(destId)).thenReturn(java.util.List.of());
-            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(java.util.List.of(sourceFolder));
+            when(cache.getChildren(destId)).thenReturn(List.of());
+            when(cache.getSubtreeFlatFull(sourceId)).thenReturn(List.of(sourceFolder));
             // DB snapshot: folder + a normal child + a UDFRepo child (which must be skipped)
-            when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(java.util.List.of(
+            when(repository.findRowsForCopy(eq(sourceId), anyInt())).thenReturn(List.of(
                     new ItemTreeFullRow(sourceId, 10L, "MixedFolder", "Folder", null, null, T, "alice"),
                     new ItemTreeFullRow(72L, sourceId, "MixedLeaf", "View", "{\"a\":1}", null, T, "alice"),
                     new ItemTreeFullRow(901L, sourceId, "alice", "UDFRepo", "{\"k\":1}", null, T, "alice")));
-            when(repository.allocateIds(2)).thenReturn(java.util.List.of(801L, 802L));
+            when(repository.allocateIds(2)).thenReturn(List.of(801L, 802L));
 
             List<CachedNode> result = service.copyItem(sourceId, destId, ctx);
 
