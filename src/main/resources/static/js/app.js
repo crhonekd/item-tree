@@ -10,20 +10,9 @@ function $(id) { return document.getElementById(id); }
 function bindHeader() {
   $('ice-user').value = state.iceUser;
   $('impersonated-user').value = state.impersonatedUser;
-  $('backend-url').value = state.backendBaseUrl;
 
   $('ice-user').addEventListener('input', (e) => { state.iceUser = e.target.value.trim(); savePersisted(); });
   $('impersonated-user').addEventListener('input', (e) => { state.impersonatedUser = e.target.value.trim(); savePersisted(); });
-  $('backend-url').addEventListener('change', (e) => {
-    const newUrl = e.target.value.trim();
-    if (newUrl !== state.backendBaseUrl) {
-      state.backendBaseUrl = newUrl;
-      savePersisted();
-      resetTreeState();
-      renderTree();
-      $('detail-root').innerHTML = '(backend URL changed — log in again)';
-    }
-  });
   $('probe-btn').addEventListener('click', runProbe);
   $('login-btn').addEventListener('click', doLogin);
 }

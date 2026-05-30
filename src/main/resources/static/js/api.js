@@ -9,7 +9,7 @@ export class ProblemError extends Error {
 }
 
 function url(path) {
-  return `${state.backendBaseUrl}${path}`;
+  return path;
 }
 
 function buildHeaders(hasBody) {

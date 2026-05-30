@@ -8,7 +8,6 @@ const persisted = (() => {
 export const state = {
   iceUser: persisted.iceUser ?? '',
   impersonatedUser: persisted.impersonatedUser ?? '',
-  backendBaseUrl: persisted.backendBaseUrl ?? '',
   embedInTree: persisted.embedInTree ?? false,
   search: { matchIds: new Set() },
   homeFolderId: null,
@@ -28,7 +27,6 @@ export function savePersisted() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     iceUser: state.iceUser,
     impersonatedUser: state.impersonatedUser,
-    backendBaseUrl: state.backendBaseUrl,
     embedInTree: state.embedInTree,
   }));
 }
