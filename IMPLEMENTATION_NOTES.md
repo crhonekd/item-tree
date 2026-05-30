@@ -844,10 +844,27 @@ per-request timing logs to the REST API.
   covered by `SearchServiceTest`.
 - **`RequestTimingInterceptor`** (`api/filter/`): new `HandlerInterceptor` stashes
   `System.nanoTime()` in `preHandle` and logs `METHOD URI -> STATUS (N ms)` in
-  `afterCompletion`. Registered outermost (before `UserContextInterceptor`) in
-  `WebMvcConfig` so the measured span wraps the whole handler chain. Uses
-  `System.nanoTime()` — a monotonic duration source, not a wall-clock API — so the
-  `TimeMapper` UTC rule does not apply. Three unit tests; full suite: 726 tests green.
+  `afterCompletion`. The URI includes the query string when present, and an unresolved
+  handler exception is appended as ` [ex=SimpleClassName]`. Registered outermost (before
+  `UserContextInterceptor`) in `WebMvcConfig` so the measured span wraps the whole
+  handler chain. Uses `System.nanoTime()` — a monotonic duration source, not a
+  wall-clock API — so the `TimeMapper` UTC rule does not apply.
+
+**Post-review hardening (2026-05-30):** A critical review flagged two test-coverage gaps
+and two log-quality nits; all resolved:
+- New `WebMvcConfigTest` asserts both interceptors are registered **and** that
+  `RequestTimingInterceptor` is outermost — the "wraps the whole chain" invariant was
+  previously untested (a swapped registration would have passed silently).
+- `RequestTimingInterceptorTest` gains Logback `ListAppender` assertions so the log is
+  verified to be *emitted and formatted* (method, URI+query, status, `(N ms)`, and the
+  `[ex=...]` marker), not merely non-throwing.
+- The log line now carries the query string and an `[ex=...]` marker on failure.
+- Non-issues confirmed by inspection: `SearchHit.ancestors` carry `path: null` **by
+  design** (per `openapi/itemtree-api.yaml`), so `search.js` correctly passes them
+  through untouched — no fix needed. UI tasks have no automated coverage because the
+  test UI is deliberately a no-build static app (no JS test harness).
+
+Full suite: 731 tests green.
 
 ---
 
