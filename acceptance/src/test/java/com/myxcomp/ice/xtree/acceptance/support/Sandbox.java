@@ -14,6 +14,7 @@ public final class Sandbox {
     private static final String FIELD_ITEM_TREE_ID = "itemTreeId";
 
     private static ApiClient api;
+    private static long homeId;
     private static long rootId;
     private static boolean ready;
 
@@ -26,7 +27,7 @@ public final class Sandbox {
         }
         api = new ApiClient(TestConfig.baseUrl(), TestConfig.user());
         awaitReadiness();
-        long homeId = resolveHomeFolder();
+        homeId = resolveHomeFolder();
         rootId = createSandboxFolder(homeId);
         ready = true;
     }
@@ -46,6 +47,11 @@ public final class Sandbox {
     public static long rootId() {
         if (!ready) throw new IllegalStateException("Sandbox.init() has not been called");
         return rootId;
+    }
+
+    public static long homeId() {
+        if (!ready) throw new IllegalStateException("Sandbox.init() has not been called");
+        return homeId;
     }
 
     private static void awaitReadiness() {
