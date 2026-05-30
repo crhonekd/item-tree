@@ -6,7 +6,7 @@ import { renderTree, selectAndLoad, scrollToNode } from './tree.js';
 const $ = (id) => document.getElementById(id);
 
 function hitNode(hit) {
-  return { itemTreeId: hit.itemTreeId, parentId: hit.parentId, name: hit.name, type: hit.type };
+  return { itemTreeId: hit.itemTreeId, parentId: hit.parentId, name: hit.name, type: hit.type, path: hit.path };
 }
 
 // Materialize a hit's location in the tree from the ancestors carried on the hit
