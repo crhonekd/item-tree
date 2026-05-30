@@ -308,4 +308,24 @@ class ItemServiceMoveTest {
             verifyNoInteractions(ownershipChecker);
         }
     }
+
+    @Test
+    void movingUdfRepoIsRejected() {
+        long id = 901L;
+        long newParentId = 20L;
+        when(cache.getById(id)).thenReturn(Optional.of(
+                new CachedNode(id, 10L, "alice", "UDFRepo",
+                        Instant.parse("2026-05-29T00:00:00Z"), "alice")));
+        when(cache.getById(newParentId)).thenReturn(Optional.of(
+                new CachedNode(newParentId, 10L, "sub", "Folder",
+                        Instant.parse("2026-05-29T00:00:00Z"), "alice")));
+        when(cache.isAncestor(id, newParentId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.moveItem(id, newParentId, new UserContext("alice", null)))
+                .isInstanceOf(ValidationException.class)
+                .extracting(e -> ((ValidationException) e).errorCode())
+                .isEqualTo(ErrorCode.UDF_REPO_PROTECTED);
+
+        verify(repository, never()).updateParent(anyLong(), anyLong(), any(), anyString());
+    }
 }

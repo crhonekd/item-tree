@@ -300,6 +300,11 @@ public class ItemService {
         ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Source");
         ownershipChecker.requireOwned(newParentId, homeFolder, effectiveUser, "New parent");
 
+        if (Types.isUdfRepo(item.type())) {
+            throw new ValidationException(ErrorCode.UDF_REPO_PROTECTED,
+                    "UDFRepo " + id + " cannot be moved");
+        }
+
         Instant now = timeMapper.now();
         String stampUser = effectiveUser;
         long oldParentId = item.parentId();
