@@ -15,9 +15,11 @@ import com.myxcomp.ice.xtree.config.CopyProperties;
 import com.myxcomp.ice.xtree.persistence.ItemTreeRepository;
 import com.myxcomp.ice.xtree.service.OwnershipChecker;
 import com.myxcomp.ice.xtree.policy.TypePolicy;
+import com.myxcomp.ice.xtree.common.Types;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
+import com.myxcomp.ice.xtree.service.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -187,5 +189,23 @@ class ItemServiceRenameTest {
 
             verifyNoInteractions(ownershipChecker);
         }
+    }
+
+    @Test
+    void renamingUdfRepoIsRejected() {
+        long id = 901L;
+        when(cache.getById(id)).thenReturn(Optional.of(
+                new CachedNode(id, 10L, "alice", "UDFRepo",
+                        Instant.parse("2026-05-29T00:00:00Z"), "alice")));
+        when(ownershipChecker.requireHomeFolderExists("alice"))
+                .thenReturn(new CachedNode(10L, 2L, "alice", "Folder",
+                        Instant.parse("2026-05-29T00:00:00Z"), "sys"));
+
+        assertThatThrownBy(() -> service.renameItem(id, "hacked", new UserContext("alice", null)))
+                .isInstanceOf(ValidationException.class)
+                .extracting(e -> ((ValidationException) e).errorCode())
+                .isEqualTo(ErrorCode.UDF_REPO_PROTECTED);
+
+        verify(repository, never()).updateName(anyLong(), anyString(), any(), anyString());
     }
 }

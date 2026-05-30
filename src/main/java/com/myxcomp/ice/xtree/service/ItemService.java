@@ -230,19 +230,24 @@ public class ItemService {
      * Renames {@code id} to {@code newName}.
      *
      * @throws NotFoundException {@code ITEM_NOT_FOUND} if {@code id} is unknown
+     * @throws ValidationException {@code UDF_REPO_PROTECTED} if attempting to rename a UDFRepo
      */
     @Transactional
     public CachedNode renameItem(long id, String newName, UserContext userContext) {
         Objects.requireNonNull(newName, "newName");
         Objects.requireNonNull(userContext, "userContext");
 
-        if (cache.getById(id).isEmpty()) {
-            throw new NotFoundException(ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found");
-        }
+        CachedNode existing = cache.getById(id).orElseThrow(() -> new NotFoundException(
+                ErrorCode.ITEM_NOT_FOUND, "Item " + id + " not found"));
 
         String effectiveUser = userContext.effectiveUser();
         CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
         ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Item");
+
+        if (Types.isUdfRepo(existing.type())) {
+            throw new ValidationException(ErrorCode.UDF_REPO_PROTECTED,
+                    "UDFRepo " + id + " cannot be renamed");
+        }
 
         Instant now = timeMapper.now();
         String stampUser = effectiveUser;
