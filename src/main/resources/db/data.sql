@@ -9,6 +9,7 @@
 --   * one row of every §10 type
 --   * one JSON-null + XML-not-null row (backfill candidate)
 --   * one mixed-children folder (subfolders + leaves)
+--   * one UDFRepo under testuser1 (per-user singleton, Phase 23)
 --
 -- DELETE first so the script is idempotent: multiple ApplicationContexts that
 -- share the same named in-memory H2 database can each run this script without
@@ -34,6 +35,10 @@ INSERT INTO ITEMTREE (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LAS
   (11, 2, 'testuser2', 'Folder', NULL, 'system', TIMESTAMP '2026-05-01 10:00:00', NULL),
   (12, 2, 'deepuser',  'Folder', NULL, 'system', TIMESTAMP '2026-05-01 10:00:00', NULL),
   (13, 2, 'crhonekd',  'Folder', NULL, 'system', TIMESTAMP '2026-05-01 10:00:00', NULL);
+
+-- ── 3b. Per-user UDFRepo singleton (Phase 23) — JSON-only, name == username ──
+INSERT INTO ITEMTREE (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON) VALUES
+  (15, 10, 'testuser1', 'UDFRepo', NULL, 'system', TIMESTAMP '2026-05-01 10:00:00', '{"udfs":[]}');
 
 -- ── 4. Depth-7 chain under deepuser: deepuser/L2/L3/L4/L5/L6/leafItem ────────
 INSERT INTO ITEMTREE (ITEMTREEID, PARENTID, NAME, TYPE, XML, LASTUPDATEUSER, LASTUPDATE, JSON) VALUES

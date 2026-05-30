@@ -42,7 +42,7 @@ class JdbcItemTreeRepositoryIT {
         void returnsAllSeedRows() {
             List<StructuralRow> rows = new ArrayList<>();
             repository.streamAllStructural(rows::add);
-            assertThat(rows).hasSize(34);
+            assertThat(rows).hasSize(35);
         }
 
         @Test
@@ -79,7 +79,7 @@ class JdbcItemTreeRepositoryIT {
         void returnsRowsAfterGivenInstant() {
             List<StructuralRow> rows = repository.findStructuralChangedSince(
                     Instant.parse("2026-04-30T00:00:00Z"));
-            assertThat(rows).hasSize(34);
+            assertThat(rows).hasSize(35);
         }
 
         @ParameterizedTest(name = "{0}")
@@ -330,9 +330,9 @@ class JdbcItemTreeRepositoryIT {
 
         @Test
         void returnsLeafNodeIdForSingleNodeSubtree() {
-            // testuser1 (id=10) has no children in seed data
+            // testuser1 (id=10) has one child: the UDFRepo (id=15) in seed data
             List<Long> ids = repository.cascadeDeleteSubtree(10L);
-            assertThat(ids).containsExactlyInAnyOrder(10L);
+            assertThat(ids).containsExactlyInAnyOrder(10L, 15L);
         }
 
         @Test
@@ -359,7 +359,7 @@ class JdbcItemTreeRepositoryIT {
         void deletesEntireTreeFromRoot() {
             List<Long> ids = repository.cascadeDeleteSubtree(1L);
 
-            assertThat(ids).hasSize(34); // all seed rows
+            assertThat(ids).hasSize(35); // all seed rows
 
             long remaining = jdbcClient.sql("SELECT COUNT(*) FROM ITEMTREE")
                     .query(Long.class).single();
