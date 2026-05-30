@@ -800,6 +800,30 @@ The app must already be running before invoking this task. The task is **not** p
 
 ---
 
+## Phase 23 — UDFRepo type ✅ COMPLETE (2026-05-29)
+
+**Goal:** A per-user singleton item type `UDFRepo`, living directly in the user's
+home folder, named after the user, JSON-payload-bearing, immutable except for data
+updates.
+
+- New type literal `UDFRepo` (`Types.UDF_REPO` + `Types.isUdfRepo`). Default
+  new-format policy (has-data, JSON-only) — not added to any `itemtree.data.*` list.
+- `createItem`: when type is `UDFRepo`, the parent must be the caller's home folder
+  (`UDF_REPO_INVALID_PARENT`), no existing UDFRepo may sit directly under it
+  (`UDF_REPO_ALREADY_EXISTS`), and the name is forced to the effective username.
+- `deleteItem` / `renameItem` / `moveItem`: reject when the targeted node is a
+  UDFRepo (`UDF_REPO_PROTECTED`). Cascade delete via an ancestor is not intercepted.
+- `copyItem`: rejects a direct copy of a UDFRepo and silently skips UDFRepo nodes
+  inside a copied subtree (UDFRepo is always a leaf).
+- All rejections are HTTP 400 via the existing `ValidationException` path.
+- Seed data: a UDFRepo for `testuser1`. Test UI: `UDFRepo` added to the create
+  dropdown. Acceptance: `udf-repo.feature` (idempotent — the singleton is not torn down).
+
+**Done when:** full main-module suite green; `:acceptance` green against a live
+instance seeded for the configured user.
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
