@@ -18,6 +18,8 @@ import com.myxcomp.ice.xtree.policy.TypePolicy;
 import com.myxcomp.ice.xtree.service.exception.ErrorCode;
 import com.myxcomp.ice.xtree.service.exception.ForbiddenException;
 import com.myxcomp.ice.xtree.service.exception.NotFoundException;
+import com.myxcomp.ice.xtree.service.exception.ValidationException;
+import com.myxcomp.ice.xtree.common.Types;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -205,5 +207,20 @@ class ItemServiceDeleteTest {
             verify(repository).cascadeDeleteSubtree(50L);
             verify(publisher).publish(any());
         }
+    }
+
+    @Test
+    void deletingUdfRepoIsRejected() {
+        long id = 901L;
+        when(cache.getById(id)).thenReturn(Optional.of(
+                new CachedNode(id, 10L, "alice", "UDFRepo",
+                        Instant.parse("2026-05-29T00:00:00Z"), "alice")));
+
+        assertThatThrownBy(() -> service.deleteItem(id, new UserContext("alice", null)))
+                .isInstanceOf(ValidationException.class)
+                .extracting(e -> ((ValidationException) e).errorCode())
+                .isEqualTo(ErrorCode.UDF_REPO_PROTECTED);
+
+        verify(repository, never()).cascadeDeleteSubtree(anyLong());
     }
 }

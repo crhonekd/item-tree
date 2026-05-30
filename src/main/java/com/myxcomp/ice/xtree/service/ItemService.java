@@ -188,12 +188,15 @@ public class ItemService {
      * Cascade-deletes {@code id} and all descendants. Silent no-op if {@code id} is absent
      * from the cache (no auth check, no DB call). Ownership is enforced after the cache probe.
      * Order: cache probe → ownership check → DB cascade → cache.applyDelete → event.
+     *
+     * @throws ValidationException {@code UDF_REPO_PROTECTED} if attempting to delete a UDFRepo directly
      */
     @Transactional
     public void deleteItem(long id, UserContext userContext) {
         Objects.requireNonNull(userContext, "userContext");
 
-        if (cache.getById(id).isEmpty()) {
+        Optional<CachedNode> target = cache.getById(id);
+        if (target.isEmpty()) {
             log.info("deleteItem: id={} not present in cache; no-op", id);
             return;
         }
@@ -201,6 +204,11 @@ public class ItemService {
         String effectiveUser = userContext.effectiveUser();
         CachedNode homeFolder = ownershipChecker.requireHomeFolderExists(effectiveUser);
         ownershipChecker.requireOwned(id, homeFolder, effectiveUser, "Item");
+
+        if (Types.isUdfRepo(target.get().type())) {
+            throw new ValidationException(ErrorCode.UDF_REPO_PROTECTED,
+                    "UDFRepo " + id + " cannot be deleted");
+        }
 
         List<Long> deletedIds = repository.cascadeDeleteSubtree(id);
         if (deletedIds.isEmpty()) {
