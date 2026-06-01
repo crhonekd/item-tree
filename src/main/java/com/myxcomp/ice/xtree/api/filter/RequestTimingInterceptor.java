@@ -10,8 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Logs one INFO line per request with the HTTP method, URI (including query string when
- * present), response status, and end-to-end duration in milliseconds. When the handler
- * throws, the exception's simple class name is appended as {@code [ex=ClassName]}.
+ * present), response status, and end-to-end duration in milliseconds.
  * Registered outermost in {@link WebMvcConfig} so the measured span wraps the whole
  * handler chain. Uses {@link System#nanoTime()} (a monotonic duration source, not a
  * wall-clock API) so the TimeMapper UTC-clock rule does not apply.
@@ -37,8 +36,6 @@ public class RequestTimingInterceptor implements HandlerInterceptor {
         long ms = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
         String qs = request.getQueryString();
         String uri = (qs != null) ? request.getRequestURI() + "?" + qs : request.getRequestURI();
-        String exSuffix = (ex != null) ? " [ex=" + ex.getClass().getSimpleName() + "]" : "";
-        log.info("{} {} -> {} ({} ms){}",
-                request.getMethod(), uri, response.getStatus(), ms, exSuffix);
+        log.info("{} {} -> {} ({} ms)", request.getMethod(), uri, response.getStatus(), ms);
     }
 }

@@ -118,32 +118,4 @@ class RequestTimingInterceptorTest {
         assertThat(msg).matches(".*\\(\\d+ ms\\)$");
     }
 
-    @Test
-    void afterCompletionWithExceptionAppendsExceptionSimpleName() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest(METHOD_GET, URI_TREE);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        response.setStatus(500);
-
-        interceptor.preHandle(request, response, new Object());
-        interceptor.afterCompletion(request, response, new Object(), new IllegalStateException("boom"));
-
-        assertThat(listAppender.list).hasSize(1);
-        String msg = listAppender.list.get(0).getFormattedMessage();
-        assertThat(msg).contains("[ex=IllegalStateException]");
-        assertThat(msg).matches(".*\\(\\d+ ms\\).*");
-    }
-
-    @Test
-    void afterCompletionWithNullExceptionDoesNotAppendExMarker() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest(METHOD_GET, URI_TREE);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        response.setStatus(200);
-
-        interceptor.preHandle(request, response, new Object());
-        interceptor.afterCompletion(request, response, new Object(), null);
-
-        assertThat(listAppender.list).hasSize(1);
-        String msg = listAppender.list.get(0).getFormattedMessage();
-        assertThat(msg).doesNotContain("[ex=");
-    }
 }
