@@ -35,6 +35,7 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
     private static final Logger log = LoggerFactory.getLogger(JdbcItemTreeRepository.class);
 
     private static final int CHUNK_SIZE = 1000;
+    private static final int FETCH_SIZE = 5000;
     private static final String PARAM_LAST_UPDATE = "lastUpdate";
     private static final String PARAM_LAST_UPDATE_USER = "lastUpdateUser";
     private static final String SQL_FIND_ROWS_FOR_COPY_BY_IDS =
@@ -74,7 +75,7 @@ public class JdbcItemTreeRepository implements ItemTreeRepository {
                 conn -> {
                     java.sql.PreparedStatement ps = conn.prepareStatement(
                             "SELECT ITEMTREEID, PARENTID, NAME, TYPE, LASTUPDATE, LASTUPDATEUSER FROM ITEMTREE");
-                    ps.setFetchSize(1000);
+                    ps.setFetchSize(FETCH_SIZE);
                     return ps;
                 },
                 (org.springframework.jdbc.core.RowCallbackHandler)

@@ -874,7 +874,7 @@ public record JsonBackfillRow(long itemTreeId, String json) {}
 SELECT ITEMTREEID, PARENTID, NAME, TYPE, LASTUPDATE, LASTUPDATEUSER
 FROM ITEMTREE
 ```
-Streamed via `RowCallbackHandler`, `fetchSize=1000`.
+Streamed via `RowCallbackHandler`, `fetchSize=5000`.
 
 **Delta refresh:**
 ```sql
