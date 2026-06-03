@@ -25,9 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("dev")
 class PathOnReadEndpointsE2ETest {
 
-    private static final String SEARCH_URL    = "/api/v1/itemtree/search";
-    private static final String ITEMS_GET_URL = "/api/v1/itemtree/items/get";
-    private static final String HEADER_USER   = "X-Ice-User";
+    private static final String SEARCH_URL        = "/api/v1/itemtree/search";
+    private static final String ITEMS_GET_URL      = "/api/v1/itemtree/items/get";
+    private static final String HOME_SUBTREE_URL   = "/api/v1/itemtree/users/testuser1/home-subtree";
+    private static final String HEADER_USER        = "X-Ice-User";
 
     // Seed data (data.sql): id=10, name="testuser1", type=Folder, parent=2 (Users→root)
     private static final String SEARCH_TERM   = "testuser1";
@@ -69,5 +70,33 @@ class PathOnReadEndpointsE2ETest {
                 .andExpect(jsonPath("$[0].children").isArray())
                 .andExpect(jsonPath("$[0].children[0]").exists())
                 .andExpect(jsonPath("$[0].children[0].path").value(org.hamcrest.Matchers.startsWith("/root")));
+    }
+
+    @Test
+    void homeSubtreeReturnsHomeFolderAndDescendantsWithPaths() throws Exception {
+        // Seed: id=10, name="testuser1", parentId=2 (Users → root). Home folder
+        // exists and has at least itself plus seeded descendants in the array.
+        mockMvc.perform(get(HOME_SUBTREE_URL)
+                        .header(HEADER_USER, "testuser1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[0]").exists())
+                // The home folder itself (id=10) must appear, with leading-slash path.
+                .andExpect(jsonPath(
+                        "$[?(@.itemTreeId == 10)].name").value(org.hamcrest.Matchers.hasItem("testuser1")))
+                .andExpect(jsonPath(
+                        "$[?(@.itemTreeId == 10)].path").value(
+                                org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.startsWith("/root"))))
+                // Its parentId (=2 "Users") must NOT itself appear as any element's itemTreeId
+                // — that is the invariant the UI relies on to derive the home folder.
+                .andExpect(jsonPath("$[?(@.itemTreeId == 2)]").doesNotExist());
+    }
+
+    @Test
+    void homeSubtreeReturns404ForUnknownUser() throws Exception {
+        mockMvc.perform(get("/api/v1/itemtree/users/no-such-user-xyz/home-subtree")
+                        .header(HEADER_USER, "testuser1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("HOME_FOLDER_NOT_FOUND"));
     }
 }
