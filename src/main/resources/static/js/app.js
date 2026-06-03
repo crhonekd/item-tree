@@ -41,12 +41,17 @@ async function doLogin() {
   renderTree();
   $('detail-root').innerHTML = '(loading…)';
   try {
-    const [home, tree] = await Promise.all([
-      api.getHomeFolder(state.iceUser),
+    const [tree, subtree] = await Promise.all([
       api.getTree(),
+      api.getHomeSubtree(state.iceUser),
     ]);
-    state.homeFolderId = home.itemTreeId;
     ingestNodes(tree);
+
+    // Derive the home folder from the flat subtree: it is the unique element
+    // whose parentId is not the itemTreeId of any other element in the array.
+    const idsInSubtree = new Set(subtree.map((n) => n.itemTreeId));
+    const home = subtree.find((n) => !idsInSubtree.has(n.parentId));
+    state.homeFolderId = home.itemTreeId;
 
     // expand only the ancestor chain from root down to the home folder
     state.tree.expanded.add(1);
@@ -56,7 +61,6 @@ async function doLogin() {
       cur = state.tree.nodesById.get(cur.parentId);
     }
 
-    const subtree = await api.getSubtreeFull(home.itemTreeId);
     ingestSubtreeFullResult(home.itemTreeId, subtree);
 
     // expand the home folder itself and any folders directly within its loaded subtree
