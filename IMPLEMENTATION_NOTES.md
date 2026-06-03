@@ -868,6 +868,37 @@ Full suite: 731 tests green.
 
 ---
 
+## Phase 25 — Combined home-subtree endpoint + Login/Refresh button ✅ COMPLETE (2026-06-03)
+
+**Scope:**
+- New endpoint `GET /api/v1/itemtree/users/{userName}/home-subtree` returning
+  the flat `ItemNode[]` subtree of the user's home folder. Glue in
+  `UserController` composes `HomeFolderService.findHomeFolder` and
+  `TreeService.getSubtreeFull`; no new service method.
+- Test UI: `Login` button renamed to `Login/Refresh`. `doLogin` replaces the
+  three-call sequence (`home-folder` + `tree` in parallel, then sequential
+  `subtree-full`) with a two-call parallel fan-out (`tree` + `home-subtree`).
+  Derives the home folder id from the flat subtree as the unique element whose
+  `parentId` is not the `itemTreeId` of any other element. No visible UI
+  behavioural change.
+
+**Tests added:**
+- `UserControllerTest.getHomeSubtreeReturns200AndFlatArrayWithPaths`
+- `UserControllerTest.getHomeSubtreeReturns404WhenUserHasNoHomeFolder`
+- `PathOnReadEndpointsE2ETest.homeSubtreeReturnsHomeFolderAndDescendantsWithPaths`
+- `PathOnReadEndpointsE2ETest.homeSubtreeReturns404ForUnknownUser`
+
+**Existing endpoints unchanged:** `/users/{userName}/home-folder` and
+`/tree/{rootId}/subtree-full` remain available as primitives.
+
+**Manual verification:** confirmed via `gradlew bootRun` — exactly two XHRs
+on login (`/tree` and `/home-subtree`), ★ marker and expansion chain
+identical to pre-Phase-25.
+
+Full suite: 745 tests green.
+
+---
+
 ## Phase 18 — Work PC wiring (Phase B, user-managed)
 
 This phase is **not implemented on the personal PC**. Once the codebase moves to the work PC, the user (or Claude Code on the work PC) executes the following:
