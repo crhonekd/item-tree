@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -111,5 +112,20 @@ class UserControllerTest {
                 .andExpect(jsonPath("$[1].itemTreeId").value(43))
                 .andExpect(jsonPath("$[1].parentId").value(42))
                 .andExpect(jsonPath("$[1].path").value("/root/Users/alice/Notes"));
+    }
+
+    @Test
+    void getHomeSubtreeReturns404WhenUserHasNoHomeFolder() throws Exception {
+        when(homeFolderService.findHomeFolder("ghost"))
+                .thenThrow(new NotFoundException(
+                        ErrorCode.HOME_FOLDER_NOT_FOUND,
+                        "No home folder for user 'ghost'"));
+
+        mvc.perform(get("/api/v1/itemtree/users/ghost/home-subtree")
+                        .header("X-Ice-User", "caller"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.errorCode").value("HOME_FOLDER_NOT_FOUND"));
+
+        verifyNoInteractions(treeService);
     }
 }
