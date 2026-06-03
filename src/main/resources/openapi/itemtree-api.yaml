@@ -370,6 +370,42 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
+  /api/v1/itemtree/users/{userName}/home-subtree:
+    get:
+      tags: [users]
+      operationId: getHomeSubtree
+      summary: Resolve the home folder for the given user and return its full subtree
+      description: |
+        Equivalent to calling getHomeFolder followed by
+        getSubtreeFull on the resolved home folder, in a single round trip.
+        The home folder itself is the unique element in the returned array
+        whose parentId is not the itemTreeId of any other element in the array.
+      parameters:
+        - name: userName
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/XIceUser'
+        - $ref: '#/components/parameters/XImpersonatedUser'
+      responses:
+        '200':
+          description: Flat list of ItemNode (home folder root first, then all descendants in BFS order) each with path populated
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemNode'
+        '404':
+          description: Home folder not found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
 components:
 
   parameters:
