@@ -53,6 +53,9 @@ async function request(method, path, body, { retryOn503 = false } = {}) {
 export const api = {
   getHomeFolder: (userName) =>
     request('GET', `/api/v1/itemtree/users/${encodeURIComponent(userName)}/home-folder`),
+  getHomeSubtree: (userName) =>
+    request('GET', `/api/v1/itemtree/users/${encodeURIComponent(userName)}/home-subtree`,
+            undefined, { retryOn503: true }),
   getTree: () =>
     request('GET', '/api/v1/itemtree/tree', undefined, { retryOn503: true }),
   getSubtree: (rootId) =>
